@@ -1,0 +1,25 @@
+const express = require('express');
+const router = express.Router();
+const { protect, authorize } = require('../../../middlewares/auth'); // Adjusted path: src/routes/api -> src/routes -> src -> root/middlewares? No.
+// Let's check where middlewares are.
+// src/app.js: const errorHandler = require("./middlewares/errorHandler"); -> so src/middlewares
+// So from src/routes/api/Resignation.route.js:
+// ../../middlewares/auth
+
+const {
+    createResignation,
+    getMyResignation,
+    getAllResignations,
+    updateResignationStatus
+} = require('../../../controllers/Resignation/resignationController'); // src/routes/api -> src/routes -> src -> root -> controllers. Correct.
+
+const authMiddleware = require('../../middlewares/auth'); // src/middlewares/auth.js?
+// Let's check auth middleware path. 
+// In src/routes/api/Performance.route.js it used: const { authenticateStaff } = require('../../../controllers/Auth/staffProfile');
+// It didn't use middleware/auth.
+// But some routes might.
+// Let's check src/routes/api/Student/Student.route.js or similar?
+// Or just use the one commonly used.
+
+// Let's verify auth middleware path.
+// I'll read src/middlewares to see if auth.js exists.
