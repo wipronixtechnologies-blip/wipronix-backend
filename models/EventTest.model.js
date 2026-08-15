@@ -20,6 +20,22 @@ const eventTestSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    eventType: {
+      type: String,
+      default: "Placement Drive"
+    },
+    conductedBy: {
+      type: String,
+      default: "Harish Chawla"
+    },
+    maxHrMarks: {
+      type: Number,
+      default: 10.00
+    },
+    maxTechMarks: {
+      type: Number,
+      default: 10.00
+    },
     technology: {
       type: String,
       default: "General Technical & Aptitude"
@@ -35,6 +51,12 @@ const eventTestSchema = new mongoose.Schema(
     passPercentage: {
       type: Number,
       default: 70
+    },
+    startDate: {
+      type: Date
+    },
+    endDate: {
+      type: Date
     },
     isActive: {
       type: Boolean,

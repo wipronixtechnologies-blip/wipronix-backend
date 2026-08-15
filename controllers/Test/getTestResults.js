@@ -10,11 +10,12 @@ const getTestResults = async (req, res, next) => {
       college,
       eventCode,
       status,
+      isShortlisted,
       startDate,
       endDate,
       testId,
       page = 1,
-      limit = 10
+      limit = 20
     } = req.query;
 
     const query = {};
@@ -22,6 +23,7 @@ const getTestResults = async (req, res, next) => {
     if (testId) query.testId = testId;
     if (eventCode) query.eventCode = eventCode.trim().toUpperCase();
     if (college) query.collegeName = new RegExp(college.trim(), 'i');
+    if (isShortlisted === 'true') query.isShortlisted = true;
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -34,7 +36,7 @@ const getTestResults = async (req, res, next) => {
     }
 
     const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 10;
+    const limitNum = parseInt(limit) || 20;
     const skip = (pageNum - 1) * limitNum;
 
     // Fetch results matching query
@@ -74,6 +76,7 @@ const getTestResults = async (req, res, next) => {
         score: result.score || 0,
         percentage,
         status: passStatus,
+        isShortlisted: Boolean(result.isShortlisted),
         createdAt: result.createdAt,
         updatedAt: result.updatedAt
       };
@@ -86,6 +89,7 @@ const getTestResults = async (req, res, next) => {
       filteredResults = filteredResults.filter(r =>
         r.studentName.toLowerCase().includes(searchLower) ||
         r.studentEmail.toLowerCase().includes(searchLower) ||
+        r.studentPhone.toLowerCase().includes(searchLower) ||
         r.college.toLowerCase().includes(searchLower) ||
         r.eventCode.toLowerCase().includes(searchLower)
       );
@@ -128,4 +132,56 @@ const getTestResults = async (req, res, next) => {
   }
 };
 
-module.exports = getTestResults;
+// Toggle candidate shortlist status
+const toggleShortlist = async (req, res, next) => {
+  try {
+    const { resultId, isShortlisted } = req.body;
+
+    if (!resultId) {
+      return res.status(400).json({
+        success: false,
+        message: "resultId is required"
+      });
+    }
+
+    let updatedResult = null;
+
+    // 1. Try finding by MongoDB Result _id
+    try {
+      updatedResult = await Result.findByIdAndUpdate(
+        resultId,
+        { isShortlisted: Boolean(isShortlisted) },
+        { new: true }
+      );
+    } catch (e) {
+      // Invalid ObjectId format
+    }
+
+    // 2. If not found by _id, search by studentId or email
+    if (!updatedResult) {
+      updatedResult = await Result.findOneAndUpdate(
+        { $or: [{ studentId: resultId }, { studentEmail: resultId }] },
+        { isShortlisted: Boolean(isShortlisted) },
+        { new: true }
+      );
+    }
+
+    if (!updatedResult) {
+      return res.status(404).json({
+        success: false,
+        message: "Test result record not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Candidate ${isShortlisted ? 'shortlisted' : 'removed from shortlist'} successfully`,
+      data: updatedResult
+    });
+  } catch (error) {
+    console.error("Shortlist API Error:", error);
+    next(error);
+  }
+};
+
+module.exports = { getTestResults, toggleShortlist };

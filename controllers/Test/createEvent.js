@@ -1,10 +1,88 @@
 const EventTest = require("../../models/EventTest.model");
 const Question = require("../../models/Question.model");
 
+// Seed default ERP College Events if database is empty
+const seedDefaultEvents = async () => {
+  const count = await EventTest.countDocuments();
+  if (count === 0) {
+    const defaultDrives = [
+      {
+        eventCode: "WIP-TULA-2026",
+        collegeName: "Tula's Institute",
+        testTitle: "National Campus Talent Evaluation Drive",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      },
+      {
+        eventCode: "WIP-MAIMT-2026",
+        collegeName: "MAIMT, Jagadhri",
+        testTitle: "Placement Drive 2026",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      },
+      {
+        eventCode: "WIP-SHOBHIT-2026",
+        collegeName: "Shobhit Univ, Meerut",
+        testTitle: "Shobhit Deemed University Drive",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      },
+      {
+        eventCode: "WIP-GPAMBOTA-2026",
+        collegeName: "GP Ambota",
+        testTitle: "DR. BR Ambedkar Polytechnic Drive",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      },
+      {
+        eventCode: "WIP-GPKANDA-2026",
+        collegeName: "GP Kandaghat",
+        testTitle: "Govt. Polytechnic College Drive",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      },
+      {
+        eventCode: "WIP-JNGEC-2026",
+        collegeName: "JNGEC Sundernagar",
+        testTitle: "Jawaharlal Nehru Govt. Engg College Drive",
+        eventType: "Placement Drive",
+        conductedBy: "Harish Chawla",
+        maxHrMarks: 10.00,
+        maxTechMarks: 10.00,
+        technology: "General Technical & Aptitude",
+        durationMinutes: 20
+      }
+    ];
+
+    await EventTest.insertMany(defaultDrives);
+    console.log("✅ Seeded default ERP placement drive events into MongoDB");
+  }
+};
+
 // POST /api/test/create-event
 const createEvent = async (req, res, next) => {
   try {
-    const { collegeName, testTitle, technology, durationMinutes, questionsCount, passPercentage, eventCode } = req.body;
+    const { collegeName, testTitle, technology, durationMinutes, questionsCount, passPercentage, eventCode, eventType, conductedBy, maxHrMarks, maxTechMarks } = req.body;
 
     if (!collegeName || !testTitle) {
       return res.status(400).json({
@@ -29,8 +107,10 @@ const createEvent = async (req, res, next) => {
       existingEvent.testTitle = testTitle;
       existingEvent.technology = technology || existingEvent.technology;
       existingEvent.durationMinutes = durationMinutes || existingEvent.durationMinutes;
-      existingEvent.questionsCount = questionsCount || existingEvent.questionsCount;
-      existingEvent.passPercentage = passPercentage || existingEvent.passPercentage;
+      existingEvent.eventType = eventType || existingEvent.eventType || "Placement Drive";
+      existingEvent.conductedBy = conductedBy || existingEvent.conductedBy || "Harish Chawla";
+      existingEvent.maxHrMarks = maxHrMarks || existingEvent.maxHrMarks || 10;
+      existingEvent.maxTechMarks = maxTechMarks || existingEvent.maxTechMarks || 10;
       await existingEvent.save();
 
       return res.status(200).json({
@@ -44,6 +124,10 @@ const createEvent = async (req, res, next) => {
       eventCode: generatedCode,
       collegeName: cleanCollege,
       testTitle,
+      eventType: eventType || "Placement Drive",
+      conductedBy: conductedBy || "Harish Chawla",
+      maxHrMarks: maxHrMarks || 10.00,
+      maxTechMarks: maxTechMarks || 10.00,
       technology: technology || "General Technical & Aptitude",
       durationMinutes: durationMinutes || 20,
       questionsCount: questionsCount || 20,
@@ -63,6 +147,7 @@ const createEvent = async (req, res, next) => {
 // GET /api/test/events
 const getEvents = async (req, res, next) => {
   try {
+    await seedDefaultEvents();
     const events = await EventTest.find().sort({ createdAt: -1 }).lean();
     res.json({
       success: true,

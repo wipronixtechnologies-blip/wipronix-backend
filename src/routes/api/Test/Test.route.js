@@ -6,8 +6,9 @@ const fetchQuestion = require("../../../../controllers/Test/fetchQuestion");
 const submitAnswer = require("../../../../controllers/Test/submitAnswer");
 const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
-const getTestResults = require("../../../../controllers/Test/getTestResults");
+const { getTestResults, toggleShortlist } = require("../../../../controllers/Test/getTestResults");
 const { createEvent, getEvents } = require("../../../../controllers/Test/createEvent");
+const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
 
 // POST /api/test/start & /api/test/public-start
 router.post("/start", startTest);
@@ -17,8 +18,11 @@ router.post("/public-start", startTest);
 router.post("/create-event", createEvent);
 router.get("/events", getEvents);
 
-// Add question route
+// Question Bank CRUD routes
+router.get("/all-questions", getAllQuestions);
 router.post("/add-question", addQuestion);
+router.put("/question/:id", updateQuestion);
+router.delete("/question/:id", deleteQuestion);
 
 // GET /api/test/question
 router.get("/question", fetchQuestion);
@@ -29,7 +33,8 @@ router.post("/answer", submitAnswer);
 // POST /api/test/submit (Student submits test)
 router.post("/submit", submitTest);
 
-// GET /api/test/results - Get test results with filters (for admin panel)
+// GET /api/test/results & POST /api/test/toggle-shortlist
 router.get("/results", getTestResults);
+router.post("/toggle-shortlist", toggleShortlist);
 
 module.exports = router;

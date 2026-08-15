@@ -58,6 +58,10 @@ const resultSchema = new mongoose.Schema(
       enum: ['PASS', 'FAIL', 'IN_PROGRESS'],
       default: 'IN_PROGRESS'
     },
+    isShortlisted: {
+      type: Boolean,
+      default: false
+    },
     answers: Object,
     resultDeclared: {
       type: Boolean,
