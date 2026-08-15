@@ -5,7 +5,6 @@ const studentSchema = new mongoose.Schema(
     // Basic Information
     userType: {
       type: String,
-      enum: ['Student', 'Admin'],
       default: 'Student'
     },
     fullName: {
@@ -33,14 +32,14 @@ const studentSchema = new mongoose.Schema(
       trim: true
     },
     
-    // Education Information
+    // Education Information (Flexible without enum restrictions)
     education: {
       type: String,
-      enum: ['10th', '12th', 'Graduate', 'Post Graduate']
+      trim: true
     },
     course: {
       type: String,
-      enum: ['Full Stack', 'Frontend', 'Backend', 'Data Science', 'DevOps', 'Mobile Development']
+      trim: true
     },
     college: {
       type: String,
@@ -48,7 +47,7 @@ const studentSchema = new mongoose.Schema(
     },
     passingYear: {
       type: String,
-      enum: ['2024', '2025', '2026', '2027', '2028']
+      trim: true
     },
     
     // Test/Application Information
@@ -57,7 +56,7 @@ const studentSchema = new mongoose.Schema(
     batch: String,
     technology: {
       type: String,
-      enum: ['MernStack', 'AI / ML', 'PythonWebDevelopment', 'GraphicDesign', 'DataAnalytics', 'MobileAppDevelopment']
+      trim: true
     },
     
     // Authentication
@@ -86,7 +85,6 @@ const studentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for better query performance (email index created automatically by unique: true)
 studentSchema.index({ phoneNumber: 1 });
 studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 

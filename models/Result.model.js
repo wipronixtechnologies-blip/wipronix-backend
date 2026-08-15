@@ -7,18 +7,61 @@ const resultSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    studentName: {
+      type: String,
+      trim: true
+    },
+    studentEmail: {
+      type: String,
+      trim: true
+    },
+    studentPhone: {
+      type: String,
+      trim: true
+    },
+    collegeName: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    eventCode: {
+      type: String,
+      trim: true,
+      index: true
+    },
     testId: {
       type: String,
       required: true
     },
-    totalQuestions: Number,
-    attempted: Number,
-    correct: Number,
-    score: Number,
+    totalQuestions: {
+      type: Number,
+      default: 20
+    },
+    attempted: {
+      type: Number,
+      default: 0
+    },
+    correct: {
+      type: Number,
+      default: 0
+    },
+    score: {
+      type: Number,
+      default: 0
+    },
+    percentage: {
+      type: Number,
+      default: 0
+    },
+    status: {
+      type: String,
+      enum: ['PASS', 'FAIL', 'IN_PROGRESS'],
+      default: 'IN_PROGRESS'
+    },
     answers: Object,
     resultDeclared: {
       type: Boolean,
-      default: false
+      default: true
     }
   },
   { timestamps: true }

@@ -7,14 +7,17 @@ const questionSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    eventCode: {
+      type: String,
+      index: true
+    },
     type: {
       type: String,
       enum: ['aptitude', 'technology'],
-      required: true
+      default: 'technology'
     },
     technology: {
       type: String,
-      enum: ['MernStack', 'AI / ML', 'PythonWebDevelopment', 'GraphicDesign', 'DataAnalytics', 'MobileAppDevelopment'],
       required: function() { return this.type === 'technology'; }
     },
     question: {
@@ -26,12 +29,13 @@ const questionSchema = new mongoose.Schema(
       required: true
     },
     correctAnswer: {
-      type: Number, // index of option
+      type: Number, // index of option (0, 1, 2, 3)
       required: true,
-      select: false   // ❌ never send to frontend
+      select: false   // ❌ never send to frontend automatically
     }
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model("Question", questionSchema);
+

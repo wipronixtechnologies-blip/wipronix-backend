@@ -1,98 +1,202 @@
 const redis = require("../../src/config/redis");
 const TestSession = require("../../models/TestSession.model");
 const Student = require("../../models/Student.model");
+const Question = require("../../models/Question.model");
+const EventTest = require("../../models/EventTest.model");
+const Result = require("../../models/Result.model");
 
-const TEST_DURATION_SECONDS = 25 * 60; // 25 minutes
+const TEST_DURATION_SECONDS = 20 * 60; // 20 minutes default
+
+const memorySessions = new Map();
+
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Strictly normalizes questions to 4 options A, B, C, D
+function normalizeOptions(rawOptions, correctIdx = 0) {
+  let opts = Array.isArray(rawOptions) 
+    ? rawOptions.map(o => String(o || '').trim()).filter(o => o.length > 0)
+    : [];
+
+  const defaultDistractors = ['None of the above', 'All of the above', 'Both A and B', 'Cannot be determined'];
+
+  while (opts.length < 4) {
+    const fallback = defaultDistractors[opts.length] || `Option ${opts.length + 1}`;
+    opts.push(fallback);
+  }
+
+  // Strictly trim to 4 options
+  return opts.slice(0, 4);
+}
 
 const startTest = async (req, res, next) => {
   try {
-    console.log("🔄 [startTest] Starting test initialization");
-    const { studentId, testId } = req.body;
-    console.log("📝 [startTest] Received request body:", { studentId, testId });
+    const { fullName, email, phone, collegeName, eventCode, course, semester, technology, studentId: providedStudentId } = req.body;
 
-    if (!studentId || !testId) {
-      console.log("❌ [startTest] Validation failed: Missing studentId or testId");
-      return res.status(400).json({
-        success: false,
-        message: "studentId and testId are required"
-      });
+    let student = null;
+    let codeToUse = (eventCode || "GENERAL").trim().toUpperCase();
+
+    // 1️⃣ Register or update candidate in MongoDB Student collection
+    try {
+      if (fullName && email) {
+        student = await Student.findOne({ email: email.trim().toLowerCase() });
+        const courseSemesterStr = `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`;
+
+        if (!student) {
+          student = await Student.create({
+            fullName: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone ? phone.trim() : "",
+            college: collegeName ? collegeName.trim() : "Default College",
+            course: courseSemesterStr
+          });
+        } else {
+          if (collegeName) student.college = collegeName.trim();
+          if (phone) student.phone = phone.trim();
+          student.course = courseSemesterStr;
+          await student.save();
+        }
+      } else if (providedStudentId && providedStudentId.length === 24) {
+        student = await Student.findById(providedStudentId);
+      }
+    } catch (dbErr) {
+      console.warn("DB Student Operation fallback:", dbErr.message);
     }
 
-    // 1️⃣ Validate student exists
-    const student = await Student.findById(studentId);
     if (!student) {
+      student = {
+        _id: 'temp-' + Date.now(),
+        fullName: (fullName || "Candidate").trim(),
+        email: (email || "candidate@wipronix.com").trim().toLowerCase(),
+        phone: (phone || "").trim(),
+        college: (collegeName || "Wipronix Campus Drive").trim(),
+        course: `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`
+      };
+    }
+
+    const studentIdStr = student._id.toString();
+
+    // Store candidate initial status IN_PROGRESS in MongoDB Result collection
+    try {
+      if (student._id && String(student._id).length === 24) {
+        await Result.findOneAndUpdate(
+          { studentId: student._id, testId: codeToUse },
+          {
+            studentId: student._id,
+            studentName: student.fullName,
+            studentEmail: student.email,
+            studentPhone: student.phone || phone || "",
+            collegeName: student.college || collegeName || "College",
+            eventCode: codeToUse,
+            testId: codeToUse,
+            totalQuestions: 20,
+            status: "IN_PROGRESS"
+          },
+          { upsert: true, new: true }
+        );
+      }
+    } catch (rSaveErr) {
+      console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
+    }
+
+    // 2️⃣ Redis/Memory Existing Session Check
+    if (memorySessions.has(studentIdStr)) {
+      const memData = memorySessions.get(studentIdStr);
+      const elapsed = Math.floor((Date.now() - memData.startedAt) / 1000);
+      if (elapsed < TEST_DURATION_SECONDS) {
+        return res.status(200).json({
+          success: true,
+          message: "Test already in progress",
+          session: {
+            studentId: studentIdStr,
+            studentName: student.fullName,
+            email: student.email,
+            collegeName: student.college,
+            eventCode: memData.eventCode || codeToUse,
+            durationMinutes: 20,
+            remainingTimeSeconds: TEST_DURATION_SECONDS - elapsed,
+            questions: memData.clientQuestions
+          }
+        });
+      }
+    }
+
+    // 3️⃣ Query Questions DIRECTLY from MongoDB Database
+    let questionPool = await Question.find().select("+correctAnswer").lean();
+
+    if (!questionPool || questionPool.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Student not found"
+        message: "No test questions found in MongoDB database. Please add questions from Admin Panel."
       });
     }
 
-    // 2️⃣ Prevent multiple test starts (REDIS LOCK)
-    console.log("🔒 [startTest] Attempting to acquire Redis lock for studentId:", studentId);
-    const lockKey = `test:lock:${studentId}`;
-    const sessionKey = `test:session:${studentId}`;
+    // 4️⃣ Randomly sample up to 20 questions from MongoDB with 4 options each
+    const sampledQuestions = shuffleArray(questionPool).slice(0, 20);
 
-    const lock = await redis.set(lockKey, "LOCKED", "NX", "EX", 10);
-    if (!lock) {
-      console.log("🚫 [startTest] Lock acquisition failed - test already in progress for studentId:", studentId);
-      return res.status(409).json({
-        success: false,
-        message: "Test already started or in progress"
+    const clientQuestions = [];
+    const answerKeyMap = {};
+
+    sampledQuestions.forEach((q, index) => {
+      const fourOptions = normalizeOptions(q.options, q.correctAnswer || 0);
+      const correctOptionString = fourOptions[q.correctAnswer % fourOptions.length] || fourOptions[0];
+      const shuffledOptions = shuffleArray(fourOptions);
+      
+      answerKeyMap[index] = {
+        questionId: q._id.toString(),
+        correctOption: correctOptionString
+      };
+
+      clientQuestions.push({
+        id: index,
+        questionId: q._id.toString(),
+        question: q.question,
+        options: shuffledOptions,
+        type: q.type || 'technology',
+        technology: q.technology || 'General'
       });
-    }
-    console.log("✅ [startTest] Redis lock acquired successfully");
-
-    // 3️⃣ Check if session already exists (Redis)
-    const existingSession = await redis.get(sessionKey);
-    if (existingSession) {
-      const ttl = await redis.ttl(sessionKey);
-
-      return res.status(200).json({
-        success: true,
-        message: "Test already running",
-        remainingTimeSeconds: ttl
-      });
-    }
-
-    // 4️⃣ Create Mongo TestSession (PERMANENT RECORD)
-    console.log("💾 [startTest] Creating MongoDB TestSession record");
-    const startedAt = new Date();
-
-    await TestSession.create({
-      studentId,
-      testId,
-      startedAt
     });
-    console.log("✅ [startTest] MongoDB TestSession created successfully");
 
-    // 5️⃣ Create Redis LIVE session with TTL
-    console.log("🔄 [startTest] Creating Redis session with TTL");
+    // 5️⃣ Save Session in Memory
+    const startedAt = Date.now();
     const sessionData = {
-      studentId,
-      testId,
-      startedAt: startedAt.getTime()
+      studentId: studentIdStr,
+      studentName: student.fullName,
+      studentEmail: student.email,
+      studentPhone: student.phone || "",
+      collegeName: student.college || collegeName || "Default College",
+      course: student.course,
+      eventCode: codeToUse,
+      startedAt,
+      answerKeyMap,
+      clientQuestions
     };
 
-    await redis.set(
-      sessionKey,
-      JSON.stringify(sessionData),
-      "EX",
-      TEST_DURATION_SECONDS
-    );
-    console.log("✅ [startTest] Redis session created successfully with TTL:", TEST_DURATION_SECONDS);
+    memorySessions.set(studentIdStr, sessionData);
 
-    // 6️⃣ Response
-    console.log("📤 [startTest] Sending success response");
     res.status(201).json({
       success: true,
       message: "Test started successfully",
-      durationMinutes: 25,
-      remainingTimeSeconds: TEST_DURATION_SECONDS
+      session: {
+        studentId: studentIdStr,
+        studentName: student.fullName,
+        email: student.email,
+        collegeName: student.college,
+        course: student.course,
+        eventCode: codeToUse,
+        durationMinutes: 20,
+        remainingTimeSeconds: TEST_DURATION_SECONDS,
+        questions: clientQuestions
+      }
     });
 
   } catch (error) {
-    console.error("❌ [startTest] Error occurred:", error.message);
-    console.error("❌ [startTest] Stack trace:", error.stack);
     next(error);
   }
 };
