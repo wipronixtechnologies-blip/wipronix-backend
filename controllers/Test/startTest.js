@@ -40,32 +40,6 @@ const startTest = async (req, res, next) => {
     let student = null;
     let codeToUse = (eventCode || "GENERAL").trim().toUpperCase();
 
-    // 🛑 Anti-Duplicate Check: Prevent re-login for the same event
-    if (email && codeToUse) {
-      const existingResult = await Result.findOne({ 
-        studentEmail: email.trim().toLowerCase(), 
-        eventCode: codeToUse 
-      });
-
-      if (existingResult) {
-        if (existingResult.status !== "IN_PROGRESS") {
-          return res.status(403).json({
-            success: false,
-            message: "You have already completed the test for this event. Duplicate attempts are not allowed."
-          });
-        } else {
-          // If IN_PROGRESS, check if time has expired
-          const elapsed = Math.floor((Date.now() - new Date(existingResult.createdAt).getTime()) / 1000);
-          if (elapsed > TEST_DURATION_SECONDS + 300) { // 5 mins buffer
-            return res.status(403).json({
-              success: false,
-              message: "Your test duration has expired. You cannot restart the test."
-            });
-          }
-        }
-      }
-    }
-
     // 1️⃣ Register or update candidate in MongoDB Student collection
     try {
       if (fullName && email) {
