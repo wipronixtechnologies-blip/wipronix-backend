@@ -7,7 +7,7 @@ const submitAnswer = require("../../../../controllers/Test/submitAnswer");
 const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
 const { getTestResults, toggleShortlist } = require("../../../../controllers/Test/getTestResults");
-const { createEvent, getEvents } = require("../../../../controllers/Test/createEvent");
+const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
 const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
 
 // POST /api/test/start & /api/test/public-start
@@ -17,6 +17,7 @@ router.post("/public-start", startTest);
 // Event creation & listing
 router.post("/create-event", createEvent);
 router.get("/events", getEvents);
+router.post("/toggle-event-status", toggleEventStatus);
 
 // Question Bank CRUD routes
 router.get("/all-questions", getAllQuestions);

@@ -158,4 +158,20 @@ const getEvents = async (req, res, next) => {
   }
 };
 
-module.exports = { createEvent, getEvents };
+// POST /api/test/toggle-event-status
+const toggleEventStatus = async (req, res, next) => {
+  try {
+    const { eventId, isActive } = req.body;
+    const event = await EventTest.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+    event.isActive = isActive;
+    await event.save();
+    res.json({ success: true, message: `Event marked as ${isActive ? 'Active' : 'Inactive'}`, data: event });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createEvent, getEvents, toggleEventStatus };
