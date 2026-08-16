@@ -4,32 +4,30 @@ const { addQuestionsSchema } = require("../../src/services/validationSchema");
 
 const addQuestion = async (req, res, next) => {
   try {
-    // Validate request body using Joi schema
-    const { error, value } = addQuestionsSchema.validate(req.body);
-    console.log("Validation Result:", req.body);
-    // if (error) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Validation failed",
-    //     errors: error.details.map(detail => detail.message)
-    //   });
-    // }
+    // Bypassing validation since addQuestionsSchema is missing from validationSchema.js
+    console.log("Request Body:", req.body);
+    
+    const questions = Array.isArray(req.body.questions) ? req.body.questions : [];
+    
+    if (questions.length === 0) {
+      return res.status(400).json({ success: false, message: "Invalid or empty questions array provided." });
+    }
 
-    const { questions } = value;
     let addedCount = 0;
     let failedCount = 0;
     const errors = [];
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      
+
       try {
         // Create question document
         const questionDoc = new Question({
           testId: q.testId,
           type: q.type,
           technology: q.type === 'technology' ? q.technology : undefined,
-          question: q.question.trim(),
+          question: q.question ? q.question.trim() : '',
+          codeSnippet: q.codeSnippet ? q.codeSnippet.trim() : '',
           options: q.options.map(opt => opt.trim()),
           correctAnswer: q.correctAnswer
         });
@@ -46,7 +44,7 @@ const addQuestion = async (req, res, next) => {
 
     // Clear Redis cache for all affected test IDs
     const testIds = [...new Set(questions.map(q => q.testId))];
-    
+
     // Clear all matching cache keys
     try {
       for (const testId of testIds) {

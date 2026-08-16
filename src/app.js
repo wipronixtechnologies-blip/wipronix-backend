@@ -111,9 +111,10 @@ const keyGenerator = (req) => {
 };
 
 // Rate limiting - exclude OPTIONS requests
+// Increased max to 5000 to allow campus drives where 1000+ students share the same public IP (NAT)
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: 5000,
   skip: (req) => req.method === 'OPTIONS',
   keyGenerator: keyGenerator
 });

@@ -18,11 +18,15 @@ const questionSchema = new mongoose.Schema(
     },
     technology: {
       type: String,
-      required: function() { return this.type === 'technology'; }
+      required: function () { return this.type === 'technology'; }
     },
     question: {
       type: String,
       required: true
+    },
+    codeSnippet: {
+      type: String,
+      default: ''
     },
     options: {
       type: [String],

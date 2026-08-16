@@ -18,7 +18,7 @@ const getAllQuestions = async (req, res, next) => {
 const updateQuestion = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { question, options, correctAnswer, technology, type } = req.body;
+    const { question, codeSnippet, options, correctAnswer, technology, type } = req.body;
 
     if (!id) {
       return res.status(400).json({ success: false, message: "Question ID is required" });
@@ -26,6 +26,7 @@ const updateQuestion = async (req, res, next) => {
 
     const updateData = {};
     if (question) updateData.question = question.trim();
+    if (codeSnippet !== undefined) updateData.codeSnippet = codeSnippet.trim();
     if (Array.isArray(options)) updateData.options = options.map(o => String(o || '').trim());
     if (correctAnswer !== undefined) updateData.correctAnswer = Number(correctAnswer);
     if (technology) updateData.technology = technology.trim();

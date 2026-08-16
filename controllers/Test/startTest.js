@@ -7,8 +7,6 @@ const Result = require("../../models/Result.model");
 
 const TEST_DURATION_SECONDS = 20 * 60; // 20 minutes default
 
-const memorySessions = new Map();
-
 function shuffleArray(array) {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -20,7 +18,7 @@ function shuffleArray(array) {
 
 // Strictly normalizes questions to 4 options A, B, C, D
 function normalizeOptions(rawOptions, correctIdx = 0) {
-  let opts = Array.isArray(rawOptions) 
+  let opts = Array.isArray(rawOptions)
     ? rawOptions.map(o => String(o || '').trim()).filter(o => o.length > 0)
     : [];
 
@@ -105,30 +103,55 @@ const startTest = async (req, res, next) => {
       console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
     }
 
-    // 2️⃣ Redis/Memory Existing Session Check
-    if (memorySessions.has(studentIdStr)) {
-      const memData = memorySessions.get(studentIdStr);
-      const elapsed = Math.floor((Date.now() - memData.startedAt) / 1000);
-      if (elapsed < TEST_DURATION_SECONDS) {
-        return res.status(200).json({
-          success: true,
-          message: "Test already in progress",
-          session: {
-            studentId: studentIdStr,
-            studentName: student.fullName,
-            email: student.email,
-            collegeName: student.college,
-            eventCode: memData.eventCode || codeToUse,
-            durationMinutes: 20,
-            remainingTimeSeconds: TEST_DURATION_SECONDS - elapsed,
-            questions: memData.clientQuestions
+    // 2️⃣ Redis Existing Session Check
+    try {
+      if (redis && typeof redis.get === 'function') {
+        const existingSessionStr = await redis.get(`test:session:${studentIdStr}`);
+        if (existingSessionStr) {
+          const memData = JSON.parse(existingSessionStr);
+          const elapsed = Math.floor((Date.now() - memData.startedAt) / 1000);
+          if (elapsed < TEST_DURATION_SECONDS) {
+            return res.status(200).json({
+              success: true,
+              message: "Test already in progress",
+              session: {
+                studentId: studentIdStr,
+                studentName: student.fullName,
+                email: student.email,
+                collegeName: student.college,
+                eventCode: memData.eventCode || codeToUse,
+                durationMinutes: 20,
+                remainingTimeSeconds: TEST_DURATION_SECONDS - elapsed,
+                questions: memData.clientQuestions
+              }
+            });
           }
-        });
+        }
       }
+    } catch (redisErr) {
+      console.warn("Redis get session error:", redisErr.message);
     }
 
-    // 3️⃣ Query Questions DIRECTLY from MongoDB Database
-    let questionPool = await Question.find().select("+correctAnswer").lean();
+    // 3️⃣ Query Questions with Caching
+    let questionPool = [];
+    try {
+      if (redis && typeof redis.get === 'function') {
+        const cachedPoolStr = await redis.get("test:questionPool");
+        if (cachedPoolStr) {
+          questionPool = JSON.parse(cachedPoolStr);
+        }
+      }
+    } catch (redisErr) { }
+
+    if (!questionPool || questionPool.length === 0) {
+      questionPool = await Question.find().select("+correctAnswer").lean();
+      try {
+        if (redis && typeof redis.set === 'function' && questionPool.length > 0) {
+          // Cache for 10 minutes
+          await redis.set("test:questionPool", JSON.stringify(questionPool), "EX", 600);
+        }
+      } catch (redisErr) { }
+    }
 
     if (!questionPool || questionPool.length === 0) {
       return res.status(404).json({
@@ -147,7 +170,7 @@ const startTest = async (req, res, next) => {
       const fourOptions = normalizeOptions(q.options, q.correctAnswer || 0);
       const correctOptionString = fourOptions[q.correctAnswer % fourOptions.length] || fourOptions[0];
       const shuffledOptions = shuffleArray(fourOptions);
-      
+
       answerKeyMap[index] = {
         questionId: q._id.toString(),
         correctOption: correctOptionString
@@ -163,7 +186,7 @@ const startTest = async (req, res, next) => {
       });
     });
 
-    // 5️⃣ Save Session in Memory
+    // 5️⃣ Save Session in Redis
     const startedAt = Date.now();
     const sessionData = {
       studentId: studentIdStr,
@@ -178,7 +201,14 @@ const startTest = async (req, res, next) => {
       clientQuestions
     };
 
-    memorySessions.set(studentIdStr, sessionData);
+    try {
+      if (redis && typeof redis.set === 'function') {
+        // Save for test duration + 5 minutes buffer
+        await redis.set(`test:session:${studentIdStr}`, JSON.stringify(sessionData), "EX", TEST_DURATION_SECONDS + 300);
+      }
+    } catch (redisErr) {
+      console.warn("Redis set session error:", redisErr.message);
+    }
 
     res.status(201).json({
       success: true,
