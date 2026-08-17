@@ -21,7 +21,7 @@ const submitTest = async (req, res, next) => {
         const sessionStr = await redis.get(`test:session:${studentId}`);
         if (sessionStr) sessionData = JSON.parse(sessionStr);
       }
-    } catch (rErr) {}
+    } catch (rErr) { }
 
     // Fetch student profile safely
     let student = null;
@@ -29,7 +29,7 @@ const submitTest = async (req, res, next) => {
       if (studentId && studentId.length === 24) {
         student = await Student.findById(studentId);
       }
-    } catch (sErr) {}
+    } catch (sErr) { }
 
     const studentName = sessionData?.studentName || student?.fullName || "Student";
     const studentEmail = sessionData?.studentEmail || student?.email || "";
@@ -57,8 +57,8 @@ const submitTest = async (req, res, next) => {
     });
 
     const score = correctCount;
-    const percentage = totalQuestions > 0 
-      ? Math.round((correctCount / totalQuestions) * 100 * 10) / 10 
+    const percentage = totalQuestions > 0
+      ? Math.round((correctCount / totalQuestions) * 100 * 10) / 10
       : 0;
     const status = percentage >= PASS_PERCENTAGE ? "PASS" : "FAIL";
 
