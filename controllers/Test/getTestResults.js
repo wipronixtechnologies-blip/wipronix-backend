@@ -25,6 +25,7 @@ const getTestResults = async (req, res, next) => {
     if (college) query.collegeName = new RegExp(college.trim(), 'i');
     if (isShortlisted === 'true') query.isShortlisted = true;
 
+
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -184,4 +185,10 @@ const toggleShortlist = async (req, res, next) => {
   }
 };
 
-module.exports = { getTestResults, toggleShortlist };
+// API to fetch ONLY shortlisted candidates
+const getShortlistedStudents = async (req, res, next) => {
+  req.query.isShortlisted = 'true';
+  return getTestResults(req, res, next);
+};
+
+module.exports = { getTestResults, toggleShortlist, getShortlistedStudents };

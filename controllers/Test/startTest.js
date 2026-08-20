@@ -50,13 +50,13 @@ const startTest = async (req, res, next) => {
           student = await Student.create({
             fullName: fullName.trim(),
             email: email.trim().toLowerCase(),
-            phone: phone ? phone.trim() : "",
+            phoneNumber: phone ? phone.trim() : "",
             college: collegeName ? collegeName.trim() : "Default College",
             course: courseSemesterStr
           });
         } else {
           if (collegeName) student.college = collegeName.trim();
-          if (phone) student.phone = phone.trim();
+          if (phone) student.phoneNumber = phone.trim();
           student.course = courseSemesterStr;
           await student.save();
         }
@@ -72,7 +72,7 @@ const startTest = async (req, res, next) => {
         _id: 'temp-' + Date.now(),
         fullName: (fullName || "Candidate").trim(),
         email: (email || "candidate@wipronix.com").trim().toLowerCase(),
-        phone: (phone || "").trim(),
+        phoneNumber: (phone || "").trim(),
         college: (collegeName || "Wipronix Campus Drive").trim(),
         course: `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`
       };
@@ -80,28 +80,6 @@ const startTest = async (req, res, next) => {
 
     const studentIdStr = student._id.toString();
 
-    // Store candidate initial status IN_PROGRESS in MongoDB Result collection
-    try {
-      if (student._id && String(student._id).length === 24) {
-        await Result.findOneAndUpdate(
-          { studentId: student._id, testId: codeToUse },
-          {
-            studentId: student._id,
-            studentName: student.fullName,
-            studentEmail: student.email,
-            studentPhone: student.phone || phone || "",
-            collegeName: student.college || collegeName || "College",
-            eventCode: codeToUse,
-            testId: codeToUse,
-            totalQuestions: 20,
-            status: "IN_PROGRESS"
-          },
-          { upsert: true, new: true }
-        );
-      }
-    } catch (rSaveErr) {
-      console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
-    }
 
     // 2️⃣ Redis Existing Session Check
     try {
@@ -192,7 +170,7 @@ const startTest = async (req, res, next) => {
       studentId: studentIdStr,
       studentName: student.fullName,
       studentEmail: student.email,
-      studentPhone: student.phone || "",
+      studentPhone: student.phoneNumber || phone || "",
       collegeName: student.college || collegeName || "Default College",
       course: student.course,
       eventCode: codeToUse,
@@ -200,6 +178,30 @@ const startTest = async (req, res, next) => {
       answerKeyMap,
       clientQuestions
     };
+
+    // Store candidate initial status IN_PROGRESS in MongoDB Result collection
+    try {
+      if (student._id && String(student._id).length === 24) {
+        await Result.findOneAndUpdate(
+          { studentId: student._id, testId: codeToUse },
+          {
+            studentId: student._id,
+            studentName: student.fullName,
+            studentEmail: student.email,
+            studentPhone: student.phoneNumber || phone || "",
+            collegeName: student.college || collegeName || "College",
+            eventCode: codeToUse,
+            testId: codeToUse,
+            totalQuestions: 20,
+            status: "IN_PROGRESS",
+            answers: answerKeyMap
+          },
+          { upsert: true, new: true }
+        );
+      }
+    } catch (rSaveErr) {
+      console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
+    }
 
     try {
       if (redis && typeof redis.set === 'function') {

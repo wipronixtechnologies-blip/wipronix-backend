@@ -23,6 +23,12 @@ const submitTest = async (req, res, next) => {
       }
     } catch (rErr) { }
 
+    // Fetch existing IN_PROGRESS result to fallback if Redis fails
+    let existingResult = null;
+    try {
+      existingResult = await Result.findOne({ studentId, status: "IN_PROGRESS" }).sort({ createdAt: -1 });
+    } catch (e) { }
+
     // Fetch student profile safely
     let student = null;
     try {
@@ -31,12 +37,12 @@ const submitTest = async (req, res, next) => {
       }
     } catch (sErr) { }
 
-    const studentName = sessionData?.studentName || student?.fullName || "Student";
-    const studentEmail = sessionData?.studentEmail || student?.email || "";
-    const studentPhone = sessionData?.studentPhone || student?.phone || "";
-    const collegeName = sessionData?.collegeName || student?.college || "College";
-    const eventCode = sessionData?.eventCode || "GENERAL";
-    const answerKeyMap = sessionData?.answerKeyMap || {};
+    const studentName = sessionData?.studentName || existingResult?.studentName || student?.fullName || "Student";
+    const studentEmail = sessionData?.studentEmail || existingResult?.studentEmail || student?.email || "";
+    const studentPhone = sessionData?.studentPhone || existingResult?.studentPhone || student?.phoneNumber || "";
+    const collegeName = sessionData?.collegeName || existingResult?.collegeName || student?.college || "College";
+    const eventCode = sessionData?.eventCode || existingResult?.eventCode || "GENERAL";
+    const answerKeyMap = sessionData?.answerKeyMap || existingResult?.answers || {};
 
     const submittedAnswers = answers || {};
     let attempted = 0;
@@ -64,23 +70,31 @@ const submitTest = async (req, res, next) => {
 
     // Save Result document safely
     try {
-      await Result.create({
-        studentId,
-        studentName,
-        studentEmail,
-        studentPhone,
-        collegeName,
-        eventCode,
-        testId: eventCode,
-        totalQuestions,
-        attempted,
-        correct: correctCount,
-        score,
-        percentage,
-        status,
-        answers: submittedAnswers,
-        resultDeclared: true
-      });
+      const query = existingResult 
+        ? { _id: existingResult._id } 
+        : { studentId, testId: eventCode };
+
+      await Result.findOneAndUpdate(
+        query,
+        {
+          studentId,
+          studentName,
+          studentEmail,
+          studentPhone,
+          collegeName,
+          eventCode,
+          testId: eventCode,
+          totalQuestions,
+          attempted,
+          correct: correctCount,
+          score,
+          percentage,
+          status,
+          answers: submittedAnswers,
+          resultDeclared: true
+        },
+        { upsert: true, new: true }
+      );
     } catch (dbErr) {
       console.warn("Result save fallback:", dbErr.message);
     }
