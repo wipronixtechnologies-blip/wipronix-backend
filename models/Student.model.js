@@ -15,7 +15,6 @@ const studentSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true
     },
@@ -87,5 +86,7 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ phoneNumber: 1 });
 studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
+// Allow same email for different technologies, but not same email+technology twice
+studentSchema.index({ email: 1, technology: 1 }, { unique: true });
 
 module.exports = mongoose.model("Student", studentSchema);
