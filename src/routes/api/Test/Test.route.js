@@ -6,6 +6,7 @@ const fetchQuestion = require("../../../../controllers/Test/fetchQuestion");
 const submitAnswer = require("../../../../controllers/Test/submitAnswer");
 const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
+const { getTestResults, toggleShortlist, getShortlistedStudents } = require("../../../../controllers/Test/getTestResults");
 
 const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
 const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
@@ -33,6 +34,11 @@ router.post("/answer", submitAnswer);
 
 // POST /api/test/submit (Student submits test)
 router.post("/submit", submitTest);
+
+// Test results & shortlist management
+router.get("/results", getTestResults);
+router.post("/toggle-shortlist", toggleShortlist);
+router.get("/shortlisted-students", getShortlistedStudents);
 
 
 
