@@ -62,6 +62,30 @@ const resultSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    technicalRoundMarks: {
+      type: Number,
+      default: null
+    },
+    aiRoundMarks: {
+      type: Number,
+      default: null
+    },
+    screeningRoundMarks: {
+      type: Number,
+      default: null
+    },
+    isSelected: {
+      type: Boolean,
+      default: false
+    },
+    offerLetterSent: {
+      type: Boolean,
+      default: false
+    },
+    offerLetterSentDate: {
+      type: Date,
+      default: null
+    },
     answers: Object,
     resultDeclared: {
       type: Boolean,
