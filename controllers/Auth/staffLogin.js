@@ -19,7 +19,7 @@ const staffLogin = async (request, response) => {
 
     // Find staff by email
     const staff = await Staff.findOne({ email });
-    
+
     if (!staff) {
       console.log('[staffLogin] Staff not found:', email);
       return response.status(401).json({
@@ -42,7 +42,7 @@ const staffLogin = async (request, response) => {
     // Verify password
     console.log('[staffLogin] Verifying password...');
     const isPasswordValid = await staff.comparePassword(password);
-    
+
     if (!isPasswordValid) {
       console.log('[staffLogin] Password invalid for:', email);
       return response.status(401).json({
@@ -58,8 +58,8 @@ const staffLogin = async (request, response) => {
 
     // Generate JWT token with all user information
     const token = jwt.sign(
-      { 
-        userId: staff._id, 
+      {
+        userId: staff._id,
         email: staff.email,
         role: staff.role,
         userType: 'staff',

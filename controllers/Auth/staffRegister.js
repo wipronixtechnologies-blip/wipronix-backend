@@ -40,13 +40,13 @@ const rolePermissions = {
 
 const staffRegister = async (request, response, next) => {
   try {
-    const { 
+    const {
       fullName,
       lastName,
-      email, 
-      password, 
-      role, 
-      department, 
+      email,
+      password,
+      role,
+      department,
       designation,
       phoneNumber,
       createdBy
@@ -66,7 +66,7 @@ const staffRegister = async (request, response, next) => {
 
     // Check if email already exists
     const existingStaff = await Staff.findOne({ email });
-    
+
     if (existingStaff) {
       return response.status(409).json({
         success: false,
@@ -92,8 +92,8 @@ const staffRegister = async (request, response, next) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
-        userId: staff._id, 
+      {
+        userId: staff._id,
         email: staff.email,
         role: staff.role,
         userType: 'staff'
@@ -129,7 +129,7 @@ const staffRegister = async (request, response, next) => {
 
   } catch (error) {
     console.error('Staff registration error:', error);
-    
+
     if (error.name === 'ValidationError') {
       return response.status(400).json({
         success: false,

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Student = require('../../models/Student.model');
-const {loginSchema } = require('../../src/services/validationSchema');
+const { loginSchema } = require('../../src/services/validationSchema');
 
 const login = async (request, response, next) => {
   try {
