@@ -1,4 +1,5 @@
 const redis = require("../../src/config/redis");
+const Result = require("../../models/Result.model");
 
 const submitAnswer = async (req, res, next) => {
   try {
@@ -53,36 +54,50 @@ const submitAnswer = async (req, res, next) => {
 
     // 1️⃣ Check test session active (but don't fail if not found - allow answer submission)
     const sessionKey = `test:session:${studentId}`;
-    const sessionExists = await redis.exists(sessionKey);
+    const sessionExists = (redis && redis.status === 'ready') ? await redis.exists(sessionKey) : false;
     let ttl = 0;
 
-    if (sessionExists) {
+    if (sessionExists && redis && redis.status === 'ready') {
       ttl = await redis.ttl(sessionKey);
       console.log('Active session found with TTL:', ttl);
     } else {
-      console.log('No active session found for student:', studentId);
+      console.log('No active session found or Redis offline for student:', studentId);
       // Allow answer submission even without active session
     }
 
-    // 2️⃣ Save answer in Redis (HASH)
+    // 2️⃣ Save answer in Redis (HASH) or fallback directly to MongoDB Result
     const answerKey = `test:answers:${studentId}`;
 
-    await redis.hset(
-      answerKey,
-      questionIndex.toString(),
-      selectedOption.toString()
-    );
+    if (redis && redis.status === 'ready') {
+      await redis.hset(
+        answerKey,
+        questionIndex.toString(),
+        selectedOption.toString()
+      );
 
-    console.log('Answer saved to Redis:', {
-      answerKey,
-      questionIndex: questionIndex.toString(),
-      selectedOption: selectedOption.toString()
-    });
+      console.log('Answer saved to Redis:', {
+        answerKey,
+        questionIndex: questionIndex.toString(),
+        selectedOption: selectedOption.toString()
+      });
 
-    // Align answers TTL with test session if session exists
-    if (ttl > 0) {
-      await redis.expire(answerKey, ttl);
-      console.log('Answer TTL set to:', ttl);
+      // Align answers TTL with test session if session exists
+      if (ttl > 0) {
+        await redis.expire(answerKey, ttl);
+        console.log('Answer TTL set to:', ttl);
+      }
+    } else {
+      // Fallback: save to MongoDB directly
+      try {
+        await Result.findOneAndUpdate(
+          { studentId },
+          { $set: { [`answers.${questionIndex}`]: selectedOption } },
+          { upsert: true }
+        );
+        console.log('Redis offline: Answer saved directly to MongoDB Result');
+      } catch (dbErr) {
+        console.warn('Fallback MongoDB save failed:', dbErr.message);
+      }
     }
 
     // 3️⃣ Response

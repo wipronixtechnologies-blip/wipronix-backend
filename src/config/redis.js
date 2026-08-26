@@ -29,11 +29,16 @@ const getRedisUrl = () => {
 
 const redisConfig = {
   lazyConnect: true,
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: 1,
   retryDelayOnFailover: 100,
   enableReadyCheck: true,
-  connectTimeout: 10000,
-  
+  connectTimeout: 3000,
+  retryStrategy(times) {
+    if (times > 1) {
+      return null; // Stop retrying
+    }
+    return 500; // Retry once after 500ms
+  }
 };
 
 // For local Redis, no need for special TLS

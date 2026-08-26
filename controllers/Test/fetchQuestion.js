@@ -31,28 +31,38 @@ const fetchQuestion = async (req, res, next) => {
 
     // 2️⃣ Load questions from Redis cache per student
     const questionCacheKey = `test:questions:${studentId}:${testId}`;
-    let questions = await redis.get(questionCacheKey);
+    let questions = (redis && redis.status === 'ready') ? await redis.get(questionCacheKey) : null;
 
     if (!questions) {
       // FIRST TIME → LOAD FROM MONGO
       console.log("📚 Loading questions from database...");
       
       const query = { testId };
-      if (studentTechnology) {
-        query.$or = [
-          { type: 'aptitude' },
-          { type: 'technology', technology: studentTechnology }
-        ];
+      const normalizedTech = (studentTechnology || "").trim();
+      const isTechTest = !['Aptitude', 'General Awareness'].includes(normalizedTech);
+
+      if (normalizedTech) {
+        if (isTechTest) {
+          query.$or = [
+            { type: 'aptitude', technology: 'Aptitude' },
+            { type: 'aptitude', technology: 'General Awareness' },
+            { type: 'technology', technology: 'General Technical & Aptitude' },
+            { type: 'technology', technology: normalizedTech }
+          ];
+        } else {
+          query.technology = normalizedTech;
+        }
       } else {
-        query.type = 'aptitude'; // Default to aptitude if no technology specified
+        query.type = 'aptitude';
       }
 
-      const foundQuestions = await Question.find(query).select("question options type technology").limit(20);
+      // Fetch all matching questions from database
+      const foundQuestions = await Question.find(query).select("question options type technology codeSnippet").lean();
 
       if (foundQuestions.length === 0) {
         return res.status(404).json({
           success: false,
-          message: "No questions found for this test",
+          message: `No questions found for Technology Stream: ${normalizedTech || 'General'}. Please add questions from Admin Panel.`,
           details: {
             testId,
             studentTechnology,
@@ -61,42 +71,99 @@ const fetchQuestion = async (req, res, next) => {
         });
       }
 
-      // Separate aptitude and tech questions
-      const aptitudeQuestions = foundQuestions.filter(q => q.type === 'aptitude');
-      const techQuestions = foundQuestions.filter(q => q.type === 'technology' && (!studentTechnology || q.technology === studentTechnology));
+      let allQuestions = [];
 
-      console.log(`📊 Found ${aptitudeQuestions.length} aptitude and ${techQuestions.length} tech questions`);
+      if (normalizedTech) {
+        if (isTechTest) {
+          const aptitudeQuestions = foundQuestions.filter(q => q.type === 'aptitude' || q.technology === 'Aptitude' || q.technology === 'General Awareness' || q.technology === 'General Technical & Aptitude');
+          const techQuestions = foundQuestions.filter(q => q.type === 'technology' && q.technology === normalizedTech);
 
-      // Check if we have enough questions
-      if (studentTechnology && (aptitudeQuestions.length < 10 || techQuestions.length < 10)) {
-        return res.status(404).json({
-          success: false,
-          message: `Insufficient questions available. Found ${aptitudeQuestions.length} aptitude questions and ${techQuestions.length} technology questions. Need at least 10 of each type.`,
-          details: {
-            aptitudeQuestions: aptitudeQuestions.length,
-            techQuestions: techQuestions.length,
-            required: 10,
-            testId,
-            studentTechnology
+          console.log(`📊 Found ${aptitudeQuestions.length} aptitude/general awareness and ${techQuestions.length} tech questions`);
+
+          if (aptitudeQuestions.length < 15 || techQuestions.length < 5) {
+            return res.status(404).json({
+              success: false,
+              message: `Insufficient questions available. Found ${aptitudeQuestions.length} aptitude/general awareness questions (need 15) and ${techQuestions.length} technology questions (need 5).`,
+              details: {
+                aptitudeQuestions: aptitudeQuestions.length,
+                techQuestions: techQuestions.length,
+                requiredAptitude: 15,
+                requiredTech: 5,
+                testId,
+                studentTechnology
+              }
+            });
           }
-        });
-      } else if (!studentTechnology && aptitudeQuestions.length < 20) {
-        return res.status(404).json({
-          success: false,
-          message: `Insufficient aptitude questions available. Found ${aptitudeQuestions.length}, need at least 20.`,
-          details: {
-            aptitudeQuestions: aptitudeQuestions.length,
-            required: 20,
-            testId
+
+          // Sample and shuffle
+          const functionShuffle = (array) => {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+          };
+
+          const sampledApt = functionShuffle(aptitudeQuestions).slice(0, 15);
+          const sampledTech = functionShuffle(techQuestions).slice(0, 5);
+          allQuestions = functionShuffle([...sampledApt, ...sampledTech]);
+        } else {
+          const streamQuestions = foundQuestions.filter(q => q.technology === normalizedTech);
+          if (streamQuestions.length < 20) {
+            return res.status(404).json({
+              success: false,
+              message: `Insufficient questions available. Found ${streamQuestions.length} questions for stream ${normalizedTech}, need at least 20.`,
+              details: {
+                aptitudeQuestions: streamQuestions.length,
+                required: 20,
+                testId,
+                studentTechnology
+              }
+            });
           }
-        });
+
+          const functionShuffle = (array) => {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+          };
+          allQuestions = functionShuffle(streamQuestions).slice(0, 20);
+        }
+      } else {
+        const aptitudeQuestions = foundQuestions.filter(q => q.type === 'aptitude');
+        if (aptitudeQuestions.length < 20) {
+          return res.status(404).json({
+            success: false,
+            message: `Insufficient aptitude questions available. Found ${aptitudeQuestions.length}, need at least 20.`,
+            details: {
+              aptitudeQuestions: aptitudeQuestions.length,
+              required: 20,
+              testId
+            }
+          });
+        }
+
+        const functionShuffle = (array) => {
+          const arr = [...array];
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+          return arr;
+        };
+        allQuestions = functionShuffle(aptitudeQuestions).slice(0, 20);
       }
 
-      const allQuestions = [...aptitudeQuestions, ...techQuestions];
       questions = JSON.stringify(allQuestions);
 
       // cache for 1 hour
-      await redis.set(questionCacheKey, questions, "EX", 3600);
+      if (redis && redis.status === 'ready') {
+        await redis.set(questionCacheKey, questions, "EX", 3600);
+      }
       console.log(`✅ Cached ${allQuestions.length} questions`);
     }
 
@@ -104,25 +171,27 @@ const fetchQuestion = async (req, res, next) => {
 
     // 3️⃣ Check if test session is active (optional)
     const sessionKey = `test:session:${studentId}`;
-    const session = await redis.get(sessionKey);
-    const remainingTimeSeconds = session ? await redis.ttl(sessionKey) : 0;
+    const session = (redis && redis.status === 'ready') ? await redis.get(sessionKey) : null;
+    const remainingTimeSeconds = (session && redis && redis.status === 'ready') ? await redis.ttl(sessionKey) : 0;
 
     // 4️⃣ Shuffle questions per student (ONCE) - only if we have a session
     let order = null;
     if (session) {
       const orderKey = `test:order:${studentId}`;
-      order = await redis.get(orderKey);
+      order = (redis && redis.status === 'ready') ? await redis.get(orderKey) : null;
 
       if (!order) {
         const shuffledIndexes = questions.map((_, i) => i)
           .sort(() => Math.random() - 0.5);
 
-        await redis.set(
-          orderKey,
-          JSON.stringify(shuffledIndexes),
-          "EX",
-          25 * 60
-        );
+        if (redis && redis.status === 'ready') {
+          await redis.set(
+            orderKey,
+            JSON.stringify(shuffledIndexes),
+            "EX",
+            25 * 60
+          );
+        }
 
         order = shuffledIndexes;
       } else {
@@ -149,6 +218,7 @@ const fetchQuestion = async (req, res, next) => {
     // 6️⃣ Transform question for frontend compatibility
     const transformedQuestion = {
       question: question.question,
+      codeSnippet: question.codeSnippet || "",
       options: question.options.map((option, idx) => ({
         key: `option_${idx}`, // Create unique key for each option
         text: option // Store the option text

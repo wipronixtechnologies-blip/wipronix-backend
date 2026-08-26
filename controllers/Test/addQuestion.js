@@ -25,7 +25,7 @@ const addQuestion = async (req, res, next) => {
         const questionDoc = new Question({
           testId: q.testId,
           type: q.type,
-          technology: q.type === 'technology' ? q.technology : undefined,
+          technology: q.technology,
           question: q.question ? q.question.trim() : '',
           codeSnippet: q.codeSnippet ? q.codeSnippet.trim() : '',
           options: q.options.map(opt => opt.trim()),

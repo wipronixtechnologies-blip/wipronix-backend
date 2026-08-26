@@ -52,12 +52,14 @@ const startTest = async (req, res, next) => {
             email: email.trim().toLowerCase(),
             phoneNumber: phone ? phone.trim() : "",
             college: collegeName ? collegeName.trim() : "Default College",
-            course: courseSemesterStr
+            course: courseSemesterStr,
+            technology: technology ? technology.trim() : ""
           });
         } else {
           if (collegeName) student.college = collegeName.trim();
           if (phone) student.phoneNumber = phone.trim();
           student.course = courseSemesterStr;
+          if (technology) student.technology = technology.trim();
           await student.save();
         }
       } else if (providedStudentId && providedStudentId.length === 24) {
@@ -74,7 +76,8 @@ const startTest = async (req, res, next) => {
         email: (email || "candidate@wipronix.com").trim().toLowerCase(),
         phoneNumber: (phone || "").trim(),
         college: (collegeName || "Wipronix Campus Drive").trim(),
-        course: `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`
+        course: `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`,
+        technology: technology ? technology.trim() : ""
       };
     }
 
@@ -83,7 +86,7 @@ const startTest = async (req, res, next) => {
 
     // 2️⃣ Redis Existing Session Check
     try {
-      if (redis && typeof redis.get === 'function') {
+      if (redis && redis.status === 'ready' && typeof redis.get === 'function') {
         const existingSessionStr = await redis.get(`test:session:${studentIdStr}`);
         if (existingSessionStr) {
           const memData = JSON.parse(existingSessionStr);
@@ -113,7 +116,7 @@ const startTest = async (req, res, next) => {
     // 3️⃣ Query Questions with Caching
     let questionPool = [];
     try {
-      if (redis && typeof redis.get === 'function') {
+      if (redis && redis.status === 'ready' && typeof redis.get === 'function') {
         const cachedPoolStr = await redis.get("test:questionPool");
         if (cachedPoolStr) {
           questionPool = JSON.parse(cachedPoolStr);
@@ -124,7 +127,7 @@ const startTest = async (req, res, next) => {
     if (!questionPool || questionPool.length === 0) {
       questionPool = await Question.find().select("+correctAnswer").lean();
       try {
-        if (redis && typeof redis.set === 'function' && questionPool.length > 0) {
+        if (redis && redis.status === 'ready' && typeof redis.set === 'function' && questionPool.length > 0) {
           // Cache for 10 minutes
           await redis.set("test:questionPool", JSON.stringify(questionPool), "EX", 600);
         }
@@ -138,8 +141,52 @@ const startTest = async (req, res, next) => {
       });
     }
 
+    // Filter questions based on student's technology stream in-memory
+    const normalizedTech = (technology || "").trim();
+    const isTechTest = !['Aptitude', 'General Awareness'].includes(normalizedTech);
+
+    let filteredQuestions = [];
+    if (normalizedTech) {
+      if (isTechTest) {
+        // Technical test: 15 General Awareness/Aptitude questions + 5 Tech stream questions
+        const aptitudePool = questionPool.filter(q => q.type === 'aptitude' || q.technology === 'Aptitude' || q.technology === 'General Awareness' || q.technology === 'General Technical & Aptitude');
+        const techPool = questionPool.filter(q => q.type === 'technology' && q.technology && q.technology.toLowerCase() === normalizedTech.toLowerCase());
+        
+        if (aptitudePool.length < 15 || techPool.length < 5) {
+          return res.status(404).json({
+            success: false,
+            message: `Insufficient questions available. Found ${aptitudePool.length} aptitude/general awareness questions (need 15) and ${techPool.length} technology questions (need 5).`
+          });
+        }
+        
+        const sampledApt = shuffleArray(aptitudePool).slice(0, 15);
+        const sampledTech = shuffleArray(techPool).slice(0, 5);
+        filteredQuestions = shuffleArray([...sampledApt, ...sampledTech]);
+      } else {
+        // Aptitude or General Awareness test: 20 questions of that stream
+        const streamPool = questionPool.filter(q => q.technology && q.technology.toLowerCase() === normalizedTech.toLowerCase());
+        if (streamPool.length < 20) {
+          return res.status(404).json({
+            success: false,
+            message: `Insufficient questions available. Found ${streamPool.length} questions for stream ${normalizedTech}, need at least 20.`
+          });
+        }
+        filteredQuestions = shuffleArray(streamPool).slice(0, 20);
+      }
+    } else {
+      // Default: 20 aptitude questions if no tech stream specified
+      const aptitudePool = questionPool.filter(q => q.type === 'aptitude');
+      if (aptitudePool.length < 20) {
+        return res.status(404).json({
+          success: false,
+          message: `Insufficient aptitude questions available. Found ${aptitudePool.length}, need at least 20.`
+        });
+      }
+      filteredQuestions = shuffleArray(aptitudePool).slice(0, 20);
+    }
+
     // 4️⃣ Randomly sample up to 20 questions from MongoDB with 4 options each
-    const sampledQuestions = shuffleArray(questionPool).slice(0, 20);
+    const sampledQuestions = filteredQuestions;
 
     const clientQuestions = [];
     const answerKeyMap = {};
@@ -158,6 +205,7 @@ const startTest = async (req, res, next) => {
         id: index,
         questionId: q._id.toString(),
         question: q.question,
+        codeSnippet: q.codeSnippet || "",
         options: shuffledOptions,
         type: q.type || 'technology',
         technology: q.technology || 'General'
@@ -173,6 +221,7 @@ const startTest = async (req, res, next) => {
       studentPhone: student.phoneNumber || phone || "",
       collegeName: student.college || collegeName || "Default College",
       course: student.course,
+      technology: student.technology || technology || "",
       eventCode: codeToUse,
       startedAt,
       answerKeyMap,
@@ -204,7 +253,7 @@ const startTest = async (req, res, next) => {
     }
 
     try {
-      if (redis && typeof redis.set === 'function') {
+      if (redis && redis.status === 'ready' && typeof redis.set === 'function') {
         // Save for test duration + 5 minutes buffer
         await redis.set(`test:session:${studentIdStr}`, JSON.stringify(sessionData), "EX", TEST_DURATION_SECONDS + 300);
       }
@@ -221,6 +270,7 @@ const startTest = async (req, res, next) => {
         email: student.email,
         collegeName: student.college,
         course: student.course,
+        technology: student.technology || technology || "",
         eventCode: codeToUse,
         durationMinutes: 20,
         remainingTimeSeconds: TEST_DURATION_SECONDS,

@@ -17,7 +17,7 @@ const submitTest = async (req, res, next) => {
 
     let sessionData = null;
     try {
-      if (redis && typeof redis.get === 'function') {
+      if (redis && redis.status === 'ready' && typeof redis.get === 'function') {
         const sessionStr = await redis.get(`test:session:${studentId}`);
         if (sessionStr) sessionData = JSON.parse(sessionStr);
       }
