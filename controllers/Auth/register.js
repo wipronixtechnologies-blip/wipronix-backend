@@ -27,9 +27,71 @@ const register = async (request, response, next) => {
     });
 
     if (existingStudent) {
-      return response.status(400).json({
-        success: false,
-        message: "User with this email or phone number already exists",
+      if (existingStudent.password) {
+        return response.status(400).json({
+          success: false,
+          message: "User with this email or phone number already exists",
+        });
+      }
+
+      // Complete registration on existing record
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      existingStudent.fullName = fullName.trim();
+      existingStudent.email = email.toLowerCase().trim();
+      existingStudent.password = hashedPassword;
+      existingStudent.phoneNumber = phoneNumber.trim();
+      existingStudent.city = city.trim();
+      existingStudent.education = education;
+      existingStudent.course = course;
+      existingStudent.college = college.trim();
+      existingStudent.passingYear = passingYear;
+      existingStudent.isVerified = true;
+
+      const savedStudent = await existingStudent.save();
+
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          userId: savedStudent._id,
+          studentId: savedStudent._id,
+          email: savedStudent.email,
+          userType: savedStudent.userType || "Student",
+        },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "7d" }
+      );
+
+      // Set cookie with token
+      response.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      const studentResponse = {
+        _id: savedStudent._id,
+        fullName: savedStudent.fullName,
+        email: savedStudent.email,
+        phoneNumber: savedStudent.phoneNumber,
+        city: savedStudent.city,
+        education: savedStudent.education,
+        course: savedStudent.course,
+        college: savedStudent.college,
+        passingYear: savedStudent.passingYear,
+        isVerified: savedStudent.isVerified,
+        createdAt: savedStudent.createdAt,
+      };
+
+      return response.status(200).json({
+        success: true,
+        message: "Registration completed successfully",
+        data: {
+          student: studentResponse,
+          token,
+        },
       });
     }
 
@@ -104,8 +166,17 @@ const register = async (request, response, next) => {
       });
     }
 
-    // Handle validation errors
-    if (error.name === "ValidationError") {
+    // Handle Joi validation errors
+    if (error.isJoi) {
+      return response.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.details.map(detail => detail.message)
+      });
+    }
+
+    // Handle Mongoose validation errors
+    if (error.name === "ValidationError" && error.errors) {
       const validationErrors = Object.values(error.errors).map(
         (err) => err.message
       );
@@ -113,15 +184,6 @@ const register = async (request, response, next) => {
         success: false,
         message: "Validation error",
         errors: validationErrors,
-      });
-    }
-
-    // Handle Joi validation errors
-    if (error.isJoi) {
-      return response.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: error.details.map(detail => detail.message)
       });
     }
 

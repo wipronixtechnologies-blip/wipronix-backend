@@ -20,6 +20,7 @@ const resignationRoutes = require('./Resignation.route')
 const courseRoutes = require('./Course.route')
 const trainerRoutes = require('./Trainer.route')
 const financeRoutes = require('./Finance.route')
+const contactRoutes = require('./Contact.route')
 
 Router.use('/auth',auth)
 Router.use("/student", studentRoutes);
@@ -42,9 +43,11 @@ Router.use("/resignations", resignationRoutes);
 Router.use("/courses", courseRoutes);
 Router.use("/trainers", trainerRoutes);
 Router.use("/finance", financeRoutes);
+Router.use("/contact", contactRoutes);
 const settingsRoutes = require('./Settings.route');
 const highestEducationRoutes = require('./HighestEducation.route');
 const courseOptionRoutes = require('./CourseOption.route');
+const dropdownOptionRoutes = require('./DropdownOption.route');
 const passingYearRoutes = require('./PassingYear.route');
 const marketingRoutes = require('./Marketing.route');
 const bidderRoutes = require('./Bidder.route');
@@ -54,6 +57,7 @@ const adminRoutes = require('./Admin.route');
 Router.use("/settings", settingsRoutes);
 Router.use("/highest-education", highestEducationRoutes);
 Router.use("/course-options", courseOptionRoutes);
+Router.use("/dropdown-options", dropdownOptionRoutes);
 Router.use("/passing-years", passingYearRoutes);
 Router.use("/marketing", marketingRoutes);
 Router.use("/bidder", bidderRoutes);

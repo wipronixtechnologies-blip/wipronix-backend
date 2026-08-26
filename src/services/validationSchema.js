@@ -32,22 +32,19 @@ const registerSchema = Joi.object({
     'string.min': 'City name must be at least 2 characters long',
     'string.max': 'City name cannot exceed 50 characters'
   }),
-  education: Joi.string().valid('10th', '12th', 'Graduate', 'Post Graduate').required().messages({
-    'string.empty': 'Education level is required',
-    'any.only': 'Please select a valid education level'
+  education: Joi.string().required().messages({
+    'string.empty': 'Education level is required'
   }),
-  course: Joi.string().valid('Full Stack', 'Frontend', 'Backend', 'Data Science', 'DevOps', 'Mobile Development').required().messages({
-    'string.empty': 'Course selection is required',
-    'any.only': 'Please select a valid course'
+  course: Joi.string().required().messages({
+    'string.empty': 'Course selection is required'
   }),
   college: Joi.string().min(2).max(100).required().messages({
     'string.empty': 'College name is required',
     'string.min': 'College name must be at least 2 characters long',
     'string.max': 'College name cannot exceed 100 characters'
   }),
-  passingYear: Joi.string().valid('2024', '2025', '2026', '2027', '2028').required().messages({
-    'string.empty': 'Passing year is required',
-    'any.only': 'Please select a valid passing year'
+  passingYear: Joi.string().required().messages({
+    'string.empty': 'Passing year is required'
   }),
   confirmPassword: Joi.any().valid(Joi.ref('password')).required().messages({
     'any.only': 'Password and confirm password must match',
