@@ -113,6 +113,44 @@ const startTest = async (req, res, next) => {
       console.warn("Redis get session error:", redisErr.message);
     }
 
+    // 2️⃣b MongoDB Existing Result check (prevent multiple attempts by email or phone)
+    try {
+      if (student.email || student.phoneNumber || (phone && phone.trim())) {
+        const queryOr = [];
+        if (student.email) {
+          queryOr.push({ studentEmail: student.email.trim().toLowerCase() });
+        }
+        if (student.phoneNumber) {
+          queryOr.push({ studentPhone: student.phoneNumber.trim() });
+        }
+        if (phone && phone.trim() && phone.trim() !== student.phoneNumber?.trim()) {
+          queryOr.push({ studentPhone: phone.trim() });
+        }
+
+        if (queryOr.length > 0) {
+          const existingResult = await Result.findOne({
+            eventCode: codeToUse,
+            $or: queryOr
+          });
+
+          if (existingResult) {
+            const isCompleted = existingResult.status !== 'IN_PROGRESS';
+            const timeElapsedMs = Date.now() - new Date(existingResult.createdAt).getTime();
+            const isExpired = timeElapsedMs >= (TEST_DURATION_SECONDS * 1000);
+
+            if (isCompleted || isExpired) {
+              return res.status(400).json({
+                success: false,
+                message: "You have already attempted or completed this assessment for this event. Multiple attempts are not allowed."
+              });
+            }
+          }
+        }
+      }
+    } catch (dbCheckErr) {
+      console.error("Existing result check error:", dbCheckErr.message);
+    }
+
     // 3️⃣ Query Questions with Caching
     let questionPool = [];
     try {
