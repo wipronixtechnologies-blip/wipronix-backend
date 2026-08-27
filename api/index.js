@@ -4,6 +4,8 @@ const redis = require("../src/config/redis");
 
 // Allowed origins for CORS
 const allowedOrigins = [
+  "https://www.wipronix.com",
+  "https://wipronix.com/",
   "https://internship-1b6cd.web.app",
   "https://wipronix-frontend.vercel.app",
   "http://localhost:5173",
