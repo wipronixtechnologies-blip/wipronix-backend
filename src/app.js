@@ -40,18 +40,19 @@ app.use(cookieParser());
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
-// Allowed origins - add your frontend URLs here
-const allowedOrigins = [
-  "https://internship-1b6cd.web.app",
-  "https://wipronix-website.web.app",
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:8080",
-  "http://localhost:5173"
-];
+// Allowed origins - add your frontend URLs here (commented out to allow all origins)
+// const allowedOrigins = [
+//   "https://internship-1b6cd.web.app",
+//   "https://wipronix-website.web.app",
+//   "http://localhost:3000",
+//   "http://localhost:3001",
+//   "http://localhost:8080",
+//   "http://localhost:5173"
+// ];
 
 // CORS options
 const corsOptions = {
+  /*
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
@@ -71,11 +72,15 @@ const corsOptions = {
     console.log(`[CORS ERROR] Blocked origin: "${origin}"`);
     callback(new Error('Not allowed by CORS'));
   },
+  */
+  origin: function (origin, callback) {
+    // Allow all origins
+    callback(null, true);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-Student-Id"],
   exposedHeaders: ["set-cookie"],
-
 };
 
 // Apply CORS middleware

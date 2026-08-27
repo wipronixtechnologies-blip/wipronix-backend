@@ -2,30 +2,30 @@ const app = require("../src/app");
 const connectDB = require("../src/config/db");
 const redis = require("../src/config/redis");
 
-// Allowed origins for CORS
-const allowedOrigins = [
-  "https://www.wipronix.com",
-  "https://www.wipronix.com/",
-  "https://wipronix.com/",
-  "https://internship-1b6cd.web.app",
-  "https://wipronix-frontend.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000"
-];
+// Allowed origins for CORS (commented out to allow all origins)
+// const allowedOrigins = [
+//   "https://www.wipronix.com",
+//   "https://www.wipronix.com/",
+//   "https://wipronix.com/",
+//   "https://internship-1b6cd.web.app",
+//   "https://wipronix-frontend.vercel.app",
+//   "http://localhost:5173",
+//   "http://localhost:3000"
+// ];
 
-// CORS handling function for serverless environment
+// CORS handling function for serverless environment - allow all origins
 const handleCors = (req, res, next) => {
   const origin = req.headers.origin;
 
-  // Validate origin - when using credentials, cannot use "*"
-  const isAllowedOrigin = !origin || allowedOrigins.includes(origin);
+  // Previous restricted origin validation (commented out):
+  // const isAllowedOrigin = !origin || allowedOrigins.includes(origin);
+  // const allowedOrigin = isAllowedOrigin ? (origin || allowedOrigins[0]) : allowedOrigins[0];
+  // res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
 
-  // Set CORS headers for all responses
-  // When credentials are enabled, never use "*" - use the specific origin or first allowed origin
-  const allowedOrigin = isAllowedOrigin ? (origin || allowedOrigins[0]) : allowedOrigins[0];
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  // Allow all origins (*)
+  res.setHeader("Access-Control-Allow-Origin", origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Student-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Student-Id, X-Requested-With, Accept, Origin");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
   // Handle preflight OPTIONS request
