@@ -64,10 +64,11 @@ const register = async (request, response, next) => {
       );
 
       // Set cookie with token
+      const isProd = process.env.NODE_ENV === 'production';
       response.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
@@ -127,10 +128,11 @@ const register = async (request, response, next) => {
     );
 
     // Set cookie with token
+    const isProd = process.env.NODE_ENV === 'production';
     response.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 

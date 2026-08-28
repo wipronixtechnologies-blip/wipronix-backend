@@ -1,10 +1,11 @@
 const logout = async (request, response, next) => {
   try {
     // Clear the cookie
+    const isProd = process.env.NODE_ENV === 'production';
     response.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax'
     });
 
     response.status(200).json({
