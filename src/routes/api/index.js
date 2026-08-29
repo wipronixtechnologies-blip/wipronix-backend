@@ -54,6 +54,8 @@ const bidderRoutes = require('./Bidder.route');
 const placementRoutes = require('./Placement.route');
 const admissionRoutes = require('./Admission.route');
 const adminRoutes = require('./Admin.route');
+const jobRoutes = require('./Job.route');
+
 Router.use("/settings", settingsRoutes);
 Router.use("/highest-education", highestEducationRoutes);
 Router.use("/course-options", courseOptionRoutes);
@@ -64,5 +66,6 @@ Router.use("/bidder", bidderRoutes);
 Router.use("/placement", placementRoutes);
 Router.use("/admission", admissionRoutes);
 Router.use("/admin", adminRoutes);
+Router.use("/jobs", jobRoutes);
 
 module.exports = Router;
