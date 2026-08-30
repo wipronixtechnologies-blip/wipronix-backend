@@ -1,7 +1,9 @@
 const Result = require("../../models/Result.model");
 const Student = require("../../models/Student.model");
 const nodemailer = require('nodemailer');
-const { jsPDF } = require('jspdf');
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const fs = require('fs');
+const path = require('path');
 
 const QUALIFYING_MARKS = 70; // 70% passing threshold
 
@@ -346,8 +348,7 @@ const sendStudentOfferLetter = async (req, res, next) => {
     }
 
     // Generate PDF
-    const doc = generateStudentLetterPDF(candidate);
-    const pdfBuffer = doc.output('arraybuffer');
+    const pdfBuffer = await generateStudentLetterPDF(candidate);
 
     // Send Email
     const transporter = createTransporter();
@@ -398,81 +399,180 @@ const sendStudentOfferLetter = async (req, res, next) => {
   }
 };
 
-// Generate student selection letter PDF
-const generateStudentLetterPDF = (candidate) => {
-  const doc = new jsPDF();
+// Generate student selection letter PDF using pdf-lib and Letterhead.pdf
+const generateStudentLetterPDF = async (candidate) => {
+  const letterheadPath = path.join(__dirname, '../../assets', 'Letterhead.pdf');
+  if (!fs.existsSync(letterheadPath)) {
+    throw new Error('Letterhead template not found');
+  }
+  const letterheadBytes = fs.readFileSync(letterheadPath);
+
+  const pdfDoc = await PDFDocument.create();
+  const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const pageWidth = 595.5; // A4 width in pt
+  const pageHeight = 841.92; // A4 height in pt
+
+  const addPageWithLetterhead = async () => {
+    const [letterheadPage] = await pdfDoc.embedPdf(letterheadBytes);
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+    page.drawPage(letterheadPage, {
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: pageHeight,
+    });
+    return page;
+  };
+
+  let page = await addPageWithLetterhead();
+  const margin = 60;
+  const topMargin = 160; // Leave space for header logo/address
+  const bottomMargin = 100; // Leave space for footer
+  let currentY = pageHeight - topMargin;
+
+  const drawText = async (text, options = {}) => {
+    const { size = 10, color = rgb(0, 0, 0), isBullet = false, indent = 0, lineSpacing = 4, isHeader = false } = options;
+    const fontSize = isHeader ? size + 1.5 : size;
+    const xPos = margin + indent + (isBullet ? 20 : 0);
+    const maxWidth = pageWidth - margin - xPos;
+
+    if (isBullet) {
+      page.drawText('•', { x: margin + indent + 8, y: currentY, size: fontSize, font: helveticaFont, color });
+    }
+
+    const segments = [];
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    for (const part of parts) {
+      if (part === '') continue;
+      if (part.startsWith('**') && part.endsWith('**')) {
+        segments.push({ text: part.slice(2, -2), font: helveticaBoldFont });
+      } else {
+        segments.push({ text: part, font: helveticaFont });
+      }
+    }
+
+    let lines = [];
+    let currentLineBuild = [];
+    let currentLineWidth = 0;
+
+    for (const segment of segments) {
+      const words = segment.text.split(/(\s+)/);
+      for (const word of words) {
+        const wordWidth = segment.font.widthOfTextAtSize(word, fontSize);
+        if (currentLineWidth + wordWidth > maxWidth && word.trim() !== '') {
+          lines.push(currentLineBuild);
+          currentLineBuild = [];
+          currentLineWidth = 0;
+          if (word === ' ') continue;
+        }
+        currentLineBuild.push({ text: word, font: segment.font });
+        currentLineWidth += wordWidth;
+      }
+    }
+    if (currentLineBuild.length > 0) lines.push(currentLineBuild);
+
+    for (const line of lines) {
+      if (currentY < bottomMargin) {
+        page = await addPageWithLetterhead();
+        currentY = pageHeight - topMargin;
+      }
+      let xOffset = xPos;
+      for (const seg of line) {
+        page.drawText(seg.text, { x: xOffset, y: currentY, size: fontSize, font: seg.font, color });
+        xOffset += seg.font.widthOfTextAtSize(seg.text, fontSize);
+      }
+      currentY -= fontSize + lineSpacing;
+    }
+    currentY -= lineSpacing;
+  };
+
+  // Reference and Date
+  const refText = `Ref: WPR/OFFER/2026/${candidate._id.toString().slice(-5).toUpperCase()}`;
+  const dateText = `Date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`;
   
-  // Header
-  doc.setFontSize(20);
-  doc.setTextColor(229, 35, 40); // Wipronix Red
-  doc.text('WIPRONIX INFORMATICS', 14, 25);
+  page.drawText(refText, { x: margin, y: pageHeight - 130, size: 10, font: helveticaBoldFont });
+  page.drawText(dateText, { x: pageWidth - margin - 120, y: pageHeight - 130, size: 10, font: helveticaFont });
 
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text('Corporate Office: Dehradun & Mohali | Contact: info@wipronix.com', 14, 32);
-  doc.line(14, 36, 196, 36);
+  currentY = pageHeight - 150;
 
-  // Date and Reference
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text(`Ref: WPR/OFFER/2026/${candidate._id.toString().slice(-5).toUpperCase()}`, 14, 48);
-  doc.text(`Date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`, 150, 48);
-
-  // Candidate Details
-  doc.text(`To,`, 14, 62);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${candidate.studentName}`, 14, 70);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`College: ${candidate.collegeName || 'Not Specified'}`, 14, 78);
-  doc.text(`Email: ${candidate.studentEmail}`, 14, 86);
-  doc.text(`Mobile: ${candidate.studentPhone || 'N/A'}`, 14, 94);
-
-  // Subject
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(229, 35, 40);
-  doc.text('LETTER OF SELECTION & APPRENTICESHIP OFFER', 14, 110);
-
-  // Body
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(50);
-  doc.text(`Dear ${candidate.studentName},`, 14, 122);
+  // Recipient info
+  await drawText('To,');
+  await drawText(`**${candidate.studentName}**`);
+  await drawText(`College: ${candidate.collegeName || 'Not Specified'}`);
+  await drawText(`Email: ${candidate.studentEmail}`);
+  await drawText(`Mobile: ${candidate.studentPhone || 'N/A'}`);
   
-  const introText = `We are pleased to inform you that based on your exceptional performance in the National Talent Evaluation Campus Drive, and subsequent interview rounds, you have been selected for the Advanced Industrial Training & Apprenticeship Program at Wipronix.`;
-  doc.text(introText, 14, 132, { maxWidth: 180 });
+  currentY -= 15;
 
-  // Interview Scores Section
-  let yPos = 160;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 41, 59);
-  doc.text('Your Round Performance Summary:', 14, yPos);
+  // Subject line (Centered or Bold Red)
+  await drawText('**LETTER OF SELECTION & APPRENTICESHIP OFFER**', { color: rgb(0.9, 0.1, 0.1), size: 11 });
   
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80);
-  doc.text(`- Online Test Score: ${candidate.percentage.toFixed(2)}%`, 20, yPos + 10);
-  doc.text(`- Technical Interview: ${candidate.technicalRoundMarks || 'N/A'}`, 20, yPos + 18);
-  doc.text(`- AI Interview Round: ${candidate.aiRoundMarks || 'N/A'}`, 20, yPos + 26);
-  doc.text(`- Screening/HR Round: ${candidate.screeningRoundMarks || 'N/A'}`, 20, yPos + 34);
+  currentY -= 10;
 
-  yPos += 50;
-  doc.setTextColor(50);
-  doc.text('Program details, onboarding link, and other formalities will be shared with you shortly.', 14, yPos);
+  // Salutation
+  await drawText(`Dear **${candidate.studentName}**,`);
+  currentY -= 10;
+
+  // Body text
+  await drawText('We are pleased to inform you that based on your exceptional performance in the National Talent Evaluation Campus Drive, and subsequent interview rounds, you have been selected for the **Advanced Industrial Training & Apprenticeship Program** at Wipronix.');
   
-  yPos += 15;
-  doc.text('Warm regards,', 14, yPos);
+  currentY -= 10;
+
+  // Performance summary
+  await drawText('**Your Round Performance Summary:**', { isHeader: true });
+  await drawText(`Online Test Score: **${candidate.percentage.toFixed(2)}%**`, { indent: 10, isBullet: true });
+  await drawText(`Technical Interview: **${candidate.technicalRoundMarks !== null ? candidate.technicalRoundMarks : 'N/A'}**`, { indent: 10, isBullet: true });
+  await drawText(`AI Interview Round: **${candidate.aiRoundMarks !== null ? candidate.aiRoundMarks : 'N/A'}**`, { indent: 10, isBullet: true });
+  await drawText(`Screening/HR Round: **${candidate.screeningRoundMarks !== null ? candidate.screeningRoundMarks : 'N/A'}**`, { indent: 10, isBullet: true });
+
+  currentY -= 15;
+
+  await drawText('Program details, onboarding link, and other formalities will be shared with you shortly.');
   
-  doc.setFont('helvetica', 'bold');
-  doc.text('Talent Acquisition Team', 14, yPos + 10);
-  doc.text('Wipronix Informatics Pvt. Ltd.', 14, yPos + 18);
+  currentY -= 15;
 
-  // Footer on each page
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFontSize(8);
-  doc.setTextColor(128, 128, 128);
-  doc.text('www.wipronix.com | hr@wipronix.com | 9646706113', doc.internal.pageSize.getWidth() / 2, pageHeight - 10, { align: 'center' });
+  await drawText('Warm regards,');
+  currentY -= 5;
+  await drawText('**Talent Acquisition Team**');
+  await drawText('**Wipronix Informatics Pvt. Ltd.**');
 
-  return doc;
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes;
+};
+
+// Download Student Offer Letter PDF directly
+const generateStudentOfferLetterDownload = async (req, res, next) => {
+  try {
+    const { resultId } = req.params;
+
+    if (!resultId) {
+      return res.status(400).json({
+        success: false,
+        message: "resultId is required"
+      });
+    }
+
+    const candidate = await Result.findById(resultId);
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: "Candidate record not found"
+      });
+    }
+
+    // Generate PDF
+    const pdfBytes = await generateStudentLetterPDF(candidate);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Selection_Offer_Letter_${candidate.studentName.replace(/\s+/g, '_')}.pdf`);
+    return res.send(Buffer.from(pdfBytes));
+
+  } catch (error) {
+    console.error("Download Offer Letter API Error:", error);
+    next(error);
+  }
 };
 
 // API to fetch ONLY shortlisted candidates
@@ -481,4 +581,4 @@ const getShortlistedStudents = async (req, res, next) => {
   return getTestResults(req, res, next);
 };
 
-module.exports = { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter };
+module.exports = { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter, generateStudentOfferLetterDownload };

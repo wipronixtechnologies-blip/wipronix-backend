@@ -6,7 +6,7 @@ const fetchQuestion = require("../../../../controllers/Test/fetchQuestion");
 const submitAnswer = require("../../../../controllers/Test/submitAnswer");
 const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
-const { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter } = require("../../../../controllers/Test/getTestResults");
+const { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter, generateStudentOfferLetterDownload } = require("../../../../controllers/Test/getTestResults");
 
 const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
 const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
@@ -42,6 +42,7 @@ router.get("/shortlisted-students", getShortlistedStudents);
 router.post("/update-interview-marks", updateInterviewMarks);
 router.post("/toggle-selection", toggleSelection);
 router.post("/send-student-offer-letter", sendStudentOfferLetter);
+router.get("/generate-student-offer-letter/:resultId", generateStudentOfferLetterDownload);
 
 
 
