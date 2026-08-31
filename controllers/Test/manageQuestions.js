@@ -1,4 +1,19 @@
 const Question = require("../../models/Question.model");
+const redis = require("../../src/config/redis");
+
+const clearQuestionsCache = async () => {
+  try {
+    if (redis && redis.status === 'ready') {
+      await redis.del("test:questionPool");
+      const keys = await redis.keys("test:questions:*");
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    }
+  } catch (err) {
+    console.warn("Error clearing redis questions cache:", err.message);
+  }
+};
 
 // GET /api/test/all-questions - Fetch all questions in global bank
 const getAllQuestions = async (req, res, next) => {
@@ -42,6 +57,8 @@ const updateQuestion = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Question not found" });
     }
 
+    await clearQuestionsCache();
+
     res.json({
       success: true,
       message: "Question updated successfully",
@@ -66,6 +83,8 @@ const deleteQuestion = async (req, res, next) => {
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Question not found" });
     }
+
+    await clearQuestionsCache();
 
     res.json({
       success: true,

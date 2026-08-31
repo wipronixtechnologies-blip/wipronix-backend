@@ -180,47 +180,44 @@ const startTest = async (req, res, next) => {
     }
 
     // Filter questions based on student's technology stream in-memory
-    const normalizedTech = (technology || "").trim();
-    const isTechTest = !['Aptitude', 'General Awareness'].includes(normalizedTech);
+    const normalizedTech = (technology || "").trim().toLowerCase();
 
     let filteredQuestions = [];
     if (normalizedTech) {
-      if (isTechTest) {
-        // Technical test: 15 General Awareness/Aptitude questions + 5 Tech stream questions
-        const aptitudePool = questionPool.filter(q => q.type === 'aptitude' || q.technology === 'Aptitude' || q.technology === 'General Awareness' || q.technology === 'General Technical & Aptitude');
-        const techPool = questionPool.filter(q => q.type === 'technology' && q.technology && q.technology.toLowerCase() === normalizedTech.toLowerCase());
-        
-        if (aptitudePool.length < 15 || techPool.length < 5) {
-          return res.status(404).json({
-            success: false,
-            message: `Insufficient questions available. Found ${aptitudePool.length} aptitude/general awareness questions (need 15) and ${techPool.length} technology questions (need 5).`
-          });
-        }
-        
-        const sampledApt = shuffleArray(aptitudePool).slice(0, 15);
-        const sampledTech = shuffleArray(techPool).slice(0, 5);
-        filteredQuestions = shuffleArray([...sampledApt, ...sampledTech]);
+      // 1. Primary: Questions matching candidate's specific technology or type
+      const exactTechQuestions = questionPool.filter(
+        q => (q.technology && q.technology.toLowerCase() === normalizedTech) ||
+             (q.type && q.type.toLowerCase() === normalizedTech)
+      );
+
+      // 2. Secondary: Other questions available in the question pool
+      const otherQuestions = questionPool.filter(
+        q => (!q.technology || q.technology.toLowerCase() !== normalizedTech) &&
+             (!q.type || q.type.toLowerCase() !== normalizedTech)
+      );
+
+      if (exactTechQuestions.length >= 20) {
+        // We have 20 or more technology-specific questions, pick 20 from them
+        filteredQuestions = shuffleArray(exactTechQuestions).slice(0, 20);
+      } else if (exactTechQuestions.length > 0) {
+        // Use all available tech questions and supplement up to 20 with other questions if available
+        const remainingNeeded = 20 - exactTechQuestions.length;
+        const sampledOther = shuffleArray(otherQuestions).slice(0, remainingNeeded);
+        filteredQuestions = shuffleArray([...exactTechQuestions, ...sampledOther]);
       } else {
-        // Aptitude or General Awareness test: 20 questions of that stream
-        const streamPool = questionPool.filter(q => q.technology && q.technology.toLowerCase() === normalizedTech.toLowerCase());
-        if (streamPool.length < 20) {
-          return res.status(404).json({
-            success: false,
-            message: `Insufficient questions available. Found ${streamPool.length} questions for stream ${normalizedTech}, need at least 20.`
-          });
-        }
-        filteredQuestions = shuffleArray(streamPool).slice(0, 20);
+        // If no direct tech match, pick up to 20 from all available questions in pool
+        filteredQuestions = shuffleArray(questionPool).slice(0, 20);
       }
     } else {
-      // Default: 20 aptitude questions if no tech stream specified
-      const aptitudePool = questionPool.filter(q => q.type === 'aptitude');
-      if (aptitudePool.length < 20) {
-        return res.status(404).json({
-          success: false,
-          message: `Insufficient aptitude questions available. Found ${aptitudePool.length}, need at least 20.`
-        });
-      }
-      filteredQuestions = shuffleArray(aptitudePool).slice(0, 20);
+      // No specific technology provided, pick up to 20 questions from the pool
+      filteredQuestions = shuffleArray(questionPool).slice(0, 20);
+    }
+
+    if (filteredQuestions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No questions found in database for Technology Stream: ${technology || 'General'}. Please add questions from Admin Panel.`
+      });
     }
 
     // 4️⃣ Randomly sample up to 20 questions from MongoDB with 4 options each
@@ -279,7 +276,7 @@ const startTest = async (req, res, next) => {
             collegeName: student.college || collegeName || "College",
             eventCode: codeToUse,
             testId: codeToUse,
-            totalQuestions: 20,
+            totalQuestions: sampledQuestions.length,
             status: "IN_PROGRESS",
             answers: answerKeyMap
           },

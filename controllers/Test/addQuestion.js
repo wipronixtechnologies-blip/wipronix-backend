@@ -47,6 +47,9 @@ const addQuestion = async (req, res, next) => {
 
     // Clear all matching cache keys
     try {
+      if (redis && redis.status === 'ready') {
+        await redis.del("test:questionPool");
+      }
       for (const testId of testIds) {
         const keys = await redis.keys(`test:questions:*:${testId}`);
         if (keys.length > 0) {

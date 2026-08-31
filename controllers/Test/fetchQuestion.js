@@ -37,32 +37,25 @@ const fetchQuestion = async (req, res, next) => {
       // FIRST TIME → LOAD FROM MONGO
       console.log("📚 Loading questions from database...");
       
-      const query = { testId };
-      const normalizedTech = (studentTechnology || "").trim();
-      const isTechTest = !['Aptitude', 'General Awareness'].includes(normalizedTech);
+      const normalizedTech = (studentTechnology || "").trim().toLowerCase();
 
-      if (normalizedTech) {
-        if (isTechTest) {
-          query.$or = [
-            { type: 'aptitude', technology: 'Aptitude' },
-            { type: 'aptitude', technology: 'General Awareness' },
-            { type: 'technology', technology: 'General Technical & Aptitude' },
-            { type: 'technology', technology: normalizedTech }
-          ];
-        } else {
-          query.technology = normalizedTech;
-        }
-      } else {
-        query.type = 'aptitude';
+      // Fetch all questions for this test or global questions or from question bank
+      let foundQuestions = await Question.find({
+        $or: [
+          { testId },
+          { eventCode: testId },
+          { testId: "GLOBAL" }
+        ]
+      }).select("question options type technology codeSnippet").lean();
+
+      if (!foundQuestions || foundQuestions.length === 0) {
+        foundQuestions = await Question.find().select("question options type technology codeSnippet").lean();
       }
 
-      // Fetch all matching questions from database
-      const foundQuestions = await Question.find(query).select("question options type technology codeSnippet").lean();
-
-      if (foundQuestions.length === 0) {
+      if (!foundQuestions || foundQuestions.length === 0) {
         return res.status(404).json({
           success: false,
-          message: `No questions found for Technology Stream: ${normalizedTech || 'General'}. Please add questions from Admin Panel.`,
+          message: `No questions found in database. Please add questions from Admin Panel.`,
           details: {
             testId,
             studentTechnology,
@@ -71,91 +64,50 @@ const fetchQuestion = async (req, res, next) => {
         });
       }
 
+      const functionShuffle = (array) => {
+        const arr = [...array];
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      };
+
       let allQuestions = [];
 
       if (normalizedTech) {
-        if (isTechTest) {
-          const aptitudeQuestions = foundQuestions.filter(q => q.type === 'aptitude' || q.technology === 'Aptitude' || q.technology === 'General Awareness' || q.technology === 'General Technical & Aptitude');
-          const techQuestions = foundQuestions.filter(q => q.type === 'technology' && q.technology === normalizedTech);
+        const exactTechQuestions = foundQuestions.filter(
+          q => (q.technology && q.technology.toLowerCase() === normalizedTech) ||
+               (q.type && q.type.toLowerCase() === normalizedTech)
+        );
+        const otherQuestions = foundQuestions.filter(
+          q => (!q.technology || q.technology.toLowerCase() !== normalizedTech) &&
+               (!q.type || q.type.toLowerCase() !== normalizedTech)
+        );
 
-          console.log(`📊 Found ${aptitudeQuestions.length} aptitude/general awareness and ${techQuestions.length} tech questions`);
-
-          if (aptitudeQuestions.length < 15 || techQuestions.length < 5) {
-            return res.status(404).json({
-              success: false,
-              message: `Insufficient questions available. Found ${aptitudeQuestions.length} aptitude/general awareness questions (need 15) and ${techQuestions.length} technology questions (need 5).`,
-              details: {
-                aptitudeQuestions: aptitudeQuestions.length,
-                techQuestions: techQuestions.length,
-                requiredAptitude: 15,
-                requiredTech: 5,
-                testId,
-                studentTechnology
-              }
-            });
-          }
-
-          // Sample and shuffle
-          const functionShuffle = (array) => {
-            const arr = [...array];
-            for (let i = arr.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
-            return arr;
-          };
-
-          const sampledApt = functionShuffle(aptitudeQuestions).slice(0, 15);
-          const sampledTech = functionShuffle(techQuestions).slice(0, 5);
-          allQuestions = functionShuffle([...sampledApt, ...sampledTech]);
+        if (exactTechQuestions.length >= 20) {
+          allQuestions = functionShuffle(exactTechQuestions).slice(0, 20);
+        } else if (exactTechQuestions.length > 0) {
+          const remainingNeeded = 20 - exactTechQuestions.length;
+          const sampledOther = functionShuffle(otherQuestions).slice(0, remainingNeeded);
+          allQuestions = functionShuffle([...exactTechQuestions, ...sampledOther]);
         } else {
-          const streamQuestions = foundQuestions.filter(q => q.technology === normalizedTech);
-          if (streamQuestions.length < 20) {
-            return res.status(404).json({
-              success: false,
-              message: `Insufficient questions available. Found ${streamQuestions.length} questions for stream ${normalizedTech}, need at least 20.`,
-              details: {
-                aptitudeQuestions: streamQuestions.length,
-                required: 20,
-                testId,
-                studentTechnology
-              }
-            });
-          }
-
-          const functionShuffle = (array) => {
-            const arr = [...array];
-            for (let i = arr.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
-            return arr;
-          };
-          allQuestions = functionShuffle(streamQuestions).slice(0, 20);
+          allQuestions = functionShuffle(foundQuestions).slice(0, 20);
         }
       } else {
-        const aptitudeQuestions = foundQuestions.filter(q => q.type === 'aptitude');
-        if (aptitudeQuestions.length < 20) {
-          return res.status(404).json({
-            success: false,
-            message: `Insufficient aptitude questions available. Found ${aptitudeQuestions.length}, need at least 20.`,
-            details: {
-              aptitudeQuestions: aptitudeQuestions.length,
-              required: 20,
-              testId
-            }
-          });
-        }
+        allQuestions = functionShuffle(foundQuestions).slice(0, 20);
+      }
 
-        const functionShuffle = (array) => {
-          const arr = [...array];
-          for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
+      if (allQuestions.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `No questions found for Technology Stream: ${studentTechnology || 'General'}. Please add questions from Admin Panel.`,
+          details: {
+            testId,
+            studentTechnology,
+            foundQuestions: 0
           }
-          return arr;
-        };
-        allQuestions = functionShuffle(aptitudeQuestions).slice(0, 20);
+        });
       }
 
       questions = JSON.stringify(allQuestions);
