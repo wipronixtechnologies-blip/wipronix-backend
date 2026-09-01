@@ -37,19 +37,21 @@ const getAllColleges = async (req, res) => {
     }
 
     // Calculate pagination
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
+    const pageNum = parseInt(page, 10) || 1;
+    const isNoLimit = limit === 'all' || limit === '0' || limit === 0 || limit === '-1' || Number(limit) === 0;
+    const limitNum = isNoLimit ? 0 : (parseInt(limit, 10) || 10);
+    const skip = isNoLimit ? 0 : (pageNum - 1) * limitNum;
 
     // Build sort object
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
     // Fetch colleges with pagination
-    const colleges = await College.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
+    let queryExec = College.find(filter).sort(sort);
+    if (!isNoLimit && limitNum > 0) {
+      queryExec = queryExec.skip(skip).limit(limitNum);
+    }
+    const colleges = await queryExec
       .populate('createdBy', 'fullName email')
       .populate('updatedBy', 'fullName email');
 
@@ -63,9 +65,9 @@ const getAllColleges = async (req, res) => {
         colleges,
         pagination: {
           currentPage: pageNum,
-          totalPages: Math.ceil(total / limitNum),
+          totalPages: isNoLimit || limitNum === 0 ? 1 : Math.ceil(total / limitNum),
           totalItems: total,
-          itemsPerPage: limitNum
+          itemsPerPage: isNoLimit ? total : limitNum
         }
       }
     });

@@ -25,9 +25,11 @@ const getAllStudents = async (req, res, next) => {
       }
     }
 
-    // Fetch students based on query
+    // Fetch students based on query (excluding sensitive/heavy fields with lean for fast memory performance)
     const students = await Student.find(query)
-      .sort({ createdAt: -1 });
+      .select("-password -resetPasswordToken -resetPasswordExpires")
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,

@@ -29,6 +29,18 @@ const resultSchema = new mongoose.Schema(
       trim: true,
       index: true
     },
+    course: {
+      type: String,
+      trim: true
+    },
+    semester: {
+      type: String,
+      trim: true
+    },
+    technology: {
+      type: String,
+      trim: true
+    },
     testId: {
       type: String,
       required: true
@@ -94,5 +106,14 @@ const resultSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// High performance indexes for scale (500+ to 50,000+ candidates)
+resultSchema.index({ collegeName: 1, createdAt: -1 });
+resultSchema.index({ eventCode: 1, createdAt: -1 });
+resultSchema.index({ studentEmail: 1 });
+resultSchema.index({ isShortlisted: 1 });
+resultSchema.index({ isSelected: 1 });
+resultSchema.index({ status: 1 });
+resultSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("Result", resultSchema, "results");

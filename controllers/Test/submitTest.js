@@ -6,7 +6,7 @@ const PASS_PERCENTAGE = 70; // 70% passing threshold
 
 const submitTest = async (req, res, next) => {
   try {
-    const { studentId, answers } = req.body;
+    const { studentId, answers, course: bodyCourse, semester: bodySemester, technology: bodyTechnology } = req.body;
 
     if (!studentId) {
       return res.status(400).json({
@@ -41,6 +41,9 @@ const submitTest = async (req, res, next) => {
     const studentEmail = sessionData?.studentEmail || existingResult?.studentEmail || student?.email || "";
     const studentPhone = sessionData?.studentPhone || existingResult?.studentPhone || student?.phoneNumber || "";
     const collegeName = sessionData?.collegeName || existingResult?.collegeName || student?.college || "College";
+    const course = bodyCourse || sessionData?.course || existingResult?.course || student?.course || "B.Tech";
+    const semester = bodySemester || sessionData?.semester || existingResult?.semester || student?.semester || "6th Sem";
+    const technology = bodyTechnology || sessionData?.technology || existingResult?.technology || student?.technology || "Core Technical";
     const eventCode = sessionData?.eventCode || existingResult?.eventCode || "GENERAL";
     const answerKeyMap = sessionData?.answerKeyMap || existingResult?.answers || {};
 
@@ -82,6 +85,9 @@ const submitTest = async (req, res, next) => {
           studentEmail,
           studentPhone,
           collegeName,
+          course,
+          semester,
+          technology,
           eventCode,
           testId: eventCode,
           totalQuestions,

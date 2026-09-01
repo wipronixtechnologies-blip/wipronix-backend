@@ -41,10 +41,13 @@ const startTest = async (req, res, next) => {
     let codeToUse = (eventCode || "GENERAL").trim().toUpperCase();
 
     // 1️⃣ Register or update candidate in MongoDB Student collection
+    const cleanCourse = (course || 'B.Tech').trim();
+    const cleanSemester = (semester || '6th Sem').trim();
+    const cleanTechnology = (technology || 'Core Technical').trim();
+
     try {
       if (fullName && email) {
         student = await Student.findOne({ email: email.trim().toLowerCase() });
-        const courseSemesterStr = `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`;
 
         if (!student) {
           student = await Student.create({
@@ -52,14 +55,16 @@ const startTest = async (req, res, next) => {
             email: email.trim().toLowerCase(),
             phoneNumber: phone ? phone.trim() : "",
             college: collegeName ? collegeName.trim() : "Default College",
-            course: courseSemesterStr,
-            technology: technology ? technology.trim() : ""
+            course: cleanCourse,
+            semester: cleanSemester,
+            technology: cleanTechnology
           });
         } else {
           if (collegeName) student.college = collegeName.trim();
           if (phone) student.phoneNumber = phone.trim();
-          student.course = courseSemesterStr;
-          if (technology) student.technology = technology.trim();
+          student.course = cleanCourse;
+          student.semester = cleanSemester;
+          student.technology = cleanTechnology;
           await student.save();
         }
       } else if (providedStudentId && providedStudentId.length === 24) {
@@ -76,8 +81,9 @@ const startTest = async (req, res, next) => {
         email: (email || "candidate@wipronix.com").trim().toLowerCase(),
         phoneNumber: (phone || "").trim(),
         college: (collegeName || "Wipronix Campus Drive").trim(),
-        course: `${course || 'B.Tech'} - ${semester || 'Sem N/A'}`,
-        technology: technology ? technology.trim() : ""
+        course: cleanCourse,
+        semester: cleanSemester,
+        technology: cleanTechnology
       };
     }
 
@@ -255,8 +261,9 @@ const startTest = async (req, res, next) => {
       studentEmail: student.email,
       studentPhone: student.phoneNumber || phone || "",
       collegeName: student.college || collegeName || "Default College",
-      course: student.course,
-      technology: student.technology || technology || "",
+      course: student.course || cleanCourse,
+      semester: student.semester || cleanSemester,
+      technology: student.technology || cleanTechnology,
       eventCode: codeToUse,
       startedAt,
       answerKeyMap,
@@ -274,6 +281,9 @@ const startTest = async (req, res, next) => {
             studentEmail: student.email,
             studentPhone: student.phoneNumber || phone || "",
             collegeName: student.college || collegeName || "College",
+            course: student.course || cleanCourse,
+            semester: student.semester || cleanSemester,
+            technology: student.technology || cleanTechnology,
             eventCode: codeToUse,
             testId: codeToUse,
             totalQuestions: sampledQuestions.length,
@@ -304,8 +314,9 @@ const startTest = async (req, res, next) => {
         studentName: student.fullName,
         email: student.email,
         collegeName: student.college,
-        course: student.course,
-        technology: student.technology || technology || "",
+        course: student.course || cleanCourse,
+        semester: student.semester || cleanSemester,
+        technology: student.technology || cleanTechnology,
         eventCode: codeToUse,
         durationMinutes: 20,
         remainingTimeSeconds: TEST_DURATION_SECONDS,

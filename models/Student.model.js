@@ -88,5 +88,7 @@ studentSchema.index({ phoneNumber: 1 });
 studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 // Allow same email for different technologies, but not same email+technology twice
 studentSchema.index({ email: 1, technology: 1 }, { unique: true });
+studentSchema.index({ college: 1, createdAt: -1 });
+studentSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("Student", studentSchema);

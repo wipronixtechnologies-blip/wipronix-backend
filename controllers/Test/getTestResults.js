@@ -29,6 +29,11 @@ const getTestResults = async (req, res, next) => {
       eventCode,
       status,
       isShortlisted,
+      course,
+      semester,
+      technology,
+      minPercentage,
+      maxPercentage,
       startDate,
       endDate,
       testId,
@@ -41,8 +46,16 @@ const getTestResults = async (req, res, next) => {
     if (testId) query.testId = testId;
     if (eventCode) query.eventCode = eventCode.trim().toUpperCase();
     if (college) query.collegeName = new RegExp(college.trim(), 'i');
+    if (course) query.course = new RegExp(course.trim(), 'i');
+    if (semester) query.semester = new RegExp(semester.trim(), 'i');
+    if (technology) query.technology = new RegExp(technology.trim(), 'i');
     if (isShortlisted === 'true') query.isShortlisted = true;
 
+    if (minPercentage || maxPercentage) {
+      query.percentage = {};
+      if (minPercentage) query.percentage.$gte = parseFloat(minPercentage);
+      if (maxPercentage) query.percentage.$lte = parseFloat(maxPercentage);
+    }
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -54,25 +67,52 @@ const getTestResults = async (req, res, next) => {
       query.status = status.toUpperCase();
     }
 
+    if (search) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { studentName: searchRegex },
+        { studentEmail: searchRegex },
+        { studentPhone: searchRegex },
+        { collegeName: searchRegex },
+        { eventCode: searchRegex },
+        { course: searchRegex },
+        { semester: searchRegex },
+        { technology: searchRegex }
+      ];
+    }
+
     const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 20;
-    const skip = (pageNum - 1) * limitNum;
+    const isNoLimit = limit === 'all' || limit === '0' || limit === 0 || limit === '-1' || Number(limit) === 0;
+    const limitNum = isNoLimit ? 0 : (parseInt(limit) || 20);
+    const skip = isNoLimit ? 0 : (pageNum - 1) * limitNum;
 
-    // Fetch results matching query
-    let results = await Result.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
+    // Build query execution excluding heavy answers field and populating student profile
+    let queryExec = Result.find(query)
+      .select('-answers')
+      .populate('studentId', 'course semester technology education')
+      .sort({ createdAt: -1 });
 
-    const totalCount = await Result.countDocuments(query);
+    if (!isNoLimit && limitNum > 0) {
+      queryExec = queryExec.skip(skip).limit(limitNum);
+    }
 
-    // Get all unique colleges & event codes for filter dropdowns
-    const allResults = await Result.find({}, { collegeName: 1, eventCode: 1 }).lean();
-    const colleges = [...new Set(allResults.map(r => r.collegeName).filter(Boolean))].sort();
-    const eventCodes = [...new Set(allResults.map(r => r.eventCode).filter(Boolean))].sort();
+    // Execute queries in parallel for ultra-fast response times even with 500+ records
+    const [results, totalCount, passedCount, avgScoreResult, rawColleges, rawEventCodes] = await Promise.all([
+      queryExec.lean(),
+      Result.countDocuments(query),
+      Result.countDocuments({ ...query, status: 'PASS' }),
+      Result.aggregate([
+        { $match: query },
+        { $group: { _id: null, avgPercentage: { $avg: '$percentage' } } }
+      ]),
+      Result.distinct('collegeName'),
+      Result.distinct('eventCode')
+    ]);
 
-    // Map results cleanly
+    const colleges = (rawColleges || []).filter(Boolean).sort();
+    const eventCodes = (rawEventCodes || []).filter(Boolean).sort();
+
+    // Map results cleanly with course, semester, technology
     const enrichedResults = results.map(result => {
       const percentage = result.percentage !== undefined 
         ? result.percentage 
@@ -80,14 +120,35 @@ const getTestResults = async (req, res, next) => {
 
       const passStatus = result.status || (percentage >= QUALIFYING_MARKS ? 'PASS' : 'FAIL');
 
+      const studentDoc = result.studentId && typeof result.studentId === 'object' ? result.studentId : {};
+      let candidateCourse = result.course || studentDoc.course || studentDoc.education || '';
+      let candidateSemester = result.semester || studentDoc.semester || '';
+      let candidateTechnology = result.technology || studentDoc.technology || '';
+
+      // If course was previously saved as "B.Tech - 6th Sem", split them cleanly
+      if (candidateCourse && candidateCourse.includes(' - ')) {
+        const parts = candidateCourse.split(' - ');
+        candidateCourse = parts[0]?.trim() || candidateCourse;
+        if (!candidateSemester && parts[1] && parts[1] !== 'Sem N/A') {
+          candidateSemester = parts[1]?.trim();
+        }
+      }
+
+      if (!candidateCourse) candidateCourse = 'B.Tech';
+      if (!candidateSemester) candidateSemester = '6th Sem';
+      if (!candidateTechnology) candidateTechnology = 'Core Technical';
+
       return {
         _id: result._id,
-        studentId: result.studentId,
+        studentId: studentDoc._id || result.studentId,
         studentName: result.studentName || 'Unknown',
         studentEmail: result.studentEmail || 'Unknown',
         studentPhone: result.studentPhone || 'N/A',
         college: result.collegeName || 'Not Specified',
         eventCode: result.eventCode || result.testId || 'N/A',
+        course: candidateCourse,
+        semester: candidateSemester,
+        technology: candidateTechnology,
         testId: result.testId,
         totalQuestions: result.totalQuestions || 20,
         attempted: result.attempted || 0,
@@ -107,27 +168,24 @@ const getTestResults = async (req, res, next) => {
       };
     });
 
-    // In-memory search if search query provided
+    // In-memory search fallback (if needed)
     let filteredResults = enrichedResults;
-    if (search) {
+    if (search && query.$or === undefined) {
       const searchLower = search.toLowerCase();
       filteredResults = filteredResults.filter(r =>
         r.studentName.toLowerCase().includes(searchLower) ||
         r.studentEmail.toLowerCase().includes(searchLower) ||
         r.studentPhone.toLowerCase().includes(searchLower) ||
         r.college.toLowerCase().includes(searchLower) ||
-        r.eventCode.toLowerCase().includes(searchLower)
+        r.eventCode.toLowerCase().includes(searchLower) ||
+        (r.course && r.course.toLowerCase().includes(searchLower)) ||
+        (r.semester && r.semester.toLowerCase().includes(searchLower))
       );
     }
 
     // Stats calculations
     const totalStudents = totalCount;
-    const passedCount = await Result.countDocuments({ ...query, status: 'PASS' });
     const failedCount = totalStudents - passedCount;
-    const avgScoreResult = await Result.aggregate([
-      { $match: query },
-      { $group: { _id: null, avgPercentage: { $avg: '$percentage' } } }
-    ]);
     const averageScore = avgScoreResult.length > 0 ? Math.round(avgScoreResult[0].avgPercentage * 10) / 10 : 0;
 
     res.json({
@@ -145,9 +203,9 @@ const getTestResults = async (req, res, next) => {
         eventCodes,
         pagination: {
           page: pageNum,
-          limit: limitNum,
+          limit: isNoLimit ? totalCount : limitNum,
           total: totalCount,
-          totalPages: Math.ceil(totalCount / limitNum)
+          totalPages: isNoLimit || limitNum === 0 ? 1 : Math.ceil(totalCount / limitNum)
         }
       }
     });
