@@ -5,7 +5,7 @@ const Question = require("../../models/Question.model");
 const EventTest = require("../../models/EventTest.model");
 const Result = require("../../models/Result.model");
 
-const TEST_DURATION_SECONDS = 20 * 60; // 20 minutes default
+const TEST_DURATION_SECONDS = 30 * 60; // 30 minutes (30 * 60 seconds)
 
 function shuffleArray(array) {
   const arr = [...array];
@@ -31,6 +31,43 @@ function normalizeOptions(rawOptions, correctIdx = 0) {
 
   // Strictly trim to 4 options
   return opts.slice(0, 4);
+}
+
+// Category identifier helpers
+function isAptitude(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'aptitude' || /aptitude|quant|reasoning|math/i.test(tech);
+}
+
+function isComputerNetwork(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'computer-network' || type === 'computer_network' || type === 'networking' || /network|networking|tcp|osi|protocol|subnet/i.test(tech);
+}
+
+function isProblemSolving(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'problem-solving' || type === 'problem_solving' || /problem\s*solving|dsa|algorithm|logic|data\s*structure/i.test(tech);
+}
+
+function isClientHandling(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'client-handling' || type === 'client_handling' || /client|customer|soft\s*skill|stakeholder|communication/i.test(tech);
+}
+
+function isTechnology(q) {
+  return !isAptitude(q) && !isComputerNetwork(q) && !isProblemSolving(q) && !isClientHandling(q);
+}
+
+function getSectionName(q) {
+  if (isAptitude(q)) return 'Aptitude';
+  if (isComputerNetwork(q)) return 'Computer Network';
+  if (isProblemSolving(q)) return 'Problem Solving';
+  if (isClientHandling(q)) return 'Client Handling';
+  return 'Technology';
 }
 
 const startTest = async (req, res, next) => {
@@ -89,7 +126,6 @@ const startTest = async (req, res, next) => {
 
     const studentIdStr = student._id.toString();
 
-
     // 2️⃣ Redis Existing Session Check
     try {
       if (redis && redis.status === 'ready' && typeof redis.get === 'function') {
@@ -107,7 +143,7 @@ const startTest = async (req, res, next) => {
                 email: student.email,
                 collegeName: student.college,
                 eventCode: memData.eventCode || codeToUse,
-                durationMinutes: 20,
+                durationMinutes: 30,
                 remainingTimeSeconds: TEST_DURATION_SECONDS - elapsed,
                 questions: memData.clientQuestions
               }
@@ -181,53 +217,82 @@ const startTest = async (req, res, next) => {
     if (!questionPool || questionPool.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No test questions found in MongoDB database. Please add questions from Admin Panel."
+        message: "No test questions found in database. Please add questions from Admin Panel."
       });
     }
 
-    // Filter questions based on student's technology stream in-memory
+    // 4️⃣ Strict 30-Question 5-Section Distribution:
+    // 10 Technology + 5 Aptitude + 5 Computer Networks + 5 Problem Solving + 5 Client Handling = 30
     const normalizedTech = (technology || "").trim().toLowerCase();
 
-    let filteredQuestions = [];
+    // 1. Technology Domain (10 Questions)
+    const techPool = questionPool.filter(isTechnology);
+    let selectedTech = [];
     if (normalizedTech) {
-      // 1. Primary: Questions matching candidate's specific technology or type
-      const exactTechQuestions = questionPool.filter(
-        q => (q.technology && q.technology.toLowerCase() === normalizedTech) ||
-             (q.type && q.type.toLowerCase() === normalizedTech)
-      );
+      const exactTech = techPool.filter(q => {
+        const qTech = (q.technology || '').toLowerCase();
+        return qTech.includes(normalizedTech) || normalizedTech.includes(qTech);
+      });
+      const otherTech = techPool.filter(q => !exactTech.includes(q));
 
-      // 2. Secondary: Other questions available in the question pool
-      const otherQuestions = questionPool.filter(
-        q => (!q.technology || q.technology.toLowerCase() !== normalizedTech) &&
-             (!q.type || q.type.toLowerCase() !== normalizedTech)
-      );
-
-      if (exactTechQuestions.length >= 20) {
-        // We have 20 or more technology-specific questions, pick 20 from them
-        filteredQuestions = shuffleArray(exactTechQuestions).slice(0, 20);
-      } else if (exactTechQuestions.length > 0) {
-        // Use all available tech questions and supplement up to 20 with other questions if available
-        const remainingNeeded = 20 - exactTechQuestions.length;
-        const sampledOther = shuffleArray(otherQuestions).slice(0, remainingNeeded);
-        filteredQuestions = shuffleArray([...exactTechQuestions, ...sampledOther]);
+      if (exactTech.length >= 10) {
+        selectedTech = shuffleArray(exactTech).slice(0, 10);
       } else {
-        // If no direct tech match, pick up to 20 from all available questions in pool
-        filteredQuestions = shuffleArray(questionPool).slice(0, 20);
+        const needed = 10 - exactTech.length;
+        selectedTech = [...exactTech, ...shuffleArray(otherTech).slice(0, needed)];
       }
     } else {
-      // No specific technology provided, pick up to 20 questions from the pool
-      filteredQuestions = shuffleArray(questionPool).slice(0, 20);
+      selectedTech = shuffleArray(techPool).slice(0, 10);
     }
 
-    if (filteredQuestions.length === 0) {
+    // Fallback if tech pool is under 10
+    if (selectedTech.length < 10) {
+      const remainingUnused = questionPool.filter(q => !selectedTech.includes(q));
+      selectedTech = [...selectedTech, ...shuffleArray(remainingUnused).slice(0, 10 - selectedTech.length)];
+    }
+
+    // Helper to safely pick N items from category pool with fallback to unused questions
+    const pickSection = (filterFn, count, alreadySelected) => {
+      const pool = questionPool.filter(q => filterFn(q) && !alreadySelected.some(s => s._id.toString() === q._id.toString()));
+      let chosen = shuffleArray(pool).slice(0, count);
+      if (chosen.length < count) {
+        const available = questionPool.filter(q =>
+          !alreadySelected.some(s => s._id.toString() === q._id.toString()) &&
+          !chosen.some(s => s._id.toString() === q._id.toString())
+        );
+        const supplement = shuffleArray(available).slice(0, count - chosen.length);
+        chosen = [...chosen, ...supplement];
+      }
+      return chosen;
+    };
+
+    // 2. Aptitude (5 Questions)
+    const selectedApt = pickSection(isAptitude, 5, selectedTech);
+
+    // 3. Computer Networks (5 Questions)
+    const selectedCN = pickSection(isComputerNetwork, 5, [...selectedTech, ...selectedApt]);
+
+    // 4. Problem Solving (5 Questions)
+    const selectedPS = pickSection(isProblemSolving, 5, [...selectedTech, ...selectedApt, ...selectedCN]);
+
+    // 5. Client Handling (5 Questions)
+    const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS]);
+
+    // Combine 30 questions
+    const sampledQuestions = [
+      ...selectedTech,
+      ...selectedApt,
+      ...selectedCN,
+      ...selectedPS,
+      ...selectedCH
+    ];
+
+    if (sampledQuestions.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `No questions found in database for Technology Stream: ${technology || 'General'}. Please add questions from Admin Panel.`
+        message: `No questions found in database. Please add questions from Admin Panel.`
       });
     }
-
-    // 4️⃣ Randomly sample up to 20 questions from MongoDB with 4 options each
-    const sampledQuestions = filteredQuestions;
 
     const clientQuestions = [];
     const answerKeyMap = {};
@@ -236,10 +301,12 @@ const startTest = async (req, res, next) => {
       const fourOptions = normalizeOptions(q.options, q.correctAnswer || 0);
       const correctOptionString = fourOptions[q.correctAnswer % fourOptions.length] || fourOptions[0];
       const shuffledOptions = shuffleArray(fourOptions);
+      const sectionName = getSectionName(q);
 
       answerKeyMap[index] = {
         questionId: q._id.toString(),
-        correctOption: correctOptionString
+        correctOption: correctOptionString,
+        section: sectionName
       };
 
       clientQuestions.push({
@@ -249,7 +316,8 @@ const startTest = async (req, res, next) => {
         codeSnippet: q.codeSnippet || "",
         options: shuffledOptions,
         type: q.type || 'technology',
-        technology: q.technology || 'General'
+        technology: q.technology || 'General',
+        section: sectionName
       });
     });
 
@@ -299,7 +367,7 @@ const startTest = async (req, res, next) => {
 
     try {
       if (redis && redis.status === 'ready' && typeof redis.set === 'function') {
-        // Save for test duration + 5 minutes buffer
+        // Save for test duration (30m) + 5 minutes buffer
         await redis.set(`test:session:${studentIdStr}`, JSON.stringify(sessionData), "EX", TEST_DURATION_SECONDS + 300);
       }
     } catch (redisErr) {
@@ -318,7 +386,7 @@ const startTest = async (req, res, next) => {
         semester: student.semester || cleanSemester,
         technology: student.technology || cleanTechnology,
         eventCode: codeToUse,
-        durationMinutes: 20,
+        durationMinutes: 30,
         remainingTimeSeconds: TEST_DURATION_SECONDS,
         questions: clientQuestions
       }

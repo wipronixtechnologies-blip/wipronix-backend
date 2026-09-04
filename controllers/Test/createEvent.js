@@ -15,7 +15,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       },
       {
         eventCode: "WIP-MAIMT-2026",
@@ -26,7 +26,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       },
       {
         eventCode: "WIP-SHOBHIT-2026",
@@ -37,7 +37,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       },
       {
         eventCode: "WIP-GPAMBOTA-2026",
@@ -48,7 +48,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       },
       {
         eventCode: "WIP-GPKANDA-2026",
@@ -59,7 +59,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       },
       {
         eventCode: "WIP-JNGEC-2026",
@@ -70,7 +70,7 @@ const seedDefaultEvents = async () => {
         maxHrMarks: 10.00,
         maxTechMarks: 10.00,
         technology: "General Technical & Aptitude",
-        durationMinutes: 20
+        durationMinutes: 30
       }
     ];
 
@@ -129,8 +129,8 @@ const createEvent = async (req, res, next) => {
       maxHrMarks: maxHrMarks || 10.00,
       maxTechMarks: maxTechMarks || 10.00,
       technology: technology || "General Technical & Aptitude",
-      durationMinutes: durationMinutes || 20,
-      questionsCount: questionsCount || 20,
+      durationMinutes: durationMinutes || 30,
+      questionsCount: questionsCount || 30,
       passPercentage: passPercentage || 70
     });
 

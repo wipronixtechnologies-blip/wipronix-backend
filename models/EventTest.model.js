@@ -42,11 +42,11 @@ const eventTestSchema = new mongoose.Schema(
     },
     durationMinutes: {
       type: Number,
-      default: 20
+      default: 30
     },
     questionsCount: {
       type: Number,
-      default: 20
+      default: 30
     },
     passPercentage: {
       type: Number,

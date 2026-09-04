@@ -47,7 +47,7 @@ const resultSchema = new mongoose.Schema(
     },
     totalQuestions: {
       type: Number,
-      default: 20
+      default: 30
     },
     attempted: {
       type: Number,

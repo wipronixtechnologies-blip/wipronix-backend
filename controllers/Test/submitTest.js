@@ -50,7 +50,7 @@ const submitTest = async (req, res, next) => {
     const submittedAnswers = answers || {};
     let attempted = 0;
     let correctCount = 0;
-    const totalQuestions = Object.keys(answerKeyMap).length || 20;
+    const totalQuestions = Object.keys(answerKeyMap).length || 30;
 
     // Evaluate answers
     Object.keys(answerKeyMap).forEach(questionIdx => {

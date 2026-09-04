@@ -2,6 +2,35 @@ const redis = require("../../src/config/redis");
 const Question = require("../../models/Question.model");
 const Student = require("../../models/Student.model");
 
+// Category identifier helpers
+function isAptitude(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'aptitude' || /aptitude|quant|reasoning|math/i.test(tech);
+}
+
+function isComputerNetwork(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'computer-network' || type === 'computer_network' || type === 'networking' || /network|networking|tcp|osi|protocol|subnet/i.test(tech);
+}
+
+function isProblemSolving(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'problem-solving' || type === 'problem_solving' || /problem\s*solving|dsa|algorithm|logic|data\s*structure/i.test(tech);
+}
+
+function isClientHandling(q) {
+  const type = (q.type || '').toLowerCase();
+  const tech = (q.technology || '').toLowerCase();
+  return type === 'client-handling' || type === 'client_handling' || /client|customer|soft\s*skill|stakeholder|communication/i.test(tech);
+}
+
+function isTechnology(q) {
+  return !isAptitude(q) && !isComputerNetwork(q) && !isProblemSolving(q) && !isClientHandling(q);
+}
+
 const fetchQuestion = async (req, res, next) => {
   try {
     const { studentId, testId, index = 0 } = req.query;
@@ -36,7 +65,7 @@ const fetchQuestion = async (req, res, next) => {
     if (!questions) {
       // FIRST TIME → LOAD FROM MONGO
       console.log("📚 Loading questions from database...");
-      
+
       const normalizedTech = (studentTechnology || "").trim().toLowerCase();
 
       // Fetch all questions for this test or global questions or from question bank
@@ -73,30 +102,64 @@ const fetchQuestion = async (req, res, next) => {
         return arr;
       };
 
-      let allQuestions = [];
-
+      // 1. Technology Domain (10 Questions)
+      const techPool = foundQuestions.filter(isTechnology);
+      let selectedTech = [];
       if (normalizedTech) {
-        const exactTechQuestions = foundQuestions.filter(
-          q => (q.technology && q.technology.toLowerCase() === normalizedTech) ||
-               (q.type && q.type.toLowerCase() === normalizedTech)
-        );
-        const otherQuestions = foundQuestions.filter(
-          q => (!q.technology || q.technology.toLowerCase() !== normalizedTech) &&
-               (!q.type || q.type.toLowerCase() !== normalizedTech)
-        );
+        const exactTech = techPool.filter(q => {
+          const qTech = (q.technology || '').toLowerCase();
+          return qTech.includes(normalizedTech) || normalizedTech.includes(qTech);
+        });
+        const otherTech = techPool.filter(q => !exactTech.includes(q));
 
-        if (exactTechQuestions.length >= 20) {
-          allQuestions = functionShuffle(exactTechQuestions).slice(0, 20);
-        } else if (exactTechQuestions.length > 0) {
-          const remainingNeeded = 20 - exactTechQuestions.length;
-          const sampledOther = functionShuffle(otherQuestions).slice(0, remainingNeeded);
-          allQuestions = functionShuffle([...exactTechQuestions, ...sampledOther]);
+        if (exactTech.length >= 10) {
+          selectedTech = functionShuffle(exactTech).slice(0, 10);
         } else {
-          allQuestions = functionShuffle(foundQuestions).slice(0, 20);
+          const needed = 10 - exactTech.length;
+          selectedTech = [...exactTech, ...functionShuffle(otherTech).slice(0, needed)];
         }
       } else {
-        allQuestions = functionShuffle(foundQuestions).slice(0, 20);
+        selectedTech = functionShuffle(techPool).slice(0, 10);
       }
+
+      if (selectedTech.length < 10) {
+        const remainingUnused = foundQuestions.filter(q => !selectedTech.includes(q));
+        selectedTech = [...selectedTech, ...functionShuffle(remainingUnused).slice(0, 10 - selectedTech.length)];
+      }
+
+      const pickSection = (filterFn, count, alreadySelected) => {
+        const pool = foundQuestions.filter(q => filterFn(q) && !alreadySelected.some(s => s._id.toString() === q._id.toString()));
+        let chosen = functionShuffle(pool).slice(0, count);
+        if (chosen.length < count) {
+          const available = foundQuestions.filter(q =>
+            !alreadySelected.some(s => s._id.toString() === q._id.toString()) &&
+            !chosen.some(s => s._id.toString() === q._id.toString())
+          );
+          const supplement = functionShuffle(available).slice(0, count - chosen.length);
+          chosen = [...chosen, ...supplement];
+        }
+        return chosen;
+      };
+
+      // 2. Aptitude (5 Questions)
+      const selectedApt = pickSection(isAptitude, 5, selectedTech);
+
+      // 3. Computer Networks (5 Questions)
+      const selectedCN = pickSection(isComputerNetwork, 5, [...selectedTech, ...selectedApt]);
+
+      // 4. Problem Solving (5 Questions)
+      const selectedPS = pickSection(isProblemSolving, 5, [...selectedTech, ...selectedApt, ...selectedCN]);
+
+      // 5. Client Handling (5 Questions)
+      const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS]);
+
+      const allQuestions = [
+        ...selectedTech,
+        ...selectedApt,
+        ...selectedCN,
+        ...selectedPS,
+        ...selectedCH
+      ];
 
       if (allQuestions.length === 0) {
         return res.status(404).json({
@@ -141,7 +204,7 @@ const fetchQuestion = async (req, res, next) => {
             orderKey,
             JSON.stringify(shuffledIndexes),
             "EX",
-            25 * 60
+            35 * 60
           );
         }
 
@@ -172,8 +235,8 @@ const fetchQuestion = async (req, res, next) => {
       question: question.question,
       codeSnippet: question.codeSnippet || "",
       options: question.options.map((option, idx) => ({
-        key: `option_${idx}`, // Create unique key for each option
-        text: option // Store the option text
+        key: `option_${idx}`,
+        text: option
       }))
     };
 

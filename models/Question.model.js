@@ -13,12 +13,11 @@ const questionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['aptitude', 'technology'],
       default: 'technology'
     },
     technology: {
       type: String,
-      required: function () { return this.type === 'technology'; }
+      default: 'General'
     },
     question: {
       type: String,
