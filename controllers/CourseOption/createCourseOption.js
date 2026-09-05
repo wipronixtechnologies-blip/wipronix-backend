@@ -2,7 +2,7 @@ const CourseOption = require('../../models/CourseOption.model');
 
 const createCourseOption = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, highestEducation } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -11,16 +11,22 @@ const createCourseOption = async (req, res) => {
       });
     }
 
-    const existingOption = await CourseOption.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+    const educationToUse = highestEducation ? highestEducation.trim() : 'B.Tech';
+
+    const existingOption = await CourseOption.findOne({
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      highestEducation: educationToUse
+    });
     if (existingOption) {
       return res.status(400).json({
         success: false,
-        message: 'This Course / Degree option already exists'
+        message: `This Course / Degree option already exists under ${educationToUse}`
       });
     }
 
     const newOption = new CourseOption({
-      name: name.trim()
+      name: name.trim(),
+      highestEducation: educationToUse
     });
 
     await newOption.save();

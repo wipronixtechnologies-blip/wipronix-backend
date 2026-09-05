@@ -4,7 +4,11 @@ const courseOptionSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
+    trim: true
+  },
+  highestEducation: {
+    type: String,
+    default: 'B.Tech',
     trim: true
   },
   isActive: {
