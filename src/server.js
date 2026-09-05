@@ -10,6 +10,16 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
     
+    // Ensure Machine Round default configs and challenges are seeded
+    try {
+      const { ensureSeed } = require("../controllers/Test/machineRoundController");
+      if (typeof ensureSeed === "function") {
+        await ensureSeed();
+      }
+    } catch (sErr) {
+      console.warn("Machine seed on start warning:", sErr.message);
+    }
+    
     // Connect to Redis
     const redisConnected = await connectRedis();
     if (!redisConnected) {

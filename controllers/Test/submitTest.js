@@ -71,6 +71,24 @@ const submitTest = async (req, res, next) => {
       : 0;
     const status = percentage >= PASS_PERCENTAGE ? "PASS" : "FAIL";
 
+    // Check if Machine Round is enabled for this candidate's technology
+    let hasMachineRound = true;
+    try {
+      const MachineConfig = require("../../models/MachineConfig.model");
+      const cleanTech = technology.trim();
+      const techConfig = await MachineConfig.findOne({
+        technology: { $regex: new RegExp(`^${cleanTech}$`, 'i') }
+      });
+
+      if (techConfig) {
+        hasMachineRound = techConfig.hasMachineRound;
+      } else {
+        hasMachineRound = !/sales|marketing|business|hr|telecaller/i.test(cleanTech);
+      }
+    } catch (mErr) {
+      hasMachineRound = !/sales|marketing|business|hr|telecaller/i.test(technology);
+    }
+
     // Save Result document safely
     try {
       const query = existingResult 
@@ -97,7 +115,10 @@ const submitTest = async (req, res, next) => {
           percentage,
           status,
           answers: submittedAnswers,
-          resultDeclared: true
+          resultDeclared: true,
+          hasMachineRound,
+          machineRoundStatus: hasMachineRound ? "PENDING" : "NOT_APPLICABLE",
+          machineRoundTechnology: technology
         },
         { upsert: true, new: true }
       );
@@ -105,17 +126,25 @@ const submitTest = async (req, res, next) => {
       console.warn("Result save fallback:", dbErr.message);
     }
 
-    // Return confirmation cleanly to student
+    // Return confirmation cleanly to student with machine round readiness
     return res.status(200).json({
       success: true,
-      message: "Your test has been submitted successfully. Thank you!"
+      message: "Your test has been submitted successfully. Thank you!",
+      hasMachineRound,
+      technology,
+      studentId: String(studentId),
+      studentName,
+      studentEmail,
+      collegeName,
+      eventCode
     });
 
   } catch (error) {
     console.error("Submit Test Critical Error:", error);
     return res.status(200).json({
       success: true,
-      message: "Your test has been submitted successfully. Thank you!"
+      message: "Your test has been submitted successfully. Thank you!",
+      hasMachineRound: false
     });
   }
 };

@@ -10,6 +10,17 @@ const { getTestResults, toggleShortlist, getShortlistedStudents, updateInterview
 
 const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
 const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
+const {
+  getMachineRoundConfig,
+  startMachineSession,
+  runCode,
+  submitMachineRound,
+  toggleTechnologyRound,
+  getAdminChallenges,
+  saveAdminChallenge,
+  deleteAdminChallenge,
+  getCandidateSubmission
+} = require("../../../../controllers/Test/machineRoundController");
 
 // POST /api/test/start & /api/test/public-start
 router.post("/start", startTest);
@@ -35,6 +46,17 @@ router.post("/answer", submitAnswer);
 // POST /api/test/submit (Student submits test)
 router.post("/submit", submitTest);
 
+// ---------------- MACHINE ROUND / CODING PLATFORM ROUTES ----------------
+router.get("/machine-round/config", getMachineRoundConfig);
+router.post("/machine-round/start", startMachineSession);
+router.post("/machine-round/run", runCode);
+router.post("/machine-round/submit", submitMachineRound);
+router.post("/machine-round/toggle-tech", toggleTechnologyRound);
+router.get("/machine-round/admin/challenges", getAdminChallenges);
+router.post("/machine-round/admin/challenge", saveAdminChallenge);
+router.delete("/machine-round/admin/challenge/:id", deleteAdminChallenge);
+router.get("/machine-round/submission/:resultId", getCandidateSubmission);
+
 // Test results & shortlist management
 router.get("/results", getTestResults);
 router.post("/toggle-shortlist", toggleShortlist);
@@ -44,6 +66,5 @@ router.post("/toggle-selection", toggleSelection);
 router.post("/send-student-offer-letter", sendStudentOfferLetter);
 router.get("/generate-student-offer-letter/:resultId", generateStudentOfferLetterDownload);
 
-
-
 module.exports = router;
+

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const resultSchema = new mongoose.Schema(
   {
     studentId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.Mixed,
       required: true,
       index: true
     },
@@ -102,6 +102,61 @@ const resultSchema = new mongoose.Schema(
     resultDeclared: {
       type: Boolean,
       default: true
+    },
+    // Machine Coding Round fields
+    hasMachineRound: {
+      type: Boolean,
+      default: false
+    },
+    machineRoundStatus: {
+      type: String,
+      enum: ['NOT_APPLICABLE', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'],
+      default: 'NOT_APPLICABLE'
+    },
+    machineRoundTechnology: {
+      type: String,
+      default: ''
+    },
+    machineRoundChallengeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MachineChallenge',
+      default: null
+    },
+    machineRoundChallengeTitle: {
+      type: String,
+      default: ''
+    },
+    machineRoundCode: {
+      type: String,
+      default: ''
+    },
+    machineRoundLanguage: {
+      type: String,
+      default: 'javascript'
+    },
+    machineRoundScore: {
+      type: Number,
+      default: 0
+    },
+    machineRoundPassedTestCases: {
+      type: Number,
+      default: 0
+    },
+    machineRoundTotalTestCases: {
+      type: Number,
+      default: 0
+    },
+    machineRoundTimeSpent: {
+      type: Number,
+      default: 0
+    },
+    machineRoundSubmittedAt: {
+      type: Date,
+      default: null
+    },
+    machineRoundConsoleOutput: {
+      type: String,
+      default: ''
     }
   },
   { timestamps: true }
