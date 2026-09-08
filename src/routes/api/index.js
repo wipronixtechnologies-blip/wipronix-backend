@@ -55,6 +55,7 @@ const placementRoutes = require('./Placement.route');
 const admissionRoutes = require('./Admission.route');
 const adminRoutes = require('./Admin.route');
 const jobRoutes = require('./Job.route');
+const counselorRoutes = require('./Counselor.route');
 
 Router.use("/settings", settingsRoutes);
 Router.use("/highest-education", highestEducationRoutes);
@@ -67,5 +68,6 @@ Router.use("/placement", placementRoutes);
 Router.use("/admission", admissionRoutes);
 Router.use("/admin", adminRoutes);
 Router.use("/jobs", jobRoutes);
+Router.use("/counselor", counselorRoutes);
 
 module.exports = Router;

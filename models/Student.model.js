@@ -79,6 +79,31 @@ const studentSchema = new mongoose.Schema(
     profilePicture: {
       type: String,
       trim: true
+    },
+
+    // Counselor & BDE Assignment
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null
+    },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null
+    },
+    assignedAt: {
+      type: Date,
+      default: null
+    },
+    counselingStatus: {
+      type: String,
+      enum: ['unassigned', 'assigned', 'contacted', 'interested', 'not_interested', 'enrolled', 'rejected'],
+      default: 'unassigned'
+    },
+    counselingNotes: {
+      type: String,
+      default: ''
     }
   },
   { timestamps: true }
@@ -90,5 +115,7 @@ studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 studentSchema.index({ email: 1, technology: 1 }, { unique: true });
 studentSchema.index({ college: 1, createdAt: -1 });
 studentSchema.index({ createdAt: -1 });
+studentSchema.index({ assignedTo: 1, college: 1 });
+studentSchema.index({ college: 1, assignedTo: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

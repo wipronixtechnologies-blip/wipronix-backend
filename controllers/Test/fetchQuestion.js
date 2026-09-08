@@ -31,6 +31,70 @@ function isTechnology(q) {
   return !isAptitude(q) && !isComputerNetwork(q) && !isProblemSolving(q) && !isClientHandling(q);
 }
 
+// Domain identifier & matcher helper
+function isDomainMatch(studentTech, questionTech) {
+  const s = (studentTech || '').toLowerCase().trim();
+  const q = (questionTech || '').toLowerCase().trim();
+  if (!s || !q) return false;
+
+  // Direct substring / exact match
+  if (q.includes(s) || s.includes(q)) return true;
+
+  // Comprehensive Domain Groups
+  const domainGroups = [
+    {
+      aliases: ['mern', 'react', 'node', 'express', 'mongodb', 'full stack', 'fullstack', 'javascript', 'frontend', 'web development'],
+      tags: ['mern', 'react', 'node', 'express', 'mongo', 'javascript', 'js', 'frontend', 'full stack']
+    },
+    {
+      aliases: ['python', 'django', 'fastapi', 'flask', 'backend python'],
+      tags: ['python', 'django', 'fastapi', 'flask']
+    },
+    {
+      aliases: ['java', 'spring', 'springboot', 'spring boot', 'microservices'],
+      tags: ['java', 'spring', 'microservice', 'hibernate']
+    },
+    {
+      aliases: ['mobile', 'flutter', 'react native', 'android', 'ios', 'dart'],
+      tags: ['mobile', 'flutter', 'react native', 'android', 'ios', 'dart', 'kotlin', 'swift']
+    },
+    {
+      aliases: ['next', 'next.js', 'nextjs', 'tailwind'],
+      tags: ['next', 'tailwind', 'react', 'frontend']
+    },
+    {
+      aliases: ['ai', 'ml', 'ai / ml', 'data science', 'gen ai', 'machine learning', 'deep learning'],
+      tags: ['ai', 'ml', 'data science', 'gen ai', 'neural', 'machine learning', 'nlp', 'llm']
+    },
+    {
+      aliases: ['cloud', 'devops', 'aws', 'docker', 'kubernetes'],
+      tags: ['cloud', 'devops', 'aws', 'docker', 'linux', 'kubernetes', 'ci/cd']
+    },
+    {
+      aliases: ['cyber', 'security', 'cyber security', 'infosec'],
+      tags: ['cyber', 'security', 'penetration', 'firewall', 'encryption']
+    },
+    {
+      aliases: ['c++', 'cpp', 'oop', 'c / c++'],
+      tags: ['c++', 'cpp', 'oop']
+    },
+    {
+      aliases: ['ui', 'ux', 'ui/ux', 'design', 'figma'],
+      tags: ['ui', 'ux', 'figma', 'design', 'wireframe']
+    }
+  ];
+
+  for (const group of domainGroups) {
+    const studentMatches = group.aliases.some(a => s.includes(a));
+    if (studentMatches) {
+      const questionMatches = group.tags.some(t => q.includes(t)) || group.aliases.some(a => q.includes(a));
+      if (questionMatches) return true;
+    }
+  }
+
+  return false;
+}
+
 const fetchQuestion = async (req, res, next) => {
   try {
     const { studentId, testId, index = 0 } = req.query;
@@ -102,21 +166,24 @@ const fetchQuestion = async (req, res, next) => {
         return arr;
       };
 
-      // 1. Technology Domain (10 Questions)
+      // 1. Technology Domain (10 Questions strictly tailored to selected domain)
       const techPool = foundQuestions.filter(isTechnology);
       let selectedTech = [];
       if (normalizedTech) {
-        const exactTech = techPool.filter(q => {
-          const qTech = (q.technology || '').toLowerCase();
-          return qTech.includes(normalizedTech) || normalizedTech.includes(qTech);
-        });
-        const otherTech = techPool.filter(q => !exactTech.includes(q));
+        const exactTech = techPool.filter(q => isDomainMatch(normalizedTech, q.technology));
 
         if (exactTech.length >= 10) {
           selectedTech = functionShuffle(exactTech).slice(0, 10);
         } else {
+          const generalPool = techPool.filter(q => 
+            !exactTech.includes(q) && /general|web|programming|basic|core/i.test(q.technology || '')
+          );
+          const otherPool = techPool.filter(q => 
+            !exactTech.includes(q) && !generalPool.includes(q)
+          );
           const needed = 10 - exactTech.length;
-          selectedTech = [...exactTech, ...functionShuffle(otherTech).slice(0, needed)];
+          const supplement = [...functionShuffle(generalPool), ...functionShuffle(otherPool)].slice(0, needed);
+          selectedTech = [...exactTech, ...supplement];
         }
       } else {
         selectedTech = functionShuffle(techPool).slice(0, 10);
