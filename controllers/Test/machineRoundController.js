@@ -60,53 +60,24 @@ You can return the answer in any order, or as a sorted array \`[index1, index2]\
  */
 function twoSum(numbers, target) {
   // Write your code here
-  const map = new Map();
-  for (let i = 0; i < numbers.length; i++) {
-    const complement = target - numbers[i];
-    if (map.has(complement)) {
-      return [map.get(complement), i];
-    }
-    map.set(numbers[i], i);
-  }
-  return [];
+  
 }`,
       python: `def twoSum(numbers, target):
     # Write your python code here
-    seen = {}
-    for i, num in enumerate(numbers):
-        diff = target - num
-        if diff in seen:
-            return [seen[diff], i]
-        seen[num] = i
-    return []`,
+    pass`,
       java: `import java.util.*;
 
 public class Solution {
     public static int[] twoSum(int[] numbers, int target) {
-        Map<Integer, Integer> map = new HashMap<>();
-        for (int i = 0; i < numbers.length; i++) {
-            int complement = target - numbers[i];
-            if (map.containsKey(complement)) {
-                return new int[] { map.get(complement), i };
-            }
-            map.put(numbers[i], i);
-        }
+        // Write your java code here
         return new int[0];
     }
 }`,
       cpp: `#include <vector>
-#include <unordered_map>
 using namespace std;
 
 vector<int> twoSum(vector<int>& numbers, int target) {
-    unordered_map<int, int> seen;
-    for (int i = 0; i < numbers.size(); i++) {
-        int diff = target - numbers[i];
-        if (seen.find(diff) != seen.end()) {
-            return {seen[diff], i};
-        }
-        seen[numbers[i]] = i;
-    }
+    // Write your C++ code here
     return {};
 }`
     },
@@ -150,32 +121,25 @@ You can assume the string has only uppercase and lowercase letters (\`a-z\`, \`A
  * @return {string}
  */
 function compressString(str) {
-  if (!str || str.length <= 2) return str;
-  let compressed = "";
-  let count = 1;
-  for (let i = 0; i < str.length; i++) {
-    if (i + 1 < str.length && str[i] === str[i + 1]) {
-      count++;
-    } else {
-      compressed += str[i] + count;
-      count = 1;
-    }
-  }
-  return compressed.length < str.length ? compressed : str;
+  // Write your code here
+  
 }`,
       python: `def compressString(s: str) -> str:
-    if not s or len(s) <= 2:
-        return s
-    res = []
-    count = 1
-    for i in range(len(s)):
-        if i + 1 < len(s) and s[i] == s[i+1]:
-            count += 1
-        else:
-            res.append(s[i] + str(count))
-            count = 1
-    comp = "".join(res)
-    return comp if len(comp) < len(s) else s`
+    # Write your python code here
+    pass`,
+      java: `public class Solution {
+    public static String compressString(String str) {
+        // Write your java code here
+        return "";
+    }
+}`,
+      cpp: `#include <string>
+using namespace std;
+
+string compressString(string str) {
+    // Write your C++ code here
+    return "";
+}`
     },
     testCases: [
       { input: JSON.stringify(["aabcccccaaa"]), expectedOutput: JSON.stringify("a2b1c5a3"), isHidden: false, explanation: "Counts: a:2, b:1, c:5, a:3" },
@@ -217,29 +181,25 @@ An input string is valid if:
  * @return {boolean}
  */
 function isValid(s) {
-  const stack = [];
-  const map = { ')': '(', '}': '{', ']': '[' };
-  for (const ch of s) {
-    if (ch === '(' || ch === '{' || ch === '[') {
-      stack.push(ch);
-    } else if (map[ch]) {
-      if (stack.length === 0 || stack.pop() !== map[ch]) {
-        return false;
-      }
-    }
-  }
-  return stack.length === 0;
+  // Write your code here
+  
 }`,
       python: `def isValid(s: str) -> bool:
-    stack = []
-    mapping = {")": "(", "}": "{", "]": "["}
-    for char in s:
-        if char in mapping.values():
-            stack.append(char)
-        elif char in mapping:
-            if not stack or stack.pop() != mapping[char]:
-                return False
-    return not stack`
+    # Write your python code here
+    pass`,
+      java: `public class Solution {
+    public static boolean isValid(String s) {
+        // Write your java code here
+        return false;
+    }
+}`,
+      cpp: `#include <string>
+using namespace std;
+
+bool isValid(string s) {
+    // Write your C++ code here
+    return false;
+}`
     },
     testCases: [
       { input: JSON.stringify(["()"]), expectedOutput: JSON.stringify(true), isHidden: false },
@@ -279,29 +239,25 @@ Given a string \`s\`, find the length of the **longest substring** without dupli
  * @return {number}
  */
 function lengthOfLongestSubstring(s) {
-  let maxLength = 0;
-  let start = 0;
-  const map = new Map();
-  for (let end = 0; end < s.length; end++) {
-    const char = s[end];
-    if (map.has(char) && map.get(char) >= start) {
-      start = map.get(char) + 1;
-    }
-    map.set(char, end);
-    maxLength = Math.max(maxLength, end - start + 1);
-  }
-  return maxLength;
+  // Write your code here
+  
 }`,
       python: `def lengthOfLongestSubstring(s: str) -> int:
-    char_map = {}
-    max_len = 0
-    start = 0
-    for end, char in enumerate(s):
-        if char in char_map and char_map[char] >= start:
-            start = char_map[char] + 1
-        char_map[char] = end
-        max_len = max(max_len, end - start + 1)
-    return max_len`
+    # Write your python code here
+    pass`,
+      java: `public class Solution {
+    public static int lengthOfLongestSubstring(String s) {
+        // Write your java code here
+        return 0;
+    }
+}`,
+      cpp: `#include <string>
+using namespace std;
+
+int lengthOfLongestSubstring(string s) {
+    // Write your C++ code here
+    return 0;
+}`
     },
     testCases: [
       { input: JSON.stringify(["abcabcbb"]), expectedOutput: JSON.stringify(3), isHidden: false, explanation: "abc -> len 3" },
@@ -372,12 +328,15 @@ async function ensureSeed() {
       console.warn("Question tech sync to MachineConfig warning:", e.message);
     }
 
-    const challengeCount = await MachineChallenge.countDocuments();
-    if (challengeCount === 0) {
-      for (const ch of DEFAULT_CHALLENGES) {
+    for (const ch of DEFAULT_CHALLENGES) {
+      const existing = await MachineChallenge.findOne({ title: ch.title });
+      if (!existing) {
         await MachineChallenge.create(ch);
+      } else {
+        // Sync starterCodes in DB to ensure no solution code is shown
+        existing.starterCodes = ch.starterCodes;
+        await existing.save();
       }
-      console.log(`✅ Seeded ${DEFAULT_CHALLENGES.length} Machine Coding Challenges successfully.`);
     }
   } catch (err) {
     console.warn("Machine round seed fallback:", err.message);
