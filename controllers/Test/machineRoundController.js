@@ -749,9 +749,13 @@ exports.submitMachineRound = async (req, res) => {
 
     if (searchConditions.length > 0) {
       try {
-        await Result.updateMany(
-          { $or: searchConditions },
-          {
+        const existingResults = await Result.find({ $or: searchConditions });
+        for (const doc of existingResults) {
+          const finalStatus = doc.status === 'IN_PROGRESS'
+            ? (doc.percentage >= 70 ? 'PASS' : 'FAIL')
+            : (doc.status || 'FAIL');
+
+          await Result.findByIdAndUpdate(doc._id, {
             hasMachineRound: true,
             machineRoundStatus: "COMPLETED",
             machineRoundChallengeId: challenge?._id,
@@ -764,9 +768,11 @@ exports.submitMachineRound = async (req, res) => {
             machineRoundTimeSpent: timeSpentSeconds || 0,
             machineRoundSubmittedAt: new Date(),
             machineRoundConsoleOutput: cumulativeLogs.slice(0, 2000),
-            technicalRoundMarks: scoreOutOf10
-          }
-        );
+            technicalRoundMarks: scoreOutOf10,
+            status: finalStatus,
+            resultDeclared: true
+          });
+        }
       } catch (dbErr) {
         console.warn("Result machine round submission save warning:", dbErr.message);
       }
@@ -1018,6 +1024,8 @@ function executeCodeWithArgs(code, language, funcName, args) {
       error: (...msg) => logs.push('[ERR] ' + msg.join(' '))
     };
 
+    const builtinKeys = new Set(['console', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean', 'Map', 'Set', 'parseInt', 'parseFloat', 'isNaN']);
+
     const sandbox = {
       console: customConsole,
       Math,
@@ -1034,23 +1042,30 @@ function executeCodeWithArgs(code, language, funcName, args) {
       isNaN
     };
 
-    const script = new vm.Script(`
-      ${code}
-      if (typeof ${funcName} === 'function') {
-        __result = ${funcName}(...__args);
-      } else {
-        throw new Error('Function ${funcName} is not defined in your code.');
+    const context = vm.createContext(sandbox);
+
+    // Run user code inside sandbox
+    vm.runInContext(code, context, { timeout: 3000 });
+
+    // Locate target function: by exact specified name or find user's custom function
+    let targetFunc = null;
+    if (funcName && typeof context[funcName] === 'function') {
+      targetFunc = context[funcName];
+    } else {
+      for (const k of Object.keys(context)) {
+        if (!builtinKeys.has(k) && typeof context[k] === 'function' && !k.startsWith('_')) {
+          targetFunc = context[k];
+          break;
+        }
       }
-    `);
+    }
 
-    const context = vm.createContext({
-      ...sandbox,
-      __args: Array.isArray(args) ? args : [args],
-      __result: undefined
-    });
-
-    script.runInContext(context, { timeout: 3000 });
-    output = context.__result;
+    if (typeof targetFunc === 'function') {
+      const callArgs = Array.isArray(args) ? args : [args];
+      output = targetFunc(...callArgs);
+    } else {
+      throw new Error(`Function ${funcName} is not defined in your code.`);
+    }
 
   } catch (err) {
     error = err.message || String(err);

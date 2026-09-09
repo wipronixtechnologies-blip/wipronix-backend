@@ -409,27 +409,34 @@ const startTest = async (req, res, next) => {
 
     // Store candidate initial status IN_PROGRESS in MongoDB Result collection
     try {
-      if (student._id && String(student._id).length === 24) {
-        await Result.findOneAndUpdate(
-          { studentId: student._id, testId: codeToUse },
-          {
-            studentId: student._id,
-            studentName: student.fullName,
-            studentEmail: student.email,
-            studentPhone: student.phoneNumber || phone || "",
-            collegeName: student.college || collegeName || "College",
-            course: student.course || cleanCourse,
-            semester: student.semester || cleanSemester,
-            technology: student.technology || cleanTechnology,
-            eventCode: codeToUse,
-            testId: codeToUse,
-            totalQuestions: sampledQuestions.length,
-            status: "IN_PROGRESS",
-            answers: answerKeyMap
-          },
-          { upsert: true, new: true }
-        );
+      const emailFilter = (student.email || email || "").trim().toLowerCase();
+      const studentIdQuery = student._id ? [{ studentId: student._id }, { studentId: String(student._id) }] : [];
+      if (emailFilter) {
+        studentIdQuery.push({ studentEmail: emailFilter });
       }
+
+      await Result.findOneAndUpdate(
+        {
+          $or: studentIdQuery,
+          testId: codeToUse
+        },
+        {
+          studentId: student._id,
+          studentName: student.fullName,
+          studentEmail: student.email,
+          studentPhone: student.phoneNumber || phone || "",
+          collegeName: student.college || collegeName || "College",
+          course: student.course || cleanCourse,
+          semester: student.semester || cleanSemester,
+          technology: student.technology || cleanTechnology,
+          eventCode: codeToUse,
+          testId: codeToUse,
+          totalQuestions: sampledQuestions.length,
+          status: "IN_PROGRESS",
+          answers: answerKeyMap
+        },
+        { upsert: true, new: true }
+      );
     } catch (rSaveErr) {
       console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
     }
