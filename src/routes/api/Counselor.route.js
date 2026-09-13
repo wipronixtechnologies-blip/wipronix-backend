@@ -18,6 +18,10 @@ router.get('/colleges-stats', counselorController.getCollegesStudentStats);
 // Assigned/Unassigned Students with Filters
 router.get('/students', counselorController.getAssignedStudents);
 
+// My Assigned Students (for logged-in counselor)
+router.get('/my-students', counselorController.getMyAssignedStudents);
+
+
 // Assign Students (sequential remaining distribution)
 router.post('/assign-students', counselorController.assignStudents);
 

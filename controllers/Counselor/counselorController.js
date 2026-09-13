@@ -579,3 +579,165 @@ exports.getCounselorOverview = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// 9. Get My Assigned Students (For Logged-in Counselor / BDE)
+exports.getMyAssignedStudents = async (req, res) => {
+  try {
+    const loggedInStaff = req.staff;
+    if (!loggedInStaff) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    // Determine target counselor:
+    // If admin/HR and counselorId is specified, allow switching; otherwise use logged in staff ID
+    let targetStaffId = loggedInStaff._id;
+    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
+                         ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+
+    if (req.query.counselorId && isPrivileged) {
+      targetStaffId = req.query.counselorId;
+    }
+
+    const counselorObjectId = new mongoose.Types.ObjectId(targetStaffId);
+
+    // Target Counselor Details
+    const counselorStaff = await Staff.findById(counselorObjectId).select('firstName lastName fullName email phoneNumber department designation role systemRole profileImage');
+    if (!counselorStaff) {
+      return res.status(404).json({ success: false, message: 'Counselor staff record not found' });
+    }
+
+    const {
+      college,
+      counselingStatus,
+      search,
+      page = 1,
+      limit = 25,
+      sortBy = 'assignedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Base match filter for this counselor's assignments
+    const baseCounselorFilter = { assignedTo: counselorObjectId };
+    const query = { ...baseCounselorFilter };
+
+    if (college && college !== 'all') {
+      query.college = { $regex: new RegExp(college.trim(), 'i') };
+    }
+
+    if (counselingStatus && counselingStatus !== 'all') {
+      query.counselingStatus = counselingStatus;
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { fullName: searchRegex },
+        { email: searchRegex },
+        { phoneNumber: searchRegex },
+        { course: searchRegex },
+        { technology: searchRegex },
+        { city: searchRegex },
+        { college: searchRegex }
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 25));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sorting
+    const sortObj = {};
+    if (sortBy === 'fullName') {
+      sortObj.fullName = sortOrder === 'asc' ? 1 : -1;
+    } else if (sortBy === 'createdAt') {
+      sortObj.createdAt = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sortObj.assignedAt = sortOrder === 'asc' ? 1 : -1;
+      sortObj.createdAt = -1;
+    }
+
+    // Parallel queries: Students list, Total matching, Counselor Overall Stats & Distinct Colleges
+    const [
+      students,
+      totalMatchingCount,
+      totalAssignedCount,
+      statusAggregation,
+      distinctColleges
+    ] = await Promise.all([
+      Student.find(query)
+        .select('-password -resetPasswordToken -resetPasswordExpires')
+        .populate('assignedTo', 'firstName lastName fullName email designation department role')
+        .populate('assignedBy', 'fullName email')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Student.countDocuments(query),
+      Student.countDocuments(baseCounselorFilter),
+      Student.aggregate([
+        { $match: baseCounselorFilter },
+        {
+          $group: {
+            _id: '$counselingStatus',
+            count: { $sum: 1 }
+          }
+        }
+      ]),
+      Student.distinct('college', baseCounselorFilter)
+    ]);
+
+    // Build status breakdown
+    const statusBreakdown = {
+      assigned: 0,
+      contacted: 0,
+      interested: 0,
+      not_interested: 0,
+      enrolled: 0,
+      rejected: 0
+    };
+
+    statusAggregation.forEach(item => {
+      const key = item._id || 'assigned';
+      if (statusBreakdown[key] !== undefined) {
+        statusBreakdown[key] = item.count;
+      } else {
+        statusBreakdown[key] = item.count;
+      }
+    });
+
+    const enrolledCount = statusBreakdown.enrolled || 0;
+    const conversionRate = totalAssignedCount > 0
+      ? Math.round((enrolledCount / totalAssignedCount) * 100)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        counselor: counselorStaff,
+        stats: {
+          totalAssigned: totalAssignedCount,
+          assigned: statusBreakdown.assigned || 0,
+          contacted: statusBreakdown.contacted || 0,
+          interested: statusBreakdown.interested || 0,
+          enrolled: enrolledCount,
+          not_interested: statusBreakdown.not_interested || 0,
+          rejected: statusBreakdown.rejected || 0,
+          conversionRate,
+          totalColleges: distinctColleges.filter(Boolean).length
+        },
+        colleges: distinctColleges.filter(Boolean).sort(),
+        students,
+        pagination: {
+          totalCount: totalMatchingCount,
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalMatchingCount / limitNum),
+          limit: limitNum
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching counselor assigned students:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
