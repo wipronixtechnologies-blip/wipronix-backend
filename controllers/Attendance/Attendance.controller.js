@@ -67,9 +67,9 @@ const getISTTimeParts = (dateObj = new Date()) => {
 
 // Constants for attendance time thresholds (in IST)
 const PUNCH_IN_LATE_THRESHOLD_HOUR = 9;
-const PUNCH_IN_LATE_THRESHOLD_MINUTE = 10; // 9:10 AM IST
+const PUNCH_IN_LATE_THRESHOLD_MINUTE = 30; // 9:30 AM IST
 const PUNCH_OUT_EARLY_THRESHOLD_HOUR = 18;
-const PUNCH_OUT_EARLY_THRESHOLD_MINUTE = 0; // 6:00 PM IST
+const PUNCH_OUT_EARLY_THRESHOLD_MINUTE = 30; // 6:30 PM IST
 const HALF_DAY_THRESHOLD_HOUR = 13;
 const HALF_DAY_THRESHOLD_MINUTE = 30; // 1:30 PM IST
 
@@ -86,10 +86,10 @@ const getStatusFromPunchInTime = (punchInTime) => {
   const punchInDate = new Date(punchInTime);
   const { hour: punchInHour, minute: punchInMinute } = getISTTimeParts(punchInDate);
 
-  // Check if punch-in is after 9:10 AM IST
+  // Check if punch-in is after 9:30 AM IST
   if (punchInHour > PUNCH_IN_LATE_THRESHOLD_HOUR || 
       (punchInHour === PUNCH_IN_LATE_THRESHOLD_HOUR && 
-       punchInMinute >= PUNCH_IN_LATE_THRESHOLD_MINUTE)) {
+       punchInMinute > PUNCH_IN_LATE_THRESHOLD_MINUTE)) {
     return 'short_leave';
   }
 
@@ -110,14 +110,14 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
     return 'pending_other';
   }
 
-  // Check if punch-out is before 6:00 PM IST
+  // Check if punch-out is before 6:30 PM IST
   if (punchOutHour < PUNCH_OUT_EARLY_THRESHOLD_HOUR || 
       (punchOutHour === PUNCH_OUT_EARLY_THRESHOLD_HOUR && 
        punchOutMinute < PUNCH_OUT_EARLY_THRESHOLD_MINUTE)) {
     return 'short_leave';
   }
 
-  // If punch-out is on/after 6:00 PM IST and current status is already short_leave 
+  // If punch-out is on/after 6:30 PM IST and current status is already short_leave 
   // (due to late punch-in), keep it as short_leave
   if (currentStatus === 'short_leave') {
     return 'short_leave';
