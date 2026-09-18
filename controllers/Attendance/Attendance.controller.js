@@ -26,31 +26,67 @@ const validateLocation = (userLat, userLng) => {
   return distance <= MAX_DISTANCE_KM;
 };
 
-// Constants for attendance time thresholds
-const PUNCH_IN_LATE_THRESHOLD_HOUR = 9;
-const PUNCH_IN_LATE_THRESHOLD_MINUTE = 10; // 9:10 AM
-const PUNCH_OUT_EARLY_THRESHOLD_HOUR = 18;
-const PUNCH_OUT_EARLY_THRESHOLD_MINUTE = 0; // 6:00 PM
-const HALF_DAY_THRESHOLD_HOUR = 13;
-const HALF_DAY_THRESHOLD_MINUTE = 30; // 1:30 PM
+// Timezone configuration
+const TIMEZONE = 'Asia/Kolkata';
 
-// Check if current time is after half-day threshold
-const isAfterHalfDayThreshold = () => {
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+// Helper to get current Date string in YYYY-MM-DD format in IST
+const getTodayDateIST = (dateObj = new Date()) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(dateObj);
+};
+
+// Helper to get hours and minutes in IST from a Date object
+const getISTTimeParts = (dateObj = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(dateObj);
+  let hour = 0;
+  let minute = 0;
+  
+  for (const part of parts) {
+    if (part.type === 'hour') {
+      hour = parseInt(part.value, 10);
+    } else if (part.type === 'minute') {
+      minute = parseInt(part.value, 10);
+    }
+  }
+  
+  if (hour === 24) hour = 0;
+  
+  return { hour, minute };
+};
+
+// Constants for attendance time thresholds (in IST)
+const PUNCH_IN_LATE_THRESHOLD_HOUR = 9;
+const PUNCH_IN_LATE_THRESHOLD_MINUTE = 10; // 9:10 AM IST
+const PUNCH_OUT_EARLY_THRESHOLD_HOUR = 18;
+const PUNCH_OUT_EARLY_THRESHOLD_MINUTE = 0; // 6:00 PM IST
+const HALF_DAY_THRESHOLD_HOUR = 13;
+const HALF_DAY_THRESHOLD_MINUTE = 30; // 1:30 PM IST
+
+// Check if current time is after half-day threshold (in IST)
+const isAfterHalfDayThreshold = (dateObj = new Date()) => {
+  const { hour: currentHour, minute: currentMinute } = getISTTimeParts(dateObj);
   
   return currentHour > HALF_DAY_THRESHOLD_HOUR || 
          (currentHour === HALF_DAY_THRESHOLD_HOUR && currentMinute >= HALF_DAY_THRESHOLD_MINUTE);
 };
 
-// Determine status based on punch-in time
+// Determine status based on punch-in time (in IST)
 const getStatusFromPunchInTime = (punchInTime) => {
   const punchInDate = new Date(punchInTime);
-  const punchInHour = punchInDate.getHours();
-  const punchInMinute = punchInDate.getMinutes();
+  const { hour: punchInHour, minute: punchInMinute } = getISTTimeParts(punchInDate);
 
-  // Check if punch-in is after 9:10 AM
+  // Check if punch-in is after 9:10 AM IST
   if (punchInHour > PUNCH_IN_LATE_THRESHOLD_HOUR || 
       (punchInHour === PUNCH_IN_LATE_THRESHOLD_HOUR && 
        punchInMinute >= PUNCH_IN_LATE_THRESHOLD_MINUTE)) {
@@ -60,11 +96,10 @@ const getStatusFromPunchInTime = (punchInTime) => {
   return 'present';
 };
 
-// Determine or update status based on punch-out time
+// Determine or update status based on punch-out time (in IST)
 const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = null) => {
   const punchOutDate = new Date(punchOutTime);
-  const punchOutHour = punchOutDate.getHours();
-  const punchOutMinute = punchOutDate.getMinutes();
+  const { hour: punchOutHour, minute: punchOutMinute } = getISTTimeParts(punchOutDate);
 
   // If reason type is provided (half_day or other), handle accordingly
   if (reasonType === 'half_day') {
@@ -75,14 +110,14 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
     return 'pending_other';
   }
 
-  // Check if punch-out is before 6:00 PM
+  // Check if punch-out is before 6:00 PM IST
   if (punchOutHour < PUNCH_OUT_EARLY_THRESHOLD_HOUR || 
       (punchOutHour === PUNCH_OUT_EARLY_THRESHOLD_HOUR && 
        punchOutMinute < PUNCH_OUT_EARLY_THRESHOLD_MINUTE)) {
     return 'short_leave';
   }
 
-  // If punch-out is on/after 6:00 PM and current status is already short_leave 
+  // If punch-out is on/after 6:00 PM IST and current status is already short_leave 
   // (due to late punch-in), keep it as short_leave
   if (currentStatus === 'short_leave') {
     return 'short_leave';
@@ -115,7 +150,7 @@ const punchIn = async (request, response) => {
     }
 
     const staffId = request.staff._id;
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const today = getTodayDateIST(); // YYYY-MM-DD format in IST
 
     // Check if already punched in today
     const existingAttendance = await Attendance.findOne({
@@ -130,7 +165,7 @@ const punchIn = async (request, response) => {
       });
     }
 
-    // Determine status based on punch-in time
+    // Determine status based on punch-in time (in IST)
     const currentTime = new Date();
     const status = getStatusFromPunchInTime(currentTime);
 
@@ -167,7 +202,9 @@ const punchIn = async (request, response) => {
       attendance: {
         id: attendance._id,
         date: attendance.date,
+        formattedDate: attendance.formattedDate,
         punchInTime: attendance.punchInTime,
+        formattedPunchInTime: attendance.formattedPunchInTime,
         status: attendance.status,
         staff: attendance.staffId
       }
@@ -224,7 +261,7 @@ const punchOut = async (request, response) => {
     }
 
     const staffId = request.staff._id;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateIST(); // YYYY-MM-DD format in IST
 
     // Find today's attendance record
     const attendance = await Attendance.findOne({
@@ -299,8 +336,11 @@ const punchOut = async (request, response) => {
       attendance: {
         id: attendance._id,
         date: attendance.date,
+        formattedDate: attendance.formattedDate,
         punchInTime: attendance.punchInTime,
+        formattedPunchInTime: attendance.formattedPunchInTime,
         punchOutTime: attendance.punchOutTime,
+        formattedPunchOutTime: attendance.formattedPunchOutTime,
         totalHours: attendance.totalHours,
         status: attendance.status,
         punchOutReason: attendance.punchOutReason,
@@ -335,11 +375,12 @@ const getAttendanceByStaff = async (request, response) => {
       };
     } else if (month && year) {
       // Filter by specific month and year
-      const startOfMonth = new Date(year, month - 1, 1);
-      const endOfMonth = new Date(year, month, 0);
+      const m = String(month).padStart(2, '0');
+      const lastDay = new Date(year, month, 0).getDate();
+      const lastDayStr = String(lastDay).padStart(2, '0');
       query.date = {
-        $gte: startOfMonth.toISOString().split('T')[0],
-        $lte: endOfMonth.toISOString().split('T')[0]
+        $gte: `${year}-${m}-01`,
+        $lte: `${year}-${m}-${lastDayStr}`
       };
     }
 
@@ -407,7 +448,7 @@ const getAttendanceByStaff = async (request, response) => {
 const getCurrentStatus = async (request, response) => {
   try {
     const staffId = request.staff._id;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateIST();
 
     const attendance = await Attendance.findOne({
       staffId,
@@ -416,9 +457,11 @@ const getCurrentStatus = async (request, response) => {
 
     let status = 'off_duty';
     let punchInTime = null;
+    let formattedPunchInTime = null;
     let totalHours = 0;
     let canApplyHalfDay = false;
     let punchOutTime = null;
+    let formattedPunchOutTime = null;
     let hasPunchOut = false;
 
     if (attendance) {
@@ -427,12 +470,14 @@ const getCurrentStatus = async (request, response) => {
         status = 'completed';
         totalHours = attendance.totalHours;
         punchOutTime = attendance.punchOutTime;
+        formattedPunchOutTime = attendance.formattedPunchOutTime;
       } else {
         status = 'on_duty';
         // Check if user can apply for half day
         canApplyHalfDay = isAfterHalfDayThreshold();
       }
       punchInTime = attendance.punchInTime;
+      formattedPunchInTime = attendance.formattedPunchInTime;
     }
 
     response.status(200).json({
@@ -440,7 +485,9 @@ const getCurrentStatus = async (request, response) => {
       data: {
         status,
         punchInTime,
+        formattedPunchInTime,
         punchOutTime,
+        formattedPunchOutTime,
         totalHours,
         canApplyHalfDay,
         hasPunchOut,
@@ -485,11 +532,12 @@ const getAllStaffAttendance = async (request, response) => {
     if (startDate && endDate) {
       query.date = { $gte: startDate, $lte: endDate };
     } else if (month && year) {
-      const startOfMonth = new Date(year, month - 1, 1);
-      const endOfMonth = new Date(year, month, 0);
+      const m = String(month).padStart(2, '0');
+      const lastDay = new Date(year, month, 0).getDate();
+      const lastDayStr = String(lastDay).padStart(2, '0');
       query.date = {
-        $gte: startOfMonth.toISOString().split('T')[0],
-        $lte: endOfMonth.toISOString().split('T')[0]
+        $gte: `${year}-${m}-01`,
+        $lte: `${year}-${m}-${lastDayStr}`
       };
     } else if (request.query.date) {
         query.date = request.query.date;

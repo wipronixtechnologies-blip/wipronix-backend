@@ -88,7 +88,9 @@ const attendanceSchema = new mongoose.Schema({
     default: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Compound index for efficient queries
@@ -96,29 +98,47 @@ attendanceSchema.index({ staffId: 1, date: 1 }, { unique: true });
 
 // Virtual for formatted date
 attendanceSchema.virtual('formattedDate').get(function() {
+  if (!this.date) return null;
+  const parts = this.date.split('-');
+  if (parts.length === 3) {
+    const year = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const day = Number(parts[2]);
+    const date = new Date(year, month, day);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
   const date = new Date(this.date);
   return date.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
 });
 
-// Virtual for formatted punch in time
+// Virtual for formatted punch in time (in IST)
 attendanceSchema.virtual('formattedPunchInTime').get(function() {
   return this.punchInTime ? this.punchInTime.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Kolkata',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
+    hour12: true
   }) : null;
 });
 
-// Virtual for formatted punch out time
+// Virtual for formatted punch out time (in IST)
 attendanceSchema.virtual('formattedPunchOutTime').get(function() {
   return this.punchOutTime ? this.punchOutTime.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Kolkata',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
+    hour12: true
   }) : null;
 });
 
