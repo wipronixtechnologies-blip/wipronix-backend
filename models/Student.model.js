@@ -92,13 +92,18 @@ const studentSchema = new mongoose.Schema(
       ref: 'Staff',
       default: null
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null
+    },
     assignedAt: {
       type: Date,
       default: null
     },
     counselingStatus: {
       type: String,
-      enum: ['unassigned', 'assigned', 'contacted', 'interested', 'not_interested', 'enrolled', 'rejected'],
+      enum: ['unassigned', 'assigned', 'contacted', 'interested', 'not_interested', 'enrolled', 'rejected', 'other'],
       default: 'unassigned'
     },
     counselingNotes: {

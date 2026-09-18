@@ -15,6 +15,9 @@ router.get('/bdes', counselorController.getBDEs);
 // College Student Pool Stats
 router.get('/colleges-stats', counselorController.getCollegesStudentStats);
 
+// College Student Pool Breakdown by Course and Semester
+router.get('/pool-breakdown', counselorController.getPoolBreakdown);
+
 // Assigned/Unassigned Students with Filters
 router.get('/students', counselorController.getAssignedStudents);
 
@@ -33,5 +36,8 @@ router.post('/reassign-students', counselorController.reassignStudents);
 
 // Update Status & Notes
 router.patch('/student-status/:id', counselorController.updateCounselingStatus);
+
+// Add Lead directly by Counselor / Admin
+router.post('/add-lead', counselorController.addLead);
 
 module.exports = router;

@@ -50,7 +50,8 @@ exports.getBDEs = async (req, res) => {
           interested: 0,
           not_interested: 0,
           enrolled: 0,
-          rejected: 0
+          rejected: 0,
+          other: 0
         }
       };
     });
@@ -213,10 +214,159 @@ exports.getCollegesStudentStats = async (req, res) => {
   }
 };
 
-// 3. Assign Students to BDE (Sequentially from unassigned pool)
+// 2.1 Get Breakdown of Courses and Semesters with Unassigned Counts for a College/Drive
+exports.getPoolBreakdown = async (req, res) => {
+  try {
+    const { collegeName, course, semester } = req.query;
+
+    if (!collegeName) {
+      return res.status(400).json({ success: false, message: 'collegeName is required' });
+    }
+
+    const event = await EventTest.findOne({
+      $or: [
+        { collegeName: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+        { eventCode: collegeName.trim() }
+      ]
+    });
+
+    const baseCollegeMatch = {
+      $or: [
+        { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+        ...(event ? [
+          { testId: event.eventCode },
+          { testId: event._id.toString() },
+          { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
+        ] : [])
+      ]
+    };
+
+    const unassignedMatch = {
+      $and: [
+        baseCollegeMatch,
+        {
+          $or: [
+            { assignedTo: null },
+            { assignedTo: { $exists: false } }
+          ]
+        }
+      ]
+    };
+
+    // Aggregate unique courses with total and unassigned counts
+    const coursesStats = await Student.aggregate([
+      { $match: baseCollegeMatch },
+      {
+        $group: {
+          _id: { $ifNull: ['$course', 'General'] },
+          total: { $sum: 1 },
+          unassigned: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$assignedTo', null] },
+                    { $not: ['$assignedTo'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Aggregate unique semesters with total and unassigned counts
+    const semestersStats = await Student.aggregate([
+      { $match: baseCollegeMatch },
+      {
+        $group: {
+          _id: { $ifNull: ['$semester', 'General'] },
+          total: { $sum: 1 },
+          unassigned: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$assignedTo', null] },
+                    { $not: ['$assignedTo'] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Filtered count based on selected course and semester
+    const filteredConditions = [
+      baseCollegeMatch,
+      {
+        $or: [
+          { assignedTo: null },
+          { assignedTo: { $exists: false } }
+        ]
+      }
+    ];
+
+    if (course && course !== 'all' && course.trim()) {
+      filteredConditions.push({
+        course: { $regex: new RegExp(`^${course.trim()}$`, 'i') }
+      });
+    }
+
+    if (semester && semester !== 'all' && semester.trim()) {
+      filteredConditions.push({
+        semester: { $regex: new RegExp(`^${semester.trim()}$`, 'i') }
+      });
+    }
+
+    const [totalPool, unassignedPool, filteredUnassigned] = await Promise.all([
+      Student.countDocuments(baseCollegeMatch),
+      Student.countDocuments(unassignedMatch),
+      Student.countDocuments({ $and: filteredConditions })
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        collegeName,
+        totalStudents: totalPool,
+        unassignedStudents: unassignedPool,
+        matchingUnassigned: filteredUnassigned,
+        courses: coursesStats
+          .filter(c => c._id && c._id.trim() !== '')
+          .map(c => ({
+            name: c._id,
+            total: c.total,
+            unassigned: c.unassigned
+          })),
+        semesters: semestersStats
+          .filter(s => s._id && s._id.trim() !== '')
+          .map(s => ({
+            name: s._id,
+            total: s.total,
+            unassigned: s.unassigned
+          }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching pool breakdown:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 3. Assign Students to BDE (Sequentially from unassigned pool with Course & Semester filters)
 exports.assignStudents = async (req, res) => {
   try {
-    const { collegeName, bdeId, count } = req.body;
+    const { collegeName, bdeId, count, course, semester, assignmentMode } = req.body;
 
     if (!collegeName) {
       return res.status(400).json({ success: false, message: 'College name is required' });
@@ -224,11 +374,6 @@ exports.assignStudents = async (req, res) => {
 
     if (!bdeId) {
       return res.status(400).json({ success: false, message: 'BDE selection is required' });
-    }
-
-    const assignCount = parseInt(count, 10);
-    if (isNaN(assignCount) || assignCount <= 0) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid number of students (> 0)' });
     }
 
     // Verify BDE exists
@@ -245,41 +390,66 @@ exports.assignStudents = async (req, res) => {
       ]
     });
 
-    const unassignedQuery = {
-      $and: [
-        {
-          $or: [
-            { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
-            ...(event ? [
-              { testId: event.eventCode },
-              { testId: event._id.toString() },
-              { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
-            ] : [])
-          ]
-        },
-        {
-          $or: [
-            { assignedTo: null },
-            { assignedTo: { $exists: false } }
-          ]
-        }
-      ]
-    };
+    const andConditions = [
+      {
+        $or: [
+          { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+          ...(event ? [
+            { testId: event.eventCode },
+            { testId: event._id.toString() },
+            { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
+          ] : [])
+        ]
+      },
+      {
+        $or: [
+          { assignedTo: null },
+          { assignedTo: { $exists: false } }
+        ]
+      }
+    ];
+
+    if (course && course !== 'all' && course.trim()) {
+      andConditions.push({
+        course: { $regex: new RegExp(`^${course.trim()}$`, 'i') }
+      });
+    }
+
+    if (semester && semester !== 'all' && semester.trim()) {
+      andConditions.push({
+        semester: { $regex: new RegExp(`^${semester.trim()}$`, 'i') }
+      });
+    }
+
+    const unassignedQuery = { $and: andConditions };
 
     const totalUnassigned = await Student.countDocuments(unassignedQuery);
 
     if (totalUnassigned === 0) {
+      const filters = [];
+      if (course && course !== 'all') filters.push(`Course: "${course}"`);
+      if (semester && semester !== 'all') filters.push(`Semester: "${semester}"`);
+      const filterStr = filters.length > 0 ? ` with ${filters.join(', ')}` : '';
       return res.status(400).json({
         success: false,
-        message: `No unassigned students available for ${collegeName}. All students from this college have already been assigned.`
+        message: `No unassigned students available for ${collegeName}${filterStr}. All matching students have already been assigned.`
       });
     }
 
-    const numberToAssign = Math.min(assignCount, totalUnassigned);
+    let numberToAssign;
+    if (assignmentMode === 'all') {
+      numberToAssign = totalUnassigned;
+    } else {
+      const assignCount = parseInt(count, 10);
+      if (isNaN(assignCount) || assignCount <= 0) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid number of students (> 0)' });
+      }
+      numberToAssign = Math.min(assignCount, totalUnassigned);
+    }
 
     // Fetch the specific student IDs to assign
     const studentsToAssign = await Student.find(unassignedQuery)
-      .select('_id fullName email')
+      .select('_id fullName email course semester technology')
       .sort({ createdAt: 1, _id: 1 })
       .limit(numberToAssign);
 
@@ -300,16 +470,27 @@ exports.assignStudents = async (req, res) => {
 
     const remainingUnassigned = totalUnassigned - numberToAssign;
 
+    let filterSummary = '';
+    if (course && course !== 'all' && semester && semester !== 'all') {
+      filterSummary = ` (${course} - ${semester})`;
+    } else if (course && course !== 'all') {
+      filterSummary = ` (${course})`;
+    } else if (semester && semester !== 'all') {
+      filterSummary = ` (${semester})`;
+    }
+
     res.status(200).json({
       success: true,
-      message: `Successfully assigned ${numberToAssign} student(s) from ${collegeName} to ${bde.fullName}. ${remainingUnassigned} unassigned student(s) remain in the pool.`,
+      message: `Successfully assigned ${numberToAssign} student(s)${filterSummary} from ${collegeName} to ${bde.fullName}. ${remainingUnassigned} matching unassigned student(s) remain in the pool.`,
       data: {
         assignedCount: numberToAssign,
-        requestedCount: assignCount,
+        requestedCount: count,
         remainingUnassigned,
         bdeName: bde.fullName,
         bdeEmail: bde.email,
         collegeName,
+        course: course || 'all',
+        semester: semester || 'all',
         assignedStudentIds: studentIds
       }
     });
@@ -326,6 +507,8 @@ exports.getAssignedStudents = async (req, res) => {
       college,
       bdeId,
       counselingStatus,
+      course,
+      semester,
       search,
       assignmentState, // 'assigned' | 'unassigned' | 'all'
       page = 1,
@@ -336,6 +519,14 @@ exports.getAssignedStudents = async (req, res) => {
 
     if (college) {
       query.college = { $regex: new RegExp(college.trim(), 'i') };
+    }
+
+    if (course && course !== 'all' && course.trim()) {
+      query.course = { $regex: new RegExp(course.trim(), 'i') };
+    }
+
+    if (semester && semester !== 'all' && semester.trim()) {
+      query.semester = { $regex: new RegExp(semester.trim(), 'i') };
     }
 
     if (bdeId) {
@@ -361,6 +552,7 @@ exports.getAssignedStudents = async (req, res) => {
         { email: searchRegex },
         { phoneNumber: searchRegex },
         { course: searchRegex },
+        { semester: searchRegex },
         { technology: searchRegex },
         { city: searchRegex }
       ];
@@ -370,22 +562,27 @@ exports.getAssignedStudents = async (req, res) => {
     const limitNum = parseInt(limit, 10) || 25;
     const skip = (pageNum - 1) * limitNum;
 
-    const [students, totalCount] = await Promise.all([
+    const [students, totalCount, distinctCourses, distinctSemesters] = await Promise.all([
       Student.find(query)
         .select('-password -resetPasswordToken -resetPasswordExpires')
         .populate('assignedTo', 'firstName lastName fullName email designation department role')
-        .populate('assignedBy', 'fullName email')
+        .populate('assignedBy', 'firstName lastName fullName email designation department role')
+        .populate('createdBy', 'firstName lastName fullName email designation department role')
         .sort({ assignedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      Student.countDocuments(query)
+      Student.countDocuments(query),
+      Student.distinct('course', college ? { college: { $regex: new RegExp(college.trim(), 'i') } } : {}),
+      Student.distinct('semester', college ? { college: { $regex: new RegExp(college.trim(), 'i') } } : {})
     ]);
 
     res.status(200).json({
       success: true,
       data: {
         students,
+        availableCourses: distinctCourses.filter(Boolean).sort(),
+        availableSemesters: distinctSemesters.filter(Boolean).sort(),
         pagination: {
           totalCount,
           currentPage: pageNum,
@@ -609,6 +806,8 @@ exports.getMyAssignedStudents = async (req, res) => {
     const {
       college,
       counselingStatus,
+      course,
+      semester,
       search,
       page = 1,
       limit = 25,
@@ -624,6 +823,14 @@ exports.getMyAssignedStudents = async (req, res) => {
       query.college = { $regex: new RegExp(college.trim(), 'i') };
     }
 
+    if (course && course !== 'all' && course.trim()) {
+      query.course = { $regex: new RegExp(course.trim(), 'i') };
+    }
+
+    if (semester && semester !== 'all' && semester.trim()) {
+      query.semester = { $regex: new RegExp(semester.trim(), 'i') };
+    }
+
     if (counselingStatus && counselingStatus !== 'all') {
       query.counselingStatus = counselingStatus;
     }
@@ -635,6 +842,7 @@ exports.getMyAssignedStudents = async (req, res) => {
         { email: searchRegex },
         { phoneNumber: searchRegex },
         { course: searchRegex },
+        { semester: searchRegex },
         { technology: searchRegex },
         { city: searchRegex },
         { college: searchRegex }
@@ -656,18 +864,21 @@ exports.getMyAssignedStudents = async (req, res) => {
       sortObj.createdAt = -1;
     }
 
-    // Parallel queries: Students list, Total matching, Counselor Overall Stats & Distinct Colleges
+    // Parallel queries: Students list, Total matching, Counselor Overall Stats, Distinct Colleges, Courses & Semesters
     const [
       students,
       totalMatchingCount,
       totalAssignedCount,
       statusAggregation,
-      distinctColleges
+      distinctColleges,
+      distinctCourses,
+      distinctSemesters
     ] = await Promise.all([
       Student.find(query)
         .select('-password -resetPasswordToken -resetPasswordExpires')
         .populate('assignedTo', 'firstName lastName fullName email designation department role')
-        .populate('assignedBy', 'fullName email')
+        .populate('assignedBy', 'firstName lastName fullName email designation department role')
+        .populate('createdBy', 'firstName lastName fullName email designation department role')
         .sort(sortObj)
         .skip(skip)
         .limit(limitNum)
@@ -683,7 +894,9 @@ exports.getMyAssignedStudents = async (req, res) => {
           }
         }
       ]),
-      Student.distinct('college', baseCounselorFilter)
+      Student.distinct('college', baseCounselorFilter),
+      Student.distinct('course', baseCounselorFilter),
+      Student.distinct('semester', baseCounselorFilter)
     ]);
 
     // Build status breakdown
@@ -693,7 +906,8 @@ exports.getMyAssignedStudents = async (req, res) => {
       interested: 0,
       not_interested: 0,
       enrolled: 0,
-      rejected: 0
+      rejected: 0,
+      other: 0
     };
 
     statusAggregation.forEach(item => {
@@ -722,10 +936,13 @@ exports.getMyAssignedStudents = async (req, res) => {
           enrolled: enrolledCount,
           not_interested: statusBreakdown.not_interested || 0,
           rejected: statusBreakdown.rejected || 0,
+          other: statusBreakdown.other || 0,
           conversionRate,
           totalColleges: distinctColleges.filter(Boolean).length
         },
         colleges: distinctColleges.filter(Boolean).sort(),
+        courses: distinctCourses.filter(Boolean).sort(),
+        semesters: distinctSemesters.filter(Boolean).sort(),
         students,
         pagination: {
           totalCount: totalMatchingCount,
@@ -737,6 +954,126 @@ exports.getMyAssignedStudents = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching counselor assigned students:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 10. Add New Student Lead (Directly by Counselor or Admin)
+exports.addLead = async (req, res) => {
+  try {
+    const loggedInStaff = req.staff;
+    if (!loggedInStaff) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const {
+      fullName,
+      email,
+      phoneNumber,
+      college,
+      course,
+      semester,
+      technology,
+      city,
+      passingYear,
+      counselingStatus = 'assigned',
+      counselingNotes = '',
+      assignedTo
+    } = req.body;
+
+    if (!fullName || !fullName.trim()) {
+      return res.status(400).json({ success: false, message: 'Full name is required' });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Email address is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanTech = technology ? technology.trim() : '';
+
+    // Determine target counselor
+    let targetCounselorId = loggedInStaff._id;
+    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
+                         ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+
+    if (assignedTo && isPrivileged) {
+      targetCounselorId = assignedTo;
+    }
+
+    // Check if duplicate student with email exists
+    const query = { email: cleanEmail };
+    if (cleanTech) {
+      query.technology = cleanTech;
+    }
+
+    let existingStudent = await Student.findOne(query);
+
+    if (existingStudent) {
+      if (!existingStudent.assignedTo) {
+        existingStudent.fullName = fullName.trim() || existingStudent.fullName;
+        if (phoneNumber) existingStudent.phoneNumber = phoneNumber.trim();
+        if (college) existingStudent.college = college.trim();
+        if (course) existingStudent.course = course.trim();
+        if (semester) existingStudent.semester = semester.trim();
+        if (city) existingStudent.city = city.trim();
+        if (passingYear) existingStudent.passingYear = passingYear.toString().trim();
+        existingStudent.assignedTo = targetCounselorId;
+        existingStudent.assignedBy = loggedInStaff._id;
+        existingStudent.createdBy = existingStudent.createdBy || loggedInStaff._id;
+        existingStudent.assignedAt = new Date();
+        existingStudent.counselingStatus = counselingStatus || 'assigned';
+        if (counselingNotes) existingStudent.counselingNotes = counselingNotes.trim();
+
+        await existingStudent.save();
+        await existingStudent.populate('assignedTo', 'firstName lastName fullName email designation department role');
+        await existingStudent.populate('assignedBy', 'firstName lastName fullName email designation department role');
+        await existingStudent.populate('createdBy', 'firstName lastName fullName email designation department role');
+
+        return res.status(200).json({
+          success: true,
+          message: 'Existing unassigned student lead found and assigned to counselor.',
+          data: existingStudent
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `A student with this email (${cleanEmail}) is already assigned to a counselor.`
+        });
+      }
+    }
+
+    // Create new Student lead
+    const newStudent = new Student({
+      fullName: fullName.trim(),
+      email: cleanEmail,
+      phoneNumber: phoneNumber ? phoneNumber.trim() : undefined,
+      college: college ? college.trim() : 'Direct Lead',
+      course: course ? course.trim() : undefined,
+      semester: semester ? semester.trim() : undefined,
+      technology: cleanTech || undefined,
+      city: city ? city.trim() : undefined,
+      passingYear: passingYear ? passingYear.toString().trim() : undefined,
+      counselingStatus: counselingStatus || 'assigned',
+      counselingNotes: counselingNotes ? counselingNotes.trim() : '',
+      assignedTo: targetCounselorId,
+      assignedBy: loggedInStaff._id,
+      createdBy: loggedInStaff._id,
+      assignedAt: new Date()
+    });
+
+    await newStudent.save();
+    await newStudent.populate('assignedTo', 'firstName lastName fullName email designation department role');
+    await newStudent.populate('assignedBy', 'firstName lastName fullName email designation department role');
+    await newStudent.populate('createdBy', 'firstName lastName fullName email designation department role');
+
+    res.status(201).json({
+      success: true,
+      message: 'Student lead created and assigned successfully!',
+      data: newStudent
+    });
+  } catch (error) {
+    console.error('Error creating student lead:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
