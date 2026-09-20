@@ -150,9 +150,7 @@ const updateStaffProfile = async (request, response) => {
       profileImage,
       dateOfBirth,
       address,
-      documents,
-      currentPassword,
-      newPassword
+      documents
     } = request.body;
 
     // Use findById to trigger 'save' middleware if needed, or findOneAndUpdate
@@ -163,17 +161,6 @@ const updateStaffProfile = async (request, response) => {
         success: false,
         message: 'Staff not found'
       });
-    }
-
-    if (currentPassword && newPassword) {
-      const isMatch = await staff.comparePassword(currentPassword);
-      if (!isMatch) {
-        return response.status(400).json({ success: false, message: 'Invalid current password' });
-      }
-      staff.password = newPassword;
-    } else if (newPassword) {
-      // Direct password overwrite (e.g. from super admin or Profile primary form)
-      staff.password = newPassword;
     }
 
     if (firstName) staff.firstName = firstName;
@@ -208,39 +195,12 @@ const updateStaffProfile = async (request, response) => {
     });
   }
 };
-// Verify Current Password
-const verifyPassword = async (request, response) => {
-  try {
-    const { password } = request.body;
-
-    if (!password) {
-      return response.status(400).json({ success: false, message: 'Password is required for verification' });
-    }
-
-    const staff = await Staff.findById(request.staff._id);
-    if (!staff) {
-      return response.status(404).json({ success: false, message: 'Staff not found' });
-    }
-
-    const isMatch = await staff.comparePassword(password);
-
-    if (!isMatch) {
-      return response.status(400).json({ success: false, message: 'Incorrect current password' });
-    }
-
-    return response.status(200).json({ success: true, message: 'Password verified successfully' });
-  } catch (error) {
-    console.error('Verify password error:', error);
-    return response.status(500).json({ success: false, message: 'Internal server error during verification' });
-  }
-};
 
 module.exports = {
   authenticateStaff,
   authorize,
   checkPermission,
   getStaffProfile,
-  updateStaffProfile,
-  verifyPassword
+  updateStaffProfile
 };
 

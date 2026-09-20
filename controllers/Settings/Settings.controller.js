@@ -43,20 +43,3 @@ exports.verifySMTP = async (req, res) => {
     });
   }
 };
-
-exports.saveEmailSettings = async (req, res) => {
-  try {
-    // Note: Emulating save response since there is currently no designated Configuration/Settings MongoDB collection
-    return res.status(200).json({ success: true, message: 'Email settings saved successfully' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to save email settings' });
-  }
-};
-
-exports.saveGeneralSettings = async (req, res) => {
-  try {
-    return res.status(200).json({ success: true, message: 'General settings saved successfully' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to save general settings' });
-  }
-};

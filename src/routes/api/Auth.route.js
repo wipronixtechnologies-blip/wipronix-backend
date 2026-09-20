@@ -38,7 +38,6 @@ Router.post("/staff/register", staffRegister)
 Router.post("/staff/logout", staffLogout)
 Router.get("/staff/profile", authenticateStaff, staffProfile.getStaffProfile)
 Router.put("/staff/profile", authenticateStaff, staffProfile.updateStaffProfile)
-Router.post("/staff/verify-password", authenticateStaff, staffProfile.verifyPassword)
 
 // Staff Password Reset Routes
 Router.post("/staff/forgot-password", staffForgotPassword)
