@@ -17,8 +17,9 @@ const staffLogin = async (request, response) => {
       });
     }
 
-    // Find staff by email
-    const staff = await Staff.findOne({ email });
+    // Find staff by email (ensure lower case and trim)
+    const normalizedEmail = email.toLowerCase().trim();
+    const staff = await Staff.findOne({ email: normalizedEmail });
 
     if (!staff) {
       console.log('[staffLogin] Staff not found:', email);
