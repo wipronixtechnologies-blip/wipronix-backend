@@ -82,7 +82,7 @@ const seedDefaultEvents = async () => {
 // POST /api/test/create-event
 const createEvent = async (req, res, next) => {
   try {
-    const { collegeName, testTitle, technology, durationMinutes, questionsCount, passPercentage, eventCode, eventType, conductedBy, maxHrMarks, maxTechMarks } = req.body;
+    const { collegeName, testTitle, technology, durationMinutes, questionsCount, passPercentage, isActive, eventCode, eventType, conductedBy, maxHrMarks, maxTechMarks } = req.body;
 
     if (!collegeName || !testTitle) {
       return res.status(400).json({
@@ -93,7 +93,7 @@ const createEvent = async (req, res, next) => {
 
     const cleanCollege = collegeName.trim();
     // Auto-generate eventCode from College Name if not provided
-    const generatedCode = eventCode 
+    const generatedCode = eventCode
       ? eventCode.trim().toUpperCase()
       : `WIP-${cleanCollege.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)}-2026`;
 
@@ -111,6 +111,8 @@ const createEvent = async (req, res, next) => {
       existingEvent.conductedBy = conductedBy || existingEvent.conductedBy || "Harish Chawla";
       existingEvent.maxHrMarks = maxHrMarks || existingEvent.maxHrMarks || 10;
       existingEvent.maxTechMarks = maxTechMarks || existingEvent.maxTechMarks || 10;
+      existingEvent.passPercentage = passPercentage || existingEvent.passPercentage || 70;
+      if (isActive !== undefined) existingEvent.isActive = isActive;
       await existingEvent.save();
 
       return res.status(200).json({
@@ -131,7 +133,8 @@ const createEvent = async (req, res, next) => {
       technology: technology || "General Technical & Aptitude",
       durationMinutes: durationMinutes || 30,
       questionsCount: questionsCount || 30,
-      passPercentage: passPercentage || 70
+      passPercentage: passPercentage || 70,
+      isActive: isActive !== undefined ? isActive : false
     });
 
     res.status(201).json({

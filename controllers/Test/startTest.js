@@ -300,10 +300,10 @@ const startTest = async (req, res, next) => {
         selectedTech = shuffleArray(exactTech).slice(0, 10);
       } else {
         // If domain has fewer than 10, fill from general web / programming questions first
-        const generalPool = techPool.filter(q => 
+        const generalPool = techPool.filter(q =>
           !exactTech.includes(q) && /general|web|programming|basic|core/i.test(q.technology || '')
         );
-        const otherPool = techPool.filter(q => 
+        const otherPool = techPool.filter(q =>
           !exactTech.includes(q) && !generalPool.includes(q)
         );
         const needed = 10 - exactTech.length;
@@ -347,14 +347,23 @@ const startTest = async (req, res, next) => {
     // 5. Client Handling (5 Questions)
     const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS]);
 
-    // Combine 30 questions
-    const sampledQuestions = [
+    // Combine questions up to required size
+    let sampledQuestions = [
       ...selectedTech,
       ...selectedApt,
       ...selectedCN,
       ...selectedPS,
       ...selectedCH
     ];
+
+    const requiredCount = event.questionsCount || 30;
+
+    if (sampledQuestions.length > requiredCount) {
+      sampledQuestions = sampledQuestions.slice(0, requiredCount);
+    } else if (sampledQuestions.length < requiredCount) {
+      const remaining = shuffleArray(questionPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString())));
+      sampledQuestions = [...sampledQuestions, ...remaining.slice(0, requiredCount - sampledQuestions.length)];
+    }
 
     if (sampledQuestions.length === 0) {
       return res.status(404).json({
