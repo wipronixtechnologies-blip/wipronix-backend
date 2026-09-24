@@ -257,6 +257,16 @@ const startTest = async (req, res, next) => {
       console.error("Existing result check error:", dbCheckErr.message);
     }
 
+    // 2.5 Fetch Event configurations
+    let event = null;
+    if (codeToUse && codeToUse !== "GENERAL") {
+      event = await EventTest.findOne({ eventCode: codeToUse });
+    }
+    if (!event && collegeName) {
+      event = await EventTest.findOne({ collegeName: { $regex: new RegExp(`^${collegeName}$`, 'i') } });
+    }
+    const eventQuestionsCount = event?.questionsCount || 30;
+
     // 3️⃣ Query Questions with Caching
     let questionPool = [];
     try {
@@ -356,7 +366,7 @@ const startTest = async (req, res, next) => {
       ...selectedCH
     ];
 
-    const requiredCount = event.questionsCount || 30;
+    const requiredCount = eventQuestionsCount;
 
     if (sampledQuestions.length > requiredCount) {
       sampledQuestions = sampledQuestions.slice(0, requiredCount);
