@@ -3,6 +3,9 @@ const Student = require('../../models/Student.model');
 const Staff = require('../../models/Staff.model');
 const College = require('../../models/College.model');
 const EventTest = require('../../models/EventTest.model');
+const RegistrationSlip = require('../../models/RegistrationSlip.model');
+const crypto = require('crypto');
+const emailService = require('../../src/services/emailService');
 
 // 1. Get BDE Staff List with Assignment Metrics
 exports.getBDEs = async (req, res) => {
@@ -789,7 +792,7 @@ exports.getMyAssignedStudents = async (req, res) => {
     // If admin/HR and counselorId is specified, allow switching; otherwise use logged in staff ID
     let targetStaffId = loggedInStaff._id;
     const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
-                         ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+      ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
 
     if (req.query.counselorId && isPrivileged) {
       targetStaffId = req.query.counselorId;
@@ -995,7 +998,7 @@ exports.addLead = async (req, res) => {
     // Determine target counselor
     let targetCounselorId = loggedInStaff._id;
     const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
-                         ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+      ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
 
     if (assignedTo && isPrivileged) {
       targetCounselorId = assignedTo;
@@ -1078,3 +1081,76 @@ exports.addLead = async (req, res) => {
   }
 };
 
+exports.generateRegistrationSlip = async (req, res) => {
+  try {
+    const {
+      studentId,
+      studentName,
+      contactNo,
+      email,
+      address,
+      technology,
+      fatherName,
+      duration,
+      totalFee,
+      paidAmount,
+      dueAmount,
+      paymentMode,
+      nextDueDate,
+      deliveryMode
+    } = req.body;
+
+    const loggedInStaff = req.user;
+
+    // Fetch Student
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    // Determine Installment
+    const previousSlips = await RegistrationSlip.find({ student: studentId }).sort({ installmentNumber: -1 });
+    const installmentNumber = previousSlips.length > 0 ? previousSlips[0].installmentNumber + 1 : 1;
+
+    // Generate unique verification token & REG NO
+    const verificationToken = crypto.randomBytes(24).toString('hex');
+    const registrationNo = req.body.registrationNo || `WPX-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newSlip = new RegistrationSlip({
+      student: student._id,
+      issuedBy: loggedInStaff._id,
+      registrationNo,
+      technology,
+      duration,
+      totalFee,
+      paidAmount,
+      dueAmount,
+      paymentMode,
+      nextDueDate,
+      installmentNumber,
+      deliveryMode,
+      verificationToken,
+      status: 'Pending Verification'
+    });
+
+    await newSlip.save();
+
+    console.log("Slip saved. Sending Email via template...");
+
+    // Now trigger Email (if email was selected or as default)
+    if (deliveryMode && deliveryMode.includes('Email')) {
+      const studentData = { studentName, email: email || student.email };
+      const slipData = { registrationNo, technology, paidAmount, dueAmount };
+      await emailService.sendRegistrationSlipEmail(studentData, slipData, verificationToken);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Registration slip generated and sent successfully.',
+      data: newSlip
+    });
+  } catch (error) {
+    console.error('Error generating registration slip:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

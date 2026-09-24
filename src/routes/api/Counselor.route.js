@@ -40,4 +40,7 @@ router.patch('/student-status/:id', counselorController.updateCounselingStatus);
 // Add Lead directly by Counselor / Admin
 router.post('/add-lead', counselorController.addLead);
 
+// Generate Registration Slip
+router.post('/registration-slip', counselorController.generateRegistrationSlip);
+
 module.exports = router;

@@ -6,7 +6,7 @@ const createTransporter = () => {
   if (!GMAIL_APP_PASSWORD) {
     console.warn('⚠️ GMAIL_APP_PASSWORD is not set in environment variables');
   }
-  
+
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -20,9 +20,9 @@ const createTransporter = () => {
 const createTestCompletionEmailTemplate = (studentData, testResult) => {
   const { fullName, email } = studentData;
   const { totalQuestions, attempted, correct, score } = testResult;
-  
+
   const subject = 'Thank You for Completing Your Assessment - Wipronix';
-  
+
   const websiteUrl = `${WEBSITE_URL}?email=${encodeURIComponent(email)}`;
 
   return {
@@ -122,7 +122,7 @@ const createTestCompletionEmailTemplate = (studentData, testResult) => {
 const createOTPEmailTemplate = (studentData, otp) => {
   const { fullName, email } = studentData;
   const subject = 'Your Password Reset OTP - Wipronix';
-  
+
   return {
     subject,
     html: `
@@ -240,7 +240,7 @@ const sendOTPSMSEmail = async (studentData, otp) => {
 const createPasswordResetEmailTemplate = (studentData, resetToken) => {
   const { fullName, email } = studentData;
   const subject = 'Reset Your Password - Wipronix';
-  
+
   // Generate secure reset URL
   const resetUrl = `${WEBSITE_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
@@ -364,9 +364,9 @@ const sendPasswordResetEmail = async (studentData, resetToken) => {
 const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuffer) => {
   try {
     const transporter = createTransporter();
-    
+
     const subject = 'Welcome to Wipronix - Your Offer Letter & Login Credentials';
-    
+
     const html = `
       <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb;">
         <!-- Header -->
@@ -640,10 +640,130 @@ const sendStaffWelcomeEmail = async (staffData, tempPassword) => {
   }
 };
 
+// Generate Registration Slip Email Template
+const createRegistrationSlipEmailTemplate = (studentData, slipData, token) => {
+  const { studentName, email } = studentData;
+  const subject = `Your Registration Slip - Wipronix Technologies [${slipData.registrationNo}]`;
+
+  // Create secure verification URL
+  const verifyUrl = `${FRONTEND_URL || 'http://localhost:5174'}/verify-registration/${token}`;
+
+  return {
+    subject,
+    html: `
+      <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #1e3a8a, #1d4ed8); padding: 32px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.3px;">
+            Registration Confirmation
+          </h1>
+          <p style="color: #f3f3f3; margin-top: 8px; font-size: 14px;">
+            Wipronix Technologies Pvt. Ltd.
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 32px;">
+          <p style="font-size: 16px; color: #1f2937;">
+            Dear <strong>${studentName}</strong>,
+          </p>
+
+          <p style="font-size: 15.5px; color: #374151; line-height: 1.7;">
+            We are pleased to inform you that your registration at <strong>Wipronix Technologies</strong> has been initiated successfully. Your digital registration slip is ready for your verification and initial payment.
+          </p>
+
+          <!-- Slip Details Card -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; margin: 26px 0; border-radius: 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 14.5px; color: #374151;">
+              <tr>
+                <td style="padding-bottom: 12px;"><strong>Registration No:</strong></td>
+                <td style="padding-bottom: 12px; font-weight: 600;">${slipData.registrationNo}</td>
+              </tr>
+              <tr>
+                <td style="padding-bottom: 12px;"><strong>Technology:</strong></td>
+                <td style="padding-bottom: 12px;">${slipData.technology}</td>
+              </tr>
+              <tr>
+                <td style="padding-bottom: 12px;"><strong>Initial Payment Amount:</strong></td>
+                <td style="padding-bottom: 12px; color: #15803d; font-weight: 600;">₹${slipData.paidAmount}</td>
+              </tr>
+              <tr>
+                <td style="padding-bottom: 0;"><strong>Due Amount Remaining:</strong></td>
+                <td style="padding-bottom: 0; color: #b91c1c; font-weight: 600;">₹${slipData.dueAmount}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Verify Instructions -->
+          <div style="background-color: #fef3c7; border: 1px solid #fbbf24; padding: 20px; margin: 26px 0; border-radius: 6px;">
+             <h4 style="margin-top: 0; color: #92400e; font-size: 16px;">Action Required</h4>
+             <p style="margin: 0; font-size: 15px; color: #78350f; line-height: 1.6;">
+               Please click the secure button below to verify your details precisely and proceed with the payment gateway to secure your seat.
+             </p>
+          </div>
+
+          <!-- CTA -->
+          <div style="text-align: center; margin: 38px 0;">
+            <a href="${verifyUrl}"
+               style="background-color: #b91c1c; color: #ffffff; padding: 16px 48px;
+                      text-decoration: none; font-size: 16px; font-weight: 600;
+                      border-radius: 6px; display: inline-block; letter-spacing: 0.4px;">
+              Verify Details & Pay Now
+            </a>
+          </div>
+
+          <!-- Support -->
+          <p style="font-size: 14.5px; color: #4b5563; margin-top: 28px;">
+            For any queries or concerns regarding this enrollment, please contact us at
+            <a href="mailto:${SUPPORT_EMAIL || 'info@wipronix.com'}" style="color: #1d4ed8; text-decoration: none;">
+              ${SUPPORT_EMAIL || 'info@wipronix.com'}
+            </a>.
+          </p>
+
+          <!-- Closing -->
+          <p style="font-size: 15.5px; color: #1f2937; margin-top: 26px;">
+            Best regards,<br />
+            <strong>Admissions Team</strong><br />
+            Wipronix Technologies
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f3f4f6; padding: 18px; text-align: center; font-size: 13px; color: #6b7280;">
+          <p style="margin: 0;">This is a system-generated email regarding your registration.</p>
+          <p style="margin: 6px 0 0;">© 2026 Wipronix Technologies Pvt. Ltd. All rights reserved.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+const sendRegistrationSlipEmail = async (studentData, slipData, token) => {
+  try {
+    const transporter = createTransporter();
+    const emailTemplate = createRegistrationSlipEmailTemplate(studentData, slipData, token);
+
+    const mailOptions = {
+      from: GMAIL_USER || 'your-email@gmail.com',
+      to: studentData.email,
+      subject: emailTemplate.subject,
+      html: emailTemplate.html
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Registration Slip email sent successfully to ${studentData.email}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send registration slip email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendTestCompletionEmail,
   sendPasswordResetEmail,
   sendOTPSMSEmail,
   sendStaffWelcomeEmail,
-  sendStaffWelcomeEmailWithOfferLetter
+  sendStaffWelcomeEmailWithOfferLetter,
+  sendRegistrationSlipEmail
 };

@@ -493,7 +493,7 @@ exports.startMachineSession = async (req, res) => {
         if (effectiveStudentId.length === 24) {
           try {
             searchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) });
-          } catch (e) {}
+          } catch (e) { }
         }
       }
       if (effectiveEmail) {
@@ -608,7 +608,7 @@ exports.runCode = async (req, res) => {
       }
 
       const execRes = executeCodeWithArgs(code, language, funcName, parsedArgs);
-      
+
       let isPassed = false;
       let actualOutputStr = "";
 
@@ -685,7 +685,7 @@ exports.submitMachineRound = async (req, res) => {
         }
 
         const execRes = executeCodeWithArgs(cleanCode, language || "javascript", funcName, parsedArgs);
-        
+
         let isPassed = false;
         let actualOutputStr = "";
 
@@ -740,7 +740,7 @@ exports.submitMachineRound = async (req, res) => {
       if (effectiveStudentId.length === 24) {
         try {
           searchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) });
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     if (effectiveEmail) {
@@ -1044,18 +1044,20 @@ function executeCodeWithArgs(code, language, funcName, args) {
 
     const context = vm.createContext(sandbox);
 
-    // Run user code inside sandbox
-    vm.runInContext(code, context, { timeout: 3000 });
-
-    // Locate target function: by exact specified name or find user's custom function
+    // Run user code inside sandbox and evaluate the function reference
     let targetFunc = null;
-    if (funcName && typeof context[funcName] === 'function') {
-      targetFunc = context[funcName];
-    } else {
-      for (const k of Object.keys(context)) {
-        if (!builtinKeys.has(k) && typeof context[k] === 'function' && !k.startsWith('_')) {
-          targetFunc = context[k];
-          break;
+    try {
+      targetFunc = vm.runInContext(code + '\n;' + funcName, context, { timeout: 3000 });
+    } catch (e) {
+      // fallback if funcName is not found, try finding any function
+      if (typeof context[funcName] === 'function') {
+        targetFunc = context[funcName];
+      } else {
+        for (const k of Object.keys(context)) {
+          if (!builtinKeys.has(k) && typeof context[k] === 'function' && !k.startsWith('_')) {
+            targetFunc = context[k];
+            break;
+          }
         }
       }
     }
