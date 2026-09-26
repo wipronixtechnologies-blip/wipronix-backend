@@ -136,7 +136,7 @@ function getSectionName(q) {
 
 const startTest = async (req, res, next) => {
   try {
-    const { fullName, email, phone, collegeName, eventCode, course, semester, technology, studentId: providedStudentId } = req.body;
+    const { fullName, email, phone, collegeName, eventCode, course, semester, technology, studentId: providedStudentId, testTrack } = req.body;
 
     let student = null;
     let codeToUse = (eventCode || "GENERAL").trim().toUpperCase();
@@ -295,84 +295,105 @@ const startTest = async (req, res, next) => {
       });
     }
 
-    // 4️⃣ Strict 30-Question 5-Section Distribution:
-    // 10 Technology + 5 Aptitude + 5 Computer Networks + 5 Problem Solving + 5 Client Handling = 30
-    const normalizedTech = (technology || "").trim().toLowerCase();
-
-    // 1. Technology Domain (10 Questions strictly tailored to selected technology)
-    const techPool = questionPool.filter(isTechnology);
-    let selectedTech = [];
-    if (normalizedTech) {
-      const exactTech = techPool.filter(q => isDomainMatch(normalizedTech, q.technology));
-
-      if (exactTech.length >= 10) {
-        // Pure domain questions exclusively
-        selectedTech = shuffleArray(exactTech).slice(0, 10);
-      } else {
-        // If domain has fewer than 10, fill from general web / programming questions first
-        const generalPool = techPool.filter(q =>
-          !exactTech.includes(q) && /general|web|programming|basic|core/i.test(q.technology || '')
-        );
-        const otherPool = techPool.filter(q =>
-          !exactTech.includes(q) && !generalPool.includes(q)
-        );
-        const needed = 10 - exactTech.length;
-        const supplement = [...shuffleArray(generalPool), ...shuffleArray(otherPool)].slice(0, needed);
-        selectedTech = [...exactTech, ...supplement];
-      }
-    } else {
-      selectedTech = shuffleArray(techPool).slice(0, 10);
-    }
-
-    // Fallback if tech pool is under 10
-    if (selectedTech.length < 10) {
-      const remainingUnused = questionPool.filter(q => !selectedTech.includes(q));
-      selectedTech = [...selectedTech, ...shuffleArray(remainingUnused).slice(0, 10 - selectedTech.length)];
-    }
+    const isNonTechTrack = testTrack && testTrack.toLowerCase() === 'non-technical';
 
     // Helper to safely pick N items from category pool with fallback to unused questions
-    const pickSection = (filterFn, count, alreadySelected) => {
+    const pickSection = (filterFn, count, alreadySelected, requireNonTech = false) => {
       const pool = questionPool.filter(q => filterFn(q) && !alreadySelected.some(s => s._id.toString() === q._id.toString()));
       let chosen = shuffleArray(pool).slice(0, count);
       if (chosen.length < count) {
-        const available = questionPool.filter(q =>
-          !alreadySelected.some(s => s._id.toString() === q._id.toString()) &&
-          !chosen.some(s => s._id.toString() === q._id.toString())
-        );
+        const available = questionPool.filter(q => {
+          if (alreadySelected.some(s => s._id.toString() === q._id.toString())) return false;
+          if (chosen.some(s => s._id.toString() === q._id.toString())) return false;
+          if (requireNonTech) {
+            return isAptitude(q) || isClientHandling(q) || (q.type || '').toLowerCase() === 'general' || (q.technology || '').toLowerCase() === 'general';
+          }
+          return true;
+        });
         const supplement = shuffleArray(available).slice(0, count - chosen.length);
         chosen = [...chosen, ...supplement];
       }
       return chosen;
     };
 
-    // 2. Aptitude (5 Questions)
-    const selectedApt = pickSection(isAptitude, 5, selectedTech);
-
-    // 3. Computer Networks (5 Questions)
-    const selectedCN = pickSection(isComputerNetwork, 5, [...selectedTech, ...selectedApt]);
-
-    // 4. Problem Solving (5 Questions)
-    const selectedPS = pickSection(isProblemSolving, 5, [...selectedTech, ...selectedApt, ...selectedCN]);
-
-    // 5. Client Handling (5 Questions)
-    const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS]);
-
-    // Combine questions up to required size
-    let sampledQuestions = [
-      ...selectedTech,
-      ...selectedApt,
-      ...selectedCN,
-      ...selectedPS,
-      ...selectedCH
-    ];
-
+    let sampledQuestions = [];
     const requiredCount = eventQuestionsCount;
 
-    if (sampledQuestions.length > requiredCount) {
-      sampledQuestions = sampledQuestions.slice(0, requiredCount);
-    } else if (sampledQuestions.length < requiredCount) {
-      const remaining = shuffleArray(questionPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString())));
-      sampledQuestions = [...sampledQuestions, ...remaining.slice(0, requiredCount - sampledQuestions.length)];
+    if (isNonTechTrack) {
+      // Non-Technical Track: Only Aptitude, Client Handling, General (split evenly)
+      const halfCount = Math.floor(requiredCount / 2);
+      const selectedApt = pickSection(isAptitude, halfCount, [], true);
+      const selectedCH = pickSection(isClientHandling, requiredCount - selectedApt.length, selectedApt, true);
+      sampledQuestions = [...selectedApt, ...selectedCH];
+
+      // Fallback: If still under required count, pick any remaining non-technical questions
+      if (sampledQuestions.length < requiredCount) {
+        const remainingPool = questionPool.filter(q => {
+          if (sampledQuestions.some(s => s._id.toString() === q._id.toString())) return false;
+          return isAptitude(q) || isClientHandling(q) || (q.type || '').toLowerCase() === 'general' || (q.technology || '').toLowerCase() === 'general';
+        });
+        sampledQuestions = [...sampledQuestions, ...shuffleArray(remainingPool).slice(0, requiredCount - sampledQuestions.length)];
+      }
+    } else {
+      // 4️⃣ Strict 30-Question 5-Section Distribution:
+      // 10 Technology + 5 Aptitude + 5 Computer Networks + 5 Problem Solving + 5 Client Handling = 30
+      const normalizedTech = (technology || "").trim().toLowerCase();
+
+      // 1. Technology Domain (10 Questions strictly tailored to selected technology)
+      const techPool = questionPool.filter(isTechnology);
+      let selectedTech = [];
+      if (normalizedTech) {
+        const exactTech = techPool.filter(q => isDomainMatch(normalizedTech, q.technology));
+
+        if (exactTech.length >= 10) {
+          selectedTech = shuffleArray(exactTech).slice(0, 10);
+        } else {
+          const generalPool = techPool.filter(q =>
+            !exactTech.includes(q) && /general|web|programming|basic|core/i.test(q.technology || '')
+          );
+          const otherPool = techPool.filter(q =>
+            !exactTech.includes(q) && !generalPool.includes(q)
+          );
+          const needed = 10 - exactTech.length;
+          const supplement = [...shuffleArray(generalPool), ...shuffleArray(otherPool)].slice(0, needed);
+          selectedTech = [...exactTech, ...supplement];
+        }
+      } else {
+        selectedTech = shuffleArray(techPool).slice(0, 10);
+      }
+
+      if (selectedTech.length < 10) {
+        const remainingUnused = questionPool.filter(q => !selectedTech.includes(q));
+        selectedTech = [...selectedTech, ...shuffleArray(remainingUnused).slice(0, 10 - selectedTech.length)];
+      }
+
+      // 2. Aptitude (5 Questions)
+      const selectedApt = pickSection(isAptitude, 5, selectedTech, false);
+
+      // 3. Computer Networks (5 Questions)
+      const selectedCN = pickSection(isComputerNetwork, 5, [...selectedTech, ...selectedApt], false);
+
+      // 4. Problem Solving (5 Questions)
+      const selectedPS = pickSection(isProblemSolving, 5, [...selectedTech, ...selectedApt, ...selectedCN], false);
+
+      // 5. Client Handling (5 Questions)
+      const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS], false);
+
+      // Combine questions up to required size
+      sampledQuestions = [
+        ...selectedTech,
+        ...selectedApt,
+        ...selectedCN,
+        ...selectedPS,
+        ...selectedCH
+      ];
+
+      if (sampledQuestions.length > requiredCount) {
+        sampledQuestions = sampledQuestions.slice(0, requiredCount);
+      } else if (sampledQuestions.length < requiredCount) {
+        const remaining = shuffleArray(questionPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString())));
+        sampledQuestions = [...sampledQuestions, ...remaining.slice(0, requiredCount - sampledQuestions.length)];
+      }
     }
 
     if (sampledQuestions.length === 0) {
