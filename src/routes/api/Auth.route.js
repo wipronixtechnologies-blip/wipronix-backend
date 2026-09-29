@@ -44,6 +44,8 @@ Router.post("/staff/forgot-password", staffForgotPassword)
 Router.post("/staff/send-otp", staffSendOTP)
 Router.post("/staff/verify-otp", staffVerifyOTP)
 Router.post("/staff/otp-reset-password", staffOtpResetPassword)
+Router.post("/staff/change-password", authenticateStaff, staffProfile.changePassword)
+Router.post("/staff/verify-password", authenticateStaff, staffProfile.verifyPassword)
 
 // Example of role-protected route
 // Router.get("/admin/dashboard", authenticateStaff, authorize('super_admin', 'admin'), (req, res) => {

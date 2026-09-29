@@ -157,6 +157,14 @@ const resultSchema = new mongoose.Schema(
     machineRoundConsoleOutput: {
       type: String,
       default: ''
+    },
+    machineRoundToken: {
+      type: String,
+      default: null
+    },
+    machineRoundTokenExpires: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }

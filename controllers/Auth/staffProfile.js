@@ -195,8 +195,69 @@ const updateStaffProfile = async (request, response) => {
     });
   }
 };
+// Change Password
+const changePassword = async (request, response) => {
+  try {
+    const { currentPassword, newPassword } = request.body;
+
+    const staff = await Staff.findById(request.staff._id);
+
+    if (!staff) {
+      return response.status(404).json({
+        success: false,
+        message: 'Staff not found'
+      });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const isMatch = await bcrypt.compare(currentPassword, staff.password);
+
+    if (!isMatch) {
+      return response.status(400).json({
+        success: false,
+        message: 'Incorrect current password'
+      });
+    }
+
+    staff.password = newPassword;
+    await staff.save();
+
+    response.status(200).json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    response.status(500).json({
+      success: false,
+      message: 'Internal server error while changing password'
+    });
+  }
+};
+
+// Verify Current Password
+const verifyPassword = async (request, response) => {
+  try {
+    const { currentPassword } = request.body;
+    const staff = await Staff.findById(request.staff._id);
+    if (!staff) {
+      return response.status(404).json({ success: false, message: 'Staff not found' });
+    }
+    const bcrypt = require('bcryptjs');
+    const isMatch = await bcrypt.compare(currentPassword, staff.password);
+    if (!isMatch) {
+      return response.status(400).json({ success: false, message: 'Incorrect current password' });
+    }
+    response.status(200).json({ success: true, message: 'Password matches' });
+  } catch (error) {
+    console.error('Verify password error:', error);
+    response.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
 
 module.exports = {
+  verifyPassword,
+  changePassword,
   authenticateStaff,
   authorize,
   checkPermission,

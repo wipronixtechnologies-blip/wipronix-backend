@@ -21,7 +21,7 @@ const staffSendOTP = async (request, response, next) => {
 
     // Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
-    
+
     // Hash OTP before saving to database (for security)
     const hashedOTP = crypto
       .createHash('sha256')
@@ -40,13 +40,13 @@ const staffSendOTP = async (request, response, next) => {
 
     // Prepare staff data for email
     const staffData = {
-      fullName: staff.fullName,
+      fullName: `${staff.firstName} ${staff.lastName}`,
       email: staff.email
     };
 
     // Send OTP email
     const emailResult = await sendOTPSMSEmail(staffData, otp);
-    
+
     if (!emailResult.success) {
       console.error('Failed to send OTP email:', emailResult.error);
       return response.status(500).json({
@@ -57,12 +57,7 @@ const staffSendOTP = async (request, response, next) => {
 
     response.status(200).json({
       success: true,
-      message: 'OTP has been sent to your email address.',
-      // In development, you might want to include the OTP for testing
-      ...(process.env.NODE_ENV === 'development' && { 
-        otp: otp,
-        expiresIn: '10 minutes'
-      })
+      message: 'OTP has been sent to your email address.'
     });
 
   } catch (error) {
@@ -76,7 +71,7 @@ const staffSendOTP = async (request, response, next) => {
     }
 
     console.error("Staff send OTP error:", error);
-    
+
     response.status(500).json({
       success: false,
       message: "Internal server error during OTP request"

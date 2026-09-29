@@ -21,6 +21,7 @@ const {
   deleteAdminChallenge,
   getCandidateSubmission
 } = require("../../../../controllers/Test/machineRoundController");
+const { sendMachineRoundLink, verifyMachineRoundToken } = require("../../../../controllers/Test/machineRoundFlow");
 
 // POST /api/test/start & /api/test/public-start
 router.post("/start", startTest);
@@ -56,6 +57,10 @@ router.get("/machine-round/admin/challenges", getAdminChallenges);
 router.post("/machine-round/admin/challenge", saveAdminChallenge);
 router.delete("/machine-round/admin/challenge/:id", deleteAdminChallenge);
 router.get("/machine-round/submission/:resultId", getCandidateSubmission);
+
+// Secure Email Dispatch & Verification API
+router.post("/machine-round/send-link", sendMachineRoundLink);
+router.get("/machine-round/verify-token/:token", verifyMachineRoundToken);
 
 // Test results & shortlist management
 router.get("/results", getTestResults);

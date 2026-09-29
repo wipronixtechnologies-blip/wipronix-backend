@@ -171,7 +171,7 @@ const createEmailTemplate = (studentData, technology, includeLink = true) => {
             This is a system-generated email. Please do not reply.
           </p>
           <p style="margin: 6px 0 0;">
-            © 2024 Wipronix. All rights reserved.
+            © 2026 Wipronix. All rights reserved.
           </p>
         </div>
       </div>

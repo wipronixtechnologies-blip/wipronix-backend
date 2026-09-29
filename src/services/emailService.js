@@ -1,9 +1,9 @@
 const nodemailer = require('nodemailer');
-const { GMAIL_USER, SUPPORT_EMAIL, WEBSITE_URL, FRONTEND_URL } = require('../config/env');
+const { GMAIL_APP_PASSWORD, GMAIL_USER, SUPPORT_EMAIL, WEBSITE_URL, FRONTEND_URL } = require('../config/env');
 
 // Create transporter for Gmail SMTP
 const createTransporter = () => {
-  if (!GMAIL_APP_PASSWORD) {
+  if (!GMAIL_APP_PASSWORD && !process.env.GMAIL_APP_PASSWORD) {
     console.warn('⚠️ GMAIL_APP_PASSWORD is not set in environment variables');
   }
 
@@ -32,7 +32,7 @@ const createTestCompletionEmailTemplate = (studentData, testResult) => {
 
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
-          <img src="https://firebasestorage.googleapis.com/v0/b/unreal-b8198.firebasestorage.app/o/logo.png?alt=media&token=95a16c4f-af45-44ad-aa59-c2dbefd398ea" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
           <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
             Assessment Completed Successfully!
           </h1>
@@ -110,7 +110,7 @@ const createTestCompletionEmailTemplate = (studentData, testResult) => {
             This is a system-generated email. Please do not reply.
           </p>
           <p style="margin: 6px 0 0;">
-            © 2024 Wipronix. All rights reserved.
+            © 2026 Wipronix. All rights reserved.
           </p>
         </div>
       </div>
@@ -129,15 +129,16 @@ const createOTPEmailTemplate = (studentData, otp) => {
       <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb;">
 
         <!-- Header -->
-        <>< style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
-            <img src="https://firebasestorage.googleapis.com/v0/b/unreal-b8198.firebasestorage.app/o/logo.png?alt=media&token=95a16c4f-af45-44ad-aa59-c2dbefd398ea " alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
-                Password Reset OTP
-              </h1>
-              <p style="color: #f3f3f3; margin-top: 8px; font-size: 14px;">
-                Technology • Innovation • Career Growth
-              </p>
-            </></div>< /></>!-- Body -->
+        <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
+            <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
+              Password Reset OTP
+            </h1>
+            <p style="color: #f3f3f3; margin-top: 8px; font-size: 14px;">
+              Technology • Innovation • Career Growth
+            </p>
+        </div>
+        <!-- Body -->
         <div style="padding: 32px;">
           <p style="font-size: 16px; color: #1f2937;">
             Dear <strong>${fullName}</strong>,
@@ -206,7 +207,7 @@ const createOTPEmailTemplate = (studentData, otp) => {
             This is a system-generated email. Please do not reply.
           </p>
           <p style="margin: 6px 0 0;">
-            © 2024 Wipronix. All rights reserved.
+            © 2026 Wipronix. All rights reserved.
           </p>
         </div>
       </div>
@@ -251,7 +252,7 @@ const createPasswordResetEmailTemplate = (studentData, resetToken) => {
 
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
-          <img src="https://firebasestorage.googleapis.com/v0/b/unreal-b8198.firebasestorage.app/o/logo.png?alt=media&token=95a16c4f-af45-44ad-aa59-c2dbefd398ea " alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
           <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
             Password Reset Request
           </h1>
@@ -330,7 +331,7 @@ const createPasswordResetEmailTemplate = (studentData, resetToken) => {
             This is a system-generated email. Please do not reply.
           </p>
           <p style="margin: 6px 0 0;">
-            © 2024 Wipronix. All rights reserved.
+            © 2026 Wipronix. All rights reserved.
           </p>
         </div>
       </div>
@@ -375,7 +376,7 @@ const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuff
           <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td align="center">
-                 <img src="https://wipronix.com/assets/logo.png" alt="Wipronix Logo" style="display: block; max-width: 180px; width: 100%; height: auto; margin: 0 auto 20px auto; border: 0;">
+                 <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="display: block; max-width: 180px; width: 100%; height: auto; margin: 0 auto 20px auto; border: 0;">
               </td>
             </tr>
           </table>
@@ -455,7 +456,7 @@ const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuff
 
         <!-- Footer -->
         <div style="background-color: #f3f4f6; padding: 18px; text-align: center; font-size: 13px; color: #6b7280;">
-          <p style="margin: 0;">© 2024 Wipronix. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 Wipronix. All rights reserved.</p>
         </div>
       </div>
     `;
@@ -517,7 +518,7 @@ const createStaffWelcomeEmailTemplate = (staffData, tempPassword) => {
 
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
-          <img src="https://firebasestorage.googleapis.com/v0/b/unreal-b8198.firebasestorage.app/o/logo.png?alt=media&token=95a16c4f-af45-44ad-aa59-c2dbefd398ea" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
           <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
             Welcome to the Team!
           </h1>
@@ -610,7 +611,7 @@ const createStaffWelcomeEmailTemplate = (staffData, tempPassword) => {
             This is a system-generated email. Please do not reply.
           </p>
           <p style="margin: 6px 0 0;">
-            © 2024 Wipronix Technologies Pvt. Ltd. All rights reserved.
+            © 2026 Wipronix Technologies Pvt. Ltd. All rights reserved.
           </p>
         </div>
       </div>
@@ -759,11 +760,79 @@ const sendRegistrationSlipEmail = async (studentData, slipData, token) => {
   }
 };
 
+const sendMachineRoundLinkEmail = async (studentData, token) => {
+  try {
+    const transporter = createTransporter();
+    const frontendBase = WEBSITE_URL ? WEBSITE_URL.replace('/auth', '') : (FRONTEND_URL || 'https://www.wipronix.com');
+    const secureLink = `${frontendBase}/machine-round/${token}`;
+
+    const subject = `Wipronix Technical Assessment | Machine Coding Round Link (Action Required)`;
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 150px; height: auto; margin-bottom: 16px;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">
+            Machine Coding Assessment
+          </h1>
+          <p style="color: #f3f3f3; margin-top: 8px; font-size: 14px;">
+            Technical Round 2
+          </p>
+        </div>
+        <!-- Body -->
+        <div style="padding: 32px;">
+          <p style="font-size: 16px; color: #1f2937;">
+            Dear <strong>${studentData.studentName}</strong>,
+          </p>
+          <p style="font-size: 15.5px; color: #374151; line-height: 1.7;">
+            Congratulations! Based on your preliminary MCQ assessment performance, you have been shortlisted for our intensive Machine Coding Round.
+          </p>
+          
+          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14.5px; color: #991b1b; font-weight: 600;">
+              ⚠️ IMPORTANT: This secure session link will expire exactly 20 minutes from the time this email was generated. Once expired, you will not be able to access the environment.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 36px 0;">
+            <a href="${secureLink}" style="background-color: #e52328; color: #ffffff; padding: 16px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
+              Start Coding Assessment
+            </a>
+          </div>
+
+          <p style="font-size: 15.5px; color: #374151; line-height: 1.7;">
+            Please ensure you are on a stable connection. The assessment is heavily proctored and you will be graded on accuracy and code compilation execution. Good luck!
+          </p>
+        </div>
+        <!-- Footer -->
+        <div style="background-color: #f3f4f6; padding: 24px; text-align: center; font-size: 13px; color: #6b7280; border-top: 1px solid #e5e7eb;">
+          <p style="margin: 0;">© ${new Date().getFullYear()} Wipronix Technologies Pvt. Ltd. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: GMAIL_USER || 'your-email@gmail.com',
+      to: studentData.studentEmail,
+      subject: subject,
+      html: html
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Machine Round link sent successfully to ${studentData.studentEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send machine round link email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendTestCompletionEmail,
   sendPasswordResetEmail,
   sendOTPSMSEmail,
   sendStaffWelcomeEmail,
   sendStaffWelcomeEmailWithOfferLetter,
-  sendRegistrationSlipEmail
+  sendRegistrationSlipEmail,
+  sendMachineRoundLinkEmail
 };
