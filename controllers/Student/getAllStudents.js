@@ -5,28 +5,20 @@ const getAllStudents = async (req, res, next) => {
   try {
     let query = {};
 
-    // Filter by assigned college if the user is a BDE
+    // Filter by assigned college or directly assigned leads if the user is a BDE
     if (req.staff.role === 'bde') {
       const assignedColleges = await College.find({ assignedTo: req.staff._id });
       const collegeNames = assignedColleges.map(c => c.name);
-      
+
+      query.$or = [{ assignedTo: req.staff._id }];
       if (collegeNames.length > 0) {
-        query.college = { $in: collegeNames };
-      } else {
-        // If BDE is assigned no colleges, they should see no students (or maybe just a message)
-        // Returning an empty list for now
-        return res.status(200).json({
-          success: true,
-          message: "No students found (No colleges assigned to you)",
-          data: {
-            students: []
-          }
-        });
+        query.$or.push({ college: { $in: collegeNames } });
       }
     }
 
     // Fetch students based on query (excluding sensitive/heavy fields with lean for fast memory performance)
     const students = await Student.find(query)
+      .populate('assignedTo', 'fullName email profileImage')
       .select("-password -resetPasswordToken -resetPasswordExpires")
       .sort({ createdAt: -1 })
       .lean();
