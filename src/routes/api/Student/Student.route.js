@@ -5,9 +5,11 @@ const multer = require('multer');
 const registerStudent = require("../../../../controllers/Student/registerStudent");
 const getAllStudents = require("../../../../controllers/Student/getAllStudents");
 const { authenticateStaff } = require("../../../../controllers/Auth/staffProfile");
+const authenticate = require("../../../middlewares/auth");
 const getStudentByEmail = require("../../../../controllers/Student/getStudentByEmail");
 const updateStudentByEmail = require("../../../../controllers/Student/updateStudentByEmail");
 const updateStudentWithProfilePicture = require("../../../../controllers/Student/updateStudentWithProfilePicture");
+const bulkUpload = require("../../../../controllers/Student/bulkUpload");
 
 // Configure multer for profile picture upload
 const storage = multer.memoryStorage();
@@ -34,12 +36,15 @@ router.post("/register", registerStudent);
 router.get("/all", authenticateStaff, getAllStudents);
 
 // GET /api/student/by-email?email=example@gmail.com
-router.get("/by-email", getStudentByEmail);
+router.get("/by-email", authenticate, getStudentByEmail);
 
 // PUT /api/student/by-email (basic update without file upload)
-router.put("/by-email", updateStudentByEmail);
+router.put("/by-email", authenticate, updateStudentByEmail);
+
+// POST /api/student/bulk (bulk upload array of students)
+router.post("/bulk", authenticateStaff, bulkUpload);
 
 // PUT /api/student/update-profile (update with profile picture upload)
-router.put("/update-profile", profilePictureUpload.single('profilePicture'), updateStudentWithProfilePicture);
+router.put("/update-profile", authenticate, profilePictureUpload.single('profilePicture'), updateStudentWithProfilePicture);
 
 module.exports = router;

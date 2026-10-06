@@ -158,7 +158,8 @@ const startTest = async (req, res, next) => {
             college: collegeName ? collegeName.trim() : "Default College",
             course: cleanCourse,
             semester: cleanSemester,
-            technology: cleanTechnology
+            technology: cleanTechnology,
+            source: 'test'
           });
         } else {
           if (collegeName) student.college = collegeName.trim();
@@ -166,6 +167,7 @@ const startTest = async (req, res, next) => {
           student.course = cleanCourse;
           student.semester = cleanSemester;
           student.technology = cleanTechnology;
+          student.source = 'test';
           await student.save();
         }
       } else if (providedStudentId && providedStudentId.length === 24) {
@@ -230,6 +232,7 @@ const startTest = async (req, res, next) => {
           queryOr.push({ studentPhone: student.phoneNumber.trim() });
         }
         if (phone && phone.trim() && phone.trim() !== student.phoneNumber?.trim()) {
+          console.log(TEST_START_DEBUG, { codeToUse, queryOr });
           queryOr.push({ studentPhone: phone.trim() });
         }
 
@@ -455,28 +458,30 @@ const startTest = async (req, res, next) => {
         studentIdQuery.push({ studentEmail: emailFilter });
       }
 
+      const resPayload = {
+        studentId: student._id,
+        studentName: student.fullName,
+        studentEmail: student.email,
+        studentPhone: student.phoneNumber || phone || "",
+        collegeName: student.college || collegeName || "College",
+        course: student.course || cleanCourse,
+        semester: student.semester || cleanSemester,
+        technology: student.technology || cleanTechnology,
+        eventCode: codeToUse,
+        testId: codeToUse,
+        totalQuestions: sampledQuestions.length,
+        status: "IN_PROGRESS",
+        answers: answerKeyMap
+      };
+
       await Result.findOneAndUpdate(
         {
           $or: studentIdQuery,
           testId: codeToUse
         },
-        {
-          studentId: student._id,
-          studentName: student.fullName,
-          studentEmail: student.email,
-          studentPhone: student.phoneNumber || phone || "",
-          collegeName: student.college || collegeName || "College",
-          course: student.course || cleanCourse,
-          semester: student.semester || cleanSemester,
-          technology: student.technology || cleanTechnology,
-          eventCode: codeToUse,
-          testId: codeToUse,
-          totalQuestions: sampledQuestions.length,
-          status: "IN_PROGRESS",
-          answers: answerKeyMap
-        },
+        resPayload,
         { upsert: true, new: true }
-      );
+      );;
     } catch (rSaveErr) {
       console.warn("Result IN_PROGRESS save warning:", rSaveErr.message);
     }

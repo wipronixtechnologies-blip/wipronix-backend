@@ -99,7 +99,7 @@ const staffRegister = async (request, response, next) => {
         userType: 'staff'
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+      { expiresIn: '1h' }
     );
 
     // Set cookie
@@ -108,7 +108,7 @@ const staffRegister = async (request, response, next) => {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 60 * 60 * 1000
     });
 
     response.status(201).json({

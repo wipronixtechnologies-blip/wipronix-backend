@@ -5,6 +5,13 @@ const imageService = require("../../src/services/imageService");
 const updateStudentWithProfilePicture = async (req, res, next) => {
   try {
     const { email, ...updateData } = req.body;
+    if (req.student && req.student.email && email && req.student.email.toLowerCase() !== email.toLowerCase().trim()) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You can only access your own profile"
+      });
+    }
+  
 
     if (!email) {
       return res.status(400).json({

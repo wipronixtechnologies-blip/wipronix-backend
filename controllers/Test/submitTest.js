@@ -54,7 +54,7 @@ const submitTest = async (req, res, next) => {
       if (mongoose.Types.ObjectId.isValid(effectiveStudentId) && effectiveStudentId.length === 24) {
         try {
           searchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) });
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     if (effectiveEmail) {
@@ -146,7 +146,7 @@ const submitTest = async (req, res, next) => {
       // Fallback: If answerKeyMap was lost, count non-empty submitted answers and score against questions
       attempted = Object.keys(submittedAnswers).filter(k => submittedAnswers[k] !== undefined && submittedAnswers[k] !== null && String(submittedAnswers[k]).trim() !== "").length;
       totalQuestions = Math.max(30, attempted);
-      
+
       // Attempt Question Bank verification if question IDs are present
       try {
         const qList = await Question.find().select("+correctAnswer").lean();
@@ -212,41 +212,48 @@ const submitTest = async (req, res, next) => {
         ? { _id: existingResult._id }
         : { studentId: targetStudentId, testId: eventCode };
 
-      savedResult = await Result.findOneAndUpdate(
-        query,
-        {
-          studentId: targetStudentId,
-          studentName,
-          studentEmail,
-          studentPhone,
-          collegeName,
-          course,
-          semester,
-          technology,
-          eventCode,
-          testId: eventCode,
-          totalQuestions,
-          attempted,
-          correct: correctCount,
-          score,
-          percentage,
-          status,
-          answers: submittedAnswers,
-          resultDeclared: true,
-          hasMachineRound,
-          machineRoundStatus,
-          machineRoundTechnology: technology,
-          ...(existingResult?.machineRoundScore !== undefined ? { machineRoundScore: existingResult.machineRoundScore } : {}),
-          ...(existingResult?.machineRoundPassedTestCases !== undefined ? { machineRoundPassedTestCases: existingResult.machineRoundPassedTestCases } : {}),
-          ...(existingResult?.machineRoundTotalTestCases !== undefined ? { machineRoundTotalTestCases: existingResult.machineRoundTotalTestCases } : {}),
-          ...(existingResult?.machineRoundCode ? { machineRoundCode: existingResult.machineRoundCode } : {}),
-          ...(existingResult?.machineRoundLanguage ? { machineRoundLanguage: existingResult.machineRoundLanguage } : {}),
-          ...(existingResult?.machineRoundSubmittedAt ? { machineRoundSubmittedAt: existingResult.machineRoundSubmittedAt } : {}),
-          ...(existingResult?.machineRoundConsoleOutput ? { machineRoundConsoleOutput: existingResult.machineRoundConsoleOutput } : {}),
-          ...(existingResult?.technicalRoundMarks !== undefined ? { technicalRoundMarks: existingResult.technicalRoundMarks } : {})
-        },
-        { upsert: true, new: true }
-      );
+
+      const submitPayload = {
+        studentId: targetStudentId,
+        studentName,
+        studentEmail,
+        studentPhone,
+        collegeName,
+        course,
+        semester,
+        technology,
+        eventCode,
+        testId: eventCode,
+        totalQuestions,
+        attempted,
+        correct: correctCount,
+        score,
+        percentage,
+        status,
+        answers: submittedAnswers,
+        resultDeclared: true,
+        hasMachineRound,
+        machineRoundStatus,
+        machineRoundTechnology: technology,
+        ...(existingResult?.machineRoundScore !== undefined ? { machineRoundScore: existingResult.machineRoundScore } : {}),
+        ...(existingResult?.machineRoundPassedTestCases !== undefined ? { machineRoundPassedTestCases: existingResult.machineRoundPassedTestCases } : {}),
+        ...(existingResult?.machineRoundTotalTestCases !== undefined ? { machineRoundTotalTestCases: existingResult.machineRoundTotalTestCases } : {}),
+        ...(existingResult?.machineRoundCode ? { machineRoundCode: existingResult.machineRoundCode } : {}),
+        ...(existingResult?.machineRoundLanguage ? { machineRoundLanguage: existingResult.machineRoundLanguage } : {}),
+        ...(existingResult?.machineRoundSubmittedAt ? { machineRoundSubmittedAt: existingResult.machineRoundSubmittedAt } : {}),
+        ...(existingResult?.machineRoundConsoleOutput ? { machineRoundConsoleOutput: existingResult.machineRoundConsoleOutput } : {}),
+        ...(existingResult?.technicalRoundMarks !== undefined ? { technicalRoundMarks: existingResult.technicalRoundMarks } : {})
+      };
+
+      if (eventCode === 'ORGANIC') {
+        if (score >= Math.floor(totalQuestions * 0.5)) {
+          submitPayload.status = 'Passed';
+        } else {
+          submitPayload.status = 'Failed';
+        }
+      }
+
+      savedResult = await Result.findOneAndUpdate(query, submitPayload, { upsert: true, new: true });
 
       // Clean up any other duplicate orphan records for this student
       if (existingResults.length > 1 && savedResult) {
@@ -266,7 +273,7 @@ const submitTest = async (req, res, next) => {
       if (redis && redis.status === 'ready' && typeof redis.del === 'function' && effectiveStudentId) {
         await redis.del(`test:session:${effectiveStudentId}`);
       }
-    } catch (rDelErr) {}
+    } catch (rDelErr) { }
 
     // Return confirmation cleanly to student with machine round readiness
     return res.status(200).json({

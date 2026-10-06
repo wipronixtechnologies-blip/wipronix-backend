@@ -181,8 +181,8 @@ const createEmailTemplate = (studentData, technology, includeLink = true) => {
 
 const applyForInternship = async (req, res, next) => {
   try {
-    const { name, email, phone, technology, college, semester, link,city,course,education,passingYear } = req.body;
-console.log(req.body);
+    const { name, email, phone, technology, college, semester, link, city, course, education, passingYear } = req.body;
+    console.log(req.body);
     // Validation
     if (!name || !email || !phone || !technology || !college || !semester) {
       return res.status(400).json({
@@ -192,21 +192,20 @@ console.log(req.body);
     }
 
     // Check if student already applied for this technology
-    const existingApplication = await Student.findOne({ 
-      email, 
-      technology 
+    const existingApplication = await Student.findOne({
+      $or: [{ email: email.toLowerCase() }, { phoneNumber: phone }]
     });
 
     if (existingApplication) {
       return res.status(409).json({
         success: false,
-        message: "You have already applied for this technology"
+        message: "An application with this email or phone number already exists."
       });
     }
 
 
     const student = await Student.create(
-      { fullName: name, email, phoneNumber:phone, technology, college, semester,city:city,course:course,education:education ,passingYear:passingYear}
+      { fullName: name, email, phoneNumber: phone, technology, college, semester, city: city, course: course, education: education, passingYear: passingYear, source: 'organic' }
     );
 
     const assessmentLink = link ? assessmentLinks[technology] : null;

@@ -544,6 +544,23 @@ exports.getAssignedStudents = async (req, res) => {
       query.$or = [{ assignedTo: null }, { assignedTo: { $exists: false } }];
     }
 
+
+        const sourceParam = req.query.source;
+    if (sourceParam && sourceParam !== 'all') {
+      const source = sourceParam;
+      if (source === 'organic') query.source = 'organic';
+      else if (source === 'import') query.source = 'import';
+      else if (source === 'test') { 
+        query.source = { $nin: ['organic', 'import'] }; 
+        // student taken test usually means technology assigned or eventCode exists
+      }
+      else if (source === 'internship') { 
+        query.source = { $nin: ['organic', 'import'] }; 
+        query.technology = { $exists: true, $ne: '' }; 
+      }
+      else query.source = source;
+    }
+  
     if (counselingStatus && counselingStatus !== 'all') {
       query.counselingStatus = counselingStatus;
     }
@@ -678,8 +695,18 @@ exports.reassignStudents = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Target BDE not found' });
     }
 
+        // Authorization check for TL: TL can only re-assign students globally if they own them, OR are super admin
+    let query = { _id: { $in: studentIds } };
+    const isSuperAdmin = req.staff && ['super_admin', 'admin', 'hr', 'hr_manager'].includes(req.staff.role || req.staff.systemRole);
+    const isTL = req.staff && (req.staff.role === 'tl' || req.staff.systemRole === 'tl');
+    
+    if (isTL && !isSuperAdmin) {
+        // Enforce TL can only reassign students already explicitly assigned to them
+        query.$or = [{ assignedTo: req.staff._id }, { assignedBy: req.staff._id }];
+    }
+
     const result = await Student.updateMany(
-      { _id: { $in: studentIds } },
+      query,
       {
         $set: {
           assignedTo: newBde._id,
@@ -819,7 +846,15 @@ exports.getMyAssignedStudents = async (req, res) => {
     } = req.query;
 
     // Base match filter for this counselor's assignments
-    const baseCounselorFilter = { assignedTo: counselorObjectId };
+    let baseCounselorFilter = { assignedTo: counselorObjectId };
+    if (loggedInStaff.role === 'tl' || loggedInStaff.systemRole === 'tl') {
+        baseCounselorFilter = {
+            $or: [
+                { assignedTo: counselorObjectId },
+                { assignedBy: counselorObjectId }
+            ]
+        };
+    }
     const query = { ...baseCounselorFilter };
 
     if (college && college !== 'all') {
@@ -834,6 +869,23 @@ exports.getMyAssignedStudents = async (req, res) => {
       query.semester = { $regex: new RegExp(semester.trim(), 'i') };
     }
 
+
+        const sourceParam = req.query.source;
+    if (sourceParam && sourceParam !== 'all') {
+      const source = sourceParam;
+      if (source === 'organic') query.source = 'organic';
+      else if (source === 'import') query.source = 'import';
+      else if (source === 'test') { 
+        query.source = { $nin: ['organic', 'import'] }; 
+        // student taken test usually means technology assigned or eventCode exists
+      }
+      else if (source === 'internship') { 
+        query.source = { $nin: ['organic', 'import'] }; 
+        query.technology = { $exists: true, $ne: '' }; 
+      }
+      else query.source = source;
+    }
+  
     if (counselingStatus && counselingStatus !== 'all') {
       query.counselingStatus = counselingStatus;
     }

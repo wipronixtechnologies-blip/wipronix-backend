@@ -3,6 +3,13 @@ const Student = require("../../models/Student.model");
 const getStudentByEmail = async (req, res, next) => {
   try {
     const { email } = req.query;
+    if (req.student && req.student.email && email && req.student.email.toLowerCase() !== email.toLowerCase().trim()) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You can only access your own profile"
+      });
+    }
+  
 
     if (!email) {
       return res.status(400).json({

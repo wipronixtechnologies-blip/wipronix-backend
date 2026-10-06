@@ -30,7 +30,7 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    
+
     // Education Information (Flexible without enum restrictions)
     education: {
       type: String,
@@ -48,7 +48,7 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    
+
     // Test/Application Information
     testId: String,
     semester: String,
@@ -57,24 +57,31 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    
+
     // Authentication
     isVerified: {
       type: Boolean,
       default: false
     },
     lastLogin: Date,
-    
+
     // Password Reset
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+
+    // Lead Source routing
+    source: {
+      type: String,
+      enum: ['organic', 'test', 'import'],
+      default: 'organic'
+    },
 
     // Result Declaration
     resultDeclared: {
       type: Boolean,
       default: false
     },
-    
+
     // Profile Picture
     profilePicture: {
       type: String,

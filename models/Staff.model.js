@@ -90,7 +90,7 @@ const staffSchema = new mongoose.Schema({
   },
   systemRole: {
     type: String,
-    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder'],
+    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl'],
     default: 'employee'
   },
   employeeType: {
@@ -144,7 +144,7 @@ const staffSchema = new mongoose.Schema({
   // System fields
   role: {
     type: String,
-    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder'],
+    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl'],
     default: 'employee'
   },
   isActive: {

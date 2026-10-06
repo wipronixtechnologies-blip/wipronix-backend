@@ -68,7 +68,7 @@ const staffLogin = async (request, response) => {
         fullName: staff.fullName
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+      { expiresIn: '1h' }
     );
 
     // Prepare user data for response (not stored in cookie anymore)
@@ -88,7 +88,7 @@ const staffLogin = async (request, response) => {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 60 * 60 * 1000 // 7 days
     });
 
     console.log('[staffLogin] Login successful, token generated.');

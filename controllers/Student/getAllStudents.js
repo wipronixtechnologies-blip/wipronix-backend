@@ -4,13 +4,15 @@ const College = require("../../models/College.model");
 const getAllStudents = async (req, res, next) => {
   try {
     let query = {};
+    const isTL = req.staff && (req.staff.role === 'tl' || req.staff.systemRole === 'tl');
+    const isBDE = req.staff && (req.staff.role === 'bde');
 
-    // Filter by assigned college or directly assigned leads if the user is a BDE
-    if (req.staff.role === 'bde') {
+    // Filter by assigned college or directly assigned leads if the user is a BDE or TL
+    if (isBDE || isTL) {
       const assignedColleges = await College.find({ assignedTo: req.staff._id });
       const collegeNames = assignedColleges.map(c => c.name);
 
-      query.$or = [{ assignedTo: req.staff._id }];
+      query.$or = [{ assignedTo: req.staff._id }, { assignedBy: req.staff._id }];
       if (collegeNames.length > 0) {
         query.$or.push({ college: { $in: collegeNames } });
       }

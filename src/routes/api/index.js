@@ -22,7 +22,7 @@ const trainerRoutes = require('./Trainer.route')
 const financeRoutes = require('./Finance.route')
 const contactRoutes = require('./Contact.route')
 
-Router.use('/auth',auth)
+Router.use('/auth', auth)
 Router.use("/student", studentRoutes);
 Router.use("/test", testRoutes);
 Router.use("/internship", internshipRoutes);
