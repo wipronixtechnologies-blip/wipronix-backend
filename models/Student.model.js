@@ -57,6 +57,11 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    testTrack: {
+      type: String,
+      enum: ['technical', 'non-technical'],
+      default: 'technical'
+    },
 
     // Authentication
     isVerified: {

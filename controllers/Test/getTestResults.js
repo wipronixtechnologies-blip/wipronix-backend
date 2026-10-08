@@ -138,6 +138,23 @@ const getTestResults = async (req, res, next) => {
       if (!candidateSemester) candidateSemester = '6th Sem';
       if (!candidateTechnology) candidateTechnology = 'Core Technical';
 
+      let effectiveMachineStatus = result.machineRoundStatus;
+      if (!effectiveMachineStatus || effectiveMachineStatus === 'NOT_APPLICABLE') {
+        if (result.machineRoundSubmittedAt || (result.machineRoundCode && result.machineRoundCode.trim())) {
+          effectiveMachineStatus = 'COMPLETED';
+        } else if (result.machineRoundToken) {
+          effectiveMachineStatus = 'PENDING';
+        } else if (result.hasMachineRound) {
+          effectiveMachineStatus = 'PENDING';
+        } else {
+          effectiveMachineStatus = 'NOT_APPLICABLE';
+        }
+      }
+
+      const effectiveMachineScore = result.machineRoundScore !== undefined && result.machineRoundScore !== null
+        ? result.machineRoundScore
+        : (result.technicalRoundMarks !== undefined && result.technicalRoundMarks !== null ? result.technicalRoundMarks : 0);
+
       return {
         _id: result._id,
         studentId: studentDoc._id || result.studentId,
@@ -160,12 +177,12 @@ const getTestResults = async (req, res, next) => {
         isSelected: Boolean(result.isSelected),
         offerLetterSent: Boolean(result.offerLetterSent),
         offerLetterSentDate: result.offerLetterSentDate || null,
-        technicalRoundMarks: result.technicalRoundMarks !== undefined ? result.technicalRoundMarks : (result.machineRoundScore !== undefined ? result.machineRoundScore : null),
+        technicalRoundMarks: result.technicalRoundMarks !== undefined ? result.technicalRoundMarks : effectiveMachineScore,
         aiRoundMarks: result.aiRoundMarks !== undefined ? result.aiRoundMarks : null,
         screeningRoundMarks: result.screeningRoundMarks !== undefined ? result.screeningRoundMarks : null,
-        hasMachineRound: Boolean(result.hasMachineRound),
-        machineRoundStatus: result.machineRoundStatus || (result.hasMachineRound ? 'PENDING' : 'NOT_APPLICABLE'),
-        machineRoundScore: result.machineRoundScore !== undefined ? result.machineRoundScore : (result.technicalRoundMarks !== undefined ? result.technicalRoundMarks : 0),
+        hasMachineRound: Boolean(result.hasMachineRound || effectiveMachineStatus !== 'NOT_APPLICABLE'),
+        machineRoundStatus: effectiveMachineStatus,
+        machineRoundScore: effectiveMachineScore,
         machineRoundPassedTestCases: result.machineRoundPassedTestCases !== undefined ? result.machineRoundPassedTestCases : 0,
         machineRoundTotalTestCases: result.machineRoundTotalTestCases !== undefined ? result.machineRoundTotalTestCases : (result.hasMachineRound ? 5 : 0),
         machineRoundCode: result.machineRoundCode || '',

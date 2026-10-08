@@ -99,6 +99,7 @@ const resultSchema = new mongoose.Schema(
       default: null
     },
     answers: Object,
+    answerKeyMap: Object,
     resultDeclared: {
       type: Boolean,
       default: true

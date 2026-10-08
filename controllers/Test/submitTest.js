@@ -101,6 +101,10 @@ const submitTest = async (req, res, next) => {
     // 4️⃣ Extract Answer Key Map from Redis session, existing Result, or Question Bank
     let answerKeyMap = sessionData?.answerKeyMap || null;
 
+    if (!answerKeyMap && existingResult?.answerKeyMap) {
+      answerKeyMap = existingResult.answerKeyMap;
+    }
+
     // Check if existing result has answerKeyMap format in answers
     if (!answerKeyMap && existingResult?.answers) {
       const firstVal = Object.values(existingResult.answers)[0];
@@ -112,6 +116,10 @@ const submitTest = async (req, res, next) => {
     // Check other existing results if duplicate exists
     if (!answerKeyMap && existingResults.length > 1) {
       for (const resDoc of existingResults) {
+        if (resDoc.answerKeyMap) {
+          answerKeyMap = resDoc.answerKeyMap;
+          break;
+        }
         if (resDoc.answers) {
           const firstVal = Object.values(resDoc.answers)[0];
           if (firstVal && typeof firstVal === 'object' && firstVal.correctOption) {
@@ -231,6 +239,7 @@ const submitTest = async (req, res, next) => {
         percentage,
         status,
         answers: submittedAnswers,
+        answerKeyMap: existingResult?.answerKeyMap || answerKeyMap,
         resultDeclared: true,
         hasMachineRound,
         machineRoundStatus,

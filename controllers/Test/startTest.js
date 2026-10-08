@@ -59,7 +59,7 @@ function isClientHandling(q) {
 }
 
 function isTechnology(q) {
-  return !isAptitude(q) && !isComputerNetwork(q) && !isProblemSolving(q) && !isClientHandling(q);
+  return !isAptitude(q) && !isClientHandling(q);
 }
 
 // Domain identifier & matcher helper
@@ -102,8 +102,8 @@ function isDomainMatch(studentTech, questionTech) {
       tags: ['cloud', 'devops', 'aws', 'docker', 'linux', 'kubernetes', 'ci/cd']
     },
     {
-      aliases: ['cyber', 'security', 'cyber security', 'infosec'],
-      tags: ['cyber', 'security', 'penetration', 'firewall', 'encryption']
+      aliases: ['cyber', 'security', 'cyber security', 'infosec', 'cybersecurity'],
+      tags: ['cyber', 'security', 'penetration', 'firewall', 'encryption', 'vulnerability', 'owasp', 'cryptography']
     },
     {
       aliases: ['c++', 'cpp', 'oop', 'c / c++'],
@@ -112,6 +112,10 @@ function isDomainMatch(studentTech, questionTech) {
     {
       aliases: ['ui', 'ux', 'ui/ux', 'design', 'figma'],
       tags: ['ui', 'ux', 'figma', 'design', 'wireframe']
+    },
+    {
+      aliases: ['general', 'general technical', 'core technical', 'core', 'software engineering', 'computer science', 'cs'],
+      tags: ['general', 'general technical', 'core technical', 'core', 'data structure', 'algorithm', 'dbms', 'operating system', 'sql', 'programming']
     }
   ];
 
@@ -159,6 +163,7 @@ const startTest = async (req, res, next) => {
             course: cleanCourse,
             semester: cleanSemester,
             technology: cleanTechnology,
+            testTrack: testTrack || 'technical',
             source: 'test'
           });
         } else {
@@ -167,6 +172,7 @@ const startTest = async (req, res, next) => {
           student.course = cleanCourse;
           student.semester = cleanSemester;
           student.technology = cleanTechnology;
+          student.testTrack = testTrack || student.testTrack || 'technical';
           student.source = 'test';
           await student.save();
         }
@@ -186,7 +192,8 @@ const startTest = async (req, res, next) => {
         college: (collegeName || "Wipronix Campus Drive").trim(),
         course: cleanCourse,
         semester: cleanSemester,
-        technology: cleanTechnology
+        technology: cleanTechnology,
+        testTrack: testTrack || 'technical'
       };
     }
 
@@ -338,64 +345,52 @@ const startTest = async (req, res, next) => {
         sampledQuestions = [...sampledQuestions, ...shuffleArray(remainingPool).slice(0, requiredCount - sampledQuestions.length)];
       }
     } else {
-      // 4️⃣ Strict 30-Question 5-Section Distribution:
-      // 10 Technology + 5 Aptitude + 5 Computer Networks + 5 Problem Solving + 5 Client Handling = 30
+      // 4️⃣ Technical Track: Questions MUST strictly come from Technical!
+      // Based on specialization: If candidate picked Cyber Security, Cyber Security questions are asked.
+      // If other specialization is picked, questions come from that specialization only!
       const normalizedTech = (technology || "").trim().toLowerCase();
 
-      // 1. Technology Domain (10 Questions strictly tailored to selected technology)
+      // Technical pool strictly excludes Aptitude and Client Handling (non-technical)
       const techPool = questionPool.filter(isTechnology);
-      let selectedTech = [];
+
+      let matchedDomainQuestions = [];
       if (normalizedTech) {
-        const exactTech = techPool.filter(q => isDomainMatch(normalizedTech, q.technology));
+        matchedDomainQuestions = techPool.filter(q => isDomainMatch(normalizedTech, q.technology));
+      }
 
-        if (exactTech.length >= 10) {
-          selectedTech = shuffleArray(exactTech).slice(0, 10);
-        } else {
-          const generalPool = techPool.filter(q =>
-            !exactTech.includes(q) && /general|web|programming|basic|core/i.test(q.technology || '')
-          );
-          const otherPool = techPool.filter(q =>
-            !exactTech.includes(q) && !generalPool.includes(q)
-          );
-          const needed = 10 - exactTech.length;
-          const supplement = [...shuffleArray(generalPool), ...shuffleArray(otherPool)].slice(0, needed);
-          selectedTech = [...exactTech, ...supplement];
-        }
+      if (matchedDomainQuestions.length >= requiredCount) {
+        // Full set tailored to chosen specialization
+        sampledQuestions = shuffleArray(matchedDomainQuestions).slice(0, requiredCount);
       } else {
-        selectedTech = shuffleArray(techPool).slice(0, 10);
+        // Take all matched domain questions first
+        sampledQuestions = shuffleArray(matchedDomainQuestions);
+
+        // Supplement remaining needed strictly from other technical pools (core/general technical first)
+        const remainingNeeded = requiredCount - sampledQuestions.length;
+        const generalTechnicalPool = techPool.filter(q =>
+          !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+          /general|core|basic|problem\s*solving|dsa|algorithm|computer\s*network/i.test(q.technology || '')
+        );
+
+        const otherTechPool = techPool.filter(q =>
+          !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+          !generalTechnicalPool.some(g => g._id.toString() === q._id.toString())
+        );
+
+        const supplement = [...shuffleArray(generalTechnicalPool), ...shuffleArray(otherTechPool)].slice(0, remainingNeeded);
+        sampledQuestions = [...sampledQuestions, ...supplement];
       }
 
-      if (selectedTech.length < 10) {
-        const remainingUnused = questionPool.filter(q => !selectedTech.includes(q));
-        selectedTech = [...selectedTech, ...shuffleArray(remainingUnused).slice(0, 10 - selectedTech.length)];
+      // Safety fallback ensuring requiredCount questions strictly within technical pool
+      if (sampledQuestions.length < requiredCount) {
+        const remainingTech = techPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString()));
+        sampledQuestions = [...sampledQuestions, ...shuffleArray(remainingTech).slice(0, requiredCount - sampledQuestions.length)];
       }
 
-      // 2. Aptitude (5 Questions)
-      const selectedApt = pickSection(isAptitude, 5, selectedTech, false);
-
-      // 3. Computer Networks (5 Questions)
-      const selectedCN = pickSection(isComputerNetwork, 5, [...selectedTech, ...selectedApt], false);
-
-      // 4. Problem Solving (5 Questions)
-      const selectedPS = pickSection(isProblemSolving, 5, [...selectedTech, ...selectedApt, ...selectedCN], false);
-
-      // 5. Client Handling (5 Questions)
-      const selectedCH = pickSection(isClientHandling, 5, [...selectedTech, ...selectedApt, ...selectedCN, ...selectedPS], false);
-
-      // Combine questions up to required size
-      sampledQuestions = [
-        ...selectedTech,
-        ...selectedApt,
-        ...selectedCN,
-        ...selectedPS,
-        ...selectedCH
-      ];
-
-      if (sampledQuestions.length > requiredCount) {
-        sampledQuestions = sampledQuestions.slice(0, requiredCount);
-      } else if (sampledQuestions.length < requiredCount) {
-        const remaining = shuffleArray(questionPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString())));
-        sampledQuestions = [...sampledQuestions, ...remaining.slice(0, requiredCount - sampledQuestions.length)];
+      // Final fallback if total technical pool is smaller than requiredCount
+      if (sampledQuestions.length < requiredCount) {
+        const remainingUnused = questionPool.filter(q => !sampledQuestions.some(s => s._id.toString() === q._id.toString()));
+        sampledQuestions = [...sampledQuestions, ...shuffleArray(remainingUnused).slice(0, requiredCount - sampledQuestions.length)];
       }
     }
 
@@ -471,6 +466,7 @@ const startTest = async (req, res, next) => {
         testId: codeToUse,
         totalQuestions: sampledQuestions.length,
         status: "IN_PROGRESS",
+        answerKeyMap: answerKeyMap,
         answers: answerKeyMap
       };
 

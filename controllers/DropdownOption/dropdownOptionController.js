@@ -9,7 +9,10 @@ const DEFAULTS = {
     "Java Spring Boot & Microservices",
     "Mobile App (Flutter / React Native)",
     "UI/UX & Product Design",
-    "AI / ML & Data Science"
+    "AI / ML & Data Science",
+    "Cyber Security",
+    "Cloud / DevOps",
+    "General"
   ],
   domain: [
     "CSE (Computer Science)",

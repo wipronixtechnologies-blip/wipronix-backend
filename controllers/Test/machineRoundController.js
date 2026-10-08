@@ -1,4 +1,5 @@
 const vm = require("vm");
+const { spawnSync } = require("child_process");
 const mongoose = require("mongoose");
 const MachineChallenge = require("../../models/MachineChallenge.model");
 const MachineConfig = require("../../models/MachineConfig.model");
@@ -64,22 +65,7 @@ function twoSum(numbers, target) {
 }`,
       python: `def twoSum(numbers, target):
     # Write your python code here
-    pass`,
-      java: `import java.util.*;
-
-public class Solution {
-    public static int[] twoSum(int[] numbers, int target) {
-        // Write your java code here
-        return new int[0];
-    }
-}`,
-      cpp: `#include <vector>
-using namespace std;
-
-vector<int> twoSum(vector<int>& numbers, int target) {
-    // Write your C++ code here
-    return {};
-}`
+    pass`
     },
     testCases: [
       { input: JSON.stringify([[2, 7, 11, 15], 9]), expectedOutput: JSON.stringify([0, 1]), isHidden: false, explanation: "2 + 7 = 9" },
@@ -126,20 +112,7 @@ function compressString(str) {
 }`,
       python: `def compressString(s: str) -> str:
     # Write your python code here
-    pass`,
-      java: `public class Solution {
-    public static String compressString(String str) {
-        // Write your java code here
-        return "";
-    }
-}`,
-      cpp: `#include <string>
-using namespace std;
-
-string compressString(string str) {
-    // Write your C++ code here
-    return "";
-}`
+    pass`
     },
     testCases: [
       { input: JSON.stringify(["aabcccccaaa"]), expectedOutput: JSON.stringify("a2b1c5a3"), isHidden: false, explanation: "Counts: a:2, b:1, c:5, a:3" },
@@ -186,20 +159,7 @@ function isValid(s) {
 }`,
       python: `def isValid(s: str) -> bool:
     # Write your python code here
-    pass`,
-      java: `public class Solution {
-    public static boolean isValid(String s) {
-        // Write your java code here
-        return false;
-    }
-}`,
-      cpp: `#include <string>
-using namespace std;
-
-bool isValid(string s) {
-    // Write your C++ code here
-    return false;
-}`
+    pass`
     },
     testCases: [
       { input: JSON.stringify(["()"]), expectedOutput: JSON.stringify(true), isHidden: false },
@@ -244,20 +204,7 @@ function lengthOfLongestSubstring(s) {
 }`,
       python: `def lengthOfLongestSubstring(s: str) -> int:
     # Write your python code here
-    pass`,
-      java: `public class Solution {
-    public static int lengthOfLongestSubstring(String s) {
-        // Write your java code here
-        return 0;
-    }
-}`,
-      cpp: `#include <string>
-using namespace std;
-
-int lengthOfLongestSubstring(string s) {
-    // Write your C++ code here
-    return 0;
-}`
+    pass`
     },
     testCases: [
       { input: JSON.stringify(["abcabcbb"]), expectedOutput: JSON.stringify(3), isHidden: false, explanation: "abc -> len 3" },
@@ -612,13 +559,18 @@ exports.runCode = async (req, res) => {
       let isPassed = false;
       let actualOutputStr = "";
 
-      try {
-        actualOutputStr = JSON.stringify(execRes.output);
-        const expectedClean = JSON.stringify(JSON.parse(tc.expectedOutput));
-        isPassed = actualOutputStr === expectedClean;
-      } catch (e) {
-        actualOutputStr = String(execRes.output);
-        isPassed = actualOutputStr.trim() === tc.expectedOutput.trim();
+      if (execRes.error) {
+        isPassed = false;
+        actualOutputStr = "Error: " + execRes.error;
+      } else {
+        isPassed = checkTestCasePassed(execRes.output, tc.expectedOutput, funcName, parsedArgs);
+        try {
+          actualOutputStr = typeof execRes.output === 'object' && execRes.output !== null
+            ? JSON.stringify(execRes.output)
+            : String(execRes.output);
+        } catch (e) {
+          actualOutputStr = String(execRes.output);
+        }
       }
 
       if (isPassed) passedCount++;
@@ -689,13 +641,18 @@ exports.submitMachineRound = async (req, res) => {
         let isPassed = false;
         let actualOutputStr = "";
 
-        try {
-          actualOutputStr = JSON.stringify(execRes.output);
-          const expectedClean = JSON.stringify(JSON.parse(tc.expectedOutput));
-          isPassed = actualOutputStr === expectedClean;
-        } catch (e) {
-          actualOutputStr = String(execRes.output);
-          isPassed = actualOutputStr.trim() === tc.expectedOutput.trim();
+        if (execRes.error) {
+          isPassed = false;
+          actualOutputStr = "Error: " + execRes.error;
+        } else {
+          isPassed = checkTestCasePassed(execRes.output, tc.expectedOutput, funcName, parsedArgs);
+          try {
+            actualOutputStr = typeof execRes.output === 'object' && execRes.output !== null
+              ? JSON.stringify(execRes.output)
+              : String(execRes.output);
+          } catch (e) {
+            actualOutputStr = String(execRes.output);
+          }
         }
 
         if (isPassed) passedCount++;
@@ -1000,24 +957,161 @@ exports.getCandidateSubmission = async (req, res) => {
 
 // ----------------- Helper execution engines -----------------
 
-function executeCodeWithArgs(code, language, funcName, args) {
+function checkTestCasePassed(output, expectedOutputRaw, funcName, parsedArgs) {
+  try {
+    const expectedClean = JSON.parse(expectedOutputRaw);
+    const actualClean = output;
+
+    // Direct object equality
+    if (JSON.stringify(actualClean) === JSON.stringify(expectedClean)) {
+      return true;
+    }
+
+    // Array comparisons
+    if (Array.isArray(actualClean) && Array.isArray(expectedClean)) {
+      // For twoSum, verify if actual pair of indices yields the target sum
+      if (funcName === 'twoSum' && Array.isArray(parsedArgs?.[0])) {
+        const nums = parsedArgs[0];
+        const target = parsedArgs[1];
+        if (actualClean.length === 2 && actualClean[0] !== actualClean[1]) {
+          const sum = nums[actualClean[0]] + nums[actualClean[1]];
+          if (sum === target) return true;
+        }
+      }
+
+      // Check sorted array equivalence (e.g. [0, 1] vs [1, 0])
+      if (JSON.stringify([...actualClean].sort()) === JSON.stringify([...expectedClean].sort())) {
+        return true;
+      }
+    }
+
+    // String / boolean / primitive equality
+    if (String(actualClean).trim() === String(expectedClean).trim()) {
+      return true;
+    }
+  } catch (e) {
+    if (String(output).trim() === String(expectedOutputRaw).trim()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function executePython(code, funcName, args) {
   const startTime = Date.now();
   let logs = [];
   let output = null;
   let error = null;
 
   try {
-    if (language === 'python' || language === 'java' || language === 'cpp') {
-      // For multi-language demonstration in JavaScript runtime, simulate or evaluate standard syntax
-      return {
-        output: "Executed",
-        logs: `[${language.toUpperCase()} Output]: Compilation & Syntax Verified.`,
-        executionTimeMs: Date.now() - startTime,
-        error: null
-      };
-    }
+    const jsonArgs = JSON.stringify(args !== undefined ? args : []);
+    const runnerScript = `
+import json, sys
 
-    // JavaScript VM Execution
+${code}
+
+if __name__ == "__main__":
+    try:
+        fn = globals().get(${JSON.stringify(funcName)}) or locals().get(${JSON.stringify(funcName)})
+        if not fn or not callable(fn):
+            funcs = [v for k, v in list(globals().items()) if callable(v) and not k.startswith('_') and getattr(v, '__module__', None) == '__main__']
+            if funcs:
+                fn = funcs[-1]
+            else:
+                raise NameError("Function '" + ${JSON.stringify(funcName)} + "' is not defined in your solution.")
+        
+        raw_args = json.loads(${JSON.stringify(jsonArgs)})
+        if isinstance(raw_args, list):
+            res = fn(*raw_args)
+        else:
+            res = fn(raw_args)
+        
+        print("__WIPRONIX_RESULT__" + json.dumps(res))
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        sys.stderr.write(tb)
+        sys.exit(1)
+`;
+
+    const py = spawnSync("python", ["-c", runnerScript], {
+      encoding: "utf-8",
+      timeout: 6000,
+      maxBuffer: 1024 * 1024 * 5
+    });
+
+    if (py.error) {
+      if (py.error.code === 'ETIMEDOUT') {
+        error = "Time Limit Exceeded: Execution took longer than 6.0 seconds.";
+      } else {
+        error = py.error.message || "Failed to execute Python process";
+      }
+    } else {
+      const stdout = py.stdout || "";
+      const stderr = py.stderr || "";
+
+      const resultMarker = "__WIPRONIX_RESULT__";
+      const markerIdx = stdout.indexOf(resultMarker);
+
+      if (markerIdx !== -1) {
+        const userLogs = stdout.substring(0, markerIdx).trim();
+        if (userLogs) logs.push(userLogs);
+
+        const resultJson = stdout.substring(markerIdx + resultMarker.length).trim();
+        try {
+          output = JSON.parse(resultJson);
+        } catch (e) {
+          output = resultJson;
+        }
+      } else {
+        if (stdout.trim()) logs.push(stdout.trim());
+      }
+
+      if (py.status !== 0 || stderr.trim()) {
+        let cleanErr = stderr.trim();
+        if (!cleanErr && py.status !== 0) {
+          cleanErr = "Process exited with code " + py.status;
+        }
+        error = cleanErr;
+      }
+    }
+  } catch (err) {
+    error = err.message || String(err);
+  }
+
+  const executionTimeMs = Date.now() - startTime;
+  return {
+    output,
+    logs: logs.join("\n"),
+    executionTimeMs,
+    error
+  };
+}
+
+function executeCodeWithArgs(code, language, funcName, args) {
+  const normLang = (language || '').toLowerCase().trim();
+
+  // Python real runner
+  if (normLang === 'python' || normLang === 'py') {
+    return executePython(code, funcName, args);
+  }
+
+  if (normLang === 'java' || normLang === 'cpp' || normLang === 'c++') {
+    return {
+      output: null,
+      logs: '',
+      executionTimeMs: 0,
+      error: 'Only JavaScript (Node.js) and Python 3 are supported for this round.'
+    };
+  }
+
+  // JavaScript VM Execution
+  const startTime = Date.now();
+  let logs = [];
+  let output = null;
+  let error = null;
+
+  try {
     const customConsole = {
       log: (...msg) => logs.push(msg.map(m => typeof m === 'object' ? JSON.stringify(m) : String(m)).join(' ')),
       warn: (...msg) => logs.push('[WARN] ' + msg.join(' ')),
@@ -1049,7 +1143,6 @@ function executeCodeWithArgs(code, language, funcName, args) {
     try {
       targetFunc = vm.runInContext(code + '\n;' + funcName, context, { timeout: 3000 });
     } catch (e) {
-      // fallback if funcName is not found, try finding any function
       if (typeof context[funcName] === 'function') {
         targetFunc = context[funcName];
       } else {

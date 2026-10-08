@@ -28,6 +28,10 @@ const sendMachineRoundLink = async (request, response) => {
 
         result.machineRoundToken = token;
         result.machineRoundTokenExpires = expires;
+        result.hasMachineRound = true;
+        if (result.machineRoundStatus !== 'COMPLETED') {
+            result.machineRoundStatus = 'PENDING';
+        }
         await result.save();
 
         // Trigger email service
