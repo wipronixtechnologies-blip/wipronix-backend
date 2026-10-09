@@ -1,5 +1,7 @@
 const vm = require("vm");
 const { spawnSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 const mongoose = require("mongoose");
 const MachineChallenge = require("../../models/MachineChallenge.model");
 const MachineConfig = require("../../models/MachineConfig.model");
@@ -997,6 +999,64 @@ function checkTestCasePassed(output, expectedOutputRaw, funcName, parsedArgs) {
   return false;
 }
 
+let cachedPythonBinary = null;
+
+function getPythonBinaryCandidates() {
+  const isWin = process.platform === "win32";
+  const list = [];
+
+  if (process.env.PYTHON_PATH) list.push(process.env.PYTHON_PATH);
+  if (process.env.PYTHON_BIN) list.push(process.env.PYTHON_BIN);
+
+  if (isWin) {
+    list.push("python");
+    list.push("py");
+    list.push("python3");
+
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "");
+    if (localAppData) {
+      ["Python313", "Python312", "Python311", "Python310", "Python39", "Python38"].forEach((v) => {
+        list.push(path.join(localAppData, "Programs", "Python", v, "python.exe"));
+      });
+    }
+
+    ["Python313", "Python312", "Python311", "Python310"].forEach((v) => {
+      list.push(`C:\\${v}\\python.exe`);
+      list.push(`C:\\Program Files\\${v}\\python.exe`);
+      list.push(`C:\\Program Files (x86)\\${v}\\python.exe`);
+    });
+  } else {
+    list.push("python3");
+    list.push("python");
+    list.push("/usr/bin/python3");
+    list.push("/usr/local/bin/python3");
+    list.push("/usr/bin/python");
+  }
+
+  return [...new Set(list)];
+}
+
+function resolveWorkingPython() {
+  if (cachedPythonBinary) return cachedPythonBinary;
+
+  const candidates = getPythonBinaryCandidates();
+  for (const cmd of candidates) {
+    try {
+      const probe = spawnSync(cmd, ["-c", "import sys; print(sys.version_info[0])"], {
+        encoding: "utf-8",
+        timeout: 2500,
+        shell: false
+      });
+      if (!probe.error && probe.status === 0 && probe.stdout && probe.stdout.trim().startsWith("3")) {
+        cachedPythonBinary = cmd;
+        return cmd;
+      }
+    } catch (e) {}
+  }
+
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 function executePython(code, funcName, args) {
   const startTime = Date.now();
   let logs = [];
@@ -1005,27 +1065,54 @@ function executePython(code, funcName, args) {
 
   try {
     const jsonArgs = JSON.stringify(args !== undefined ? args : []);
-    const runnerScript = `
-import json, sys
+    const runnerScript = `import json, sys
 
 ${code}
 
 if __name__ == "__main__":
     try:
-        fn = globals().get(${JSON.stringify(funcName)}) or locals().get(${JSON.stringify(funcName)})
-        if not fn or not callable(fn):
+        fn = None
+        target_name = ${JSON.stringify(funcName)}
+
+        # 1. Search in globals / locals
+        if target_name in globals() and callable(globals()[target_name]):
+            fn = globals()[target_name]
+        elif target_name in locals() and callable(locals()[target_name]):
+            fn = locals()[target_name]
+
+        # 2. Check if wrapped in class Solution / Solution().funcName
+        if not fn:
+            for k, v in list(globals().items()):
+                if isinstance(v, type) and not k.startswith('_'):
+                    try:
+                        inst = v()
+                        if hasattr(inst, target_name) and callable(getattr(inst, target_name)):
+                            fn = getattr(inst, target_name)
+                            break
+                    except Exception:
+                        pass
+
+        # 3. Fallback: find any candidate callable defined in main module
+        if not fn:
             funcs = [v for k, v in list(globals().items()) if callable(v) and not k.startswith('_') and getattr(v, '__module__', None) == '__main__']
             if funcs:
                 fn = funcs[-1]
             else:
-                raise NameError("Function '" + ${JSON.stringify(funcName)} + "' is not defined in your solution.")
-        
+                raise NameError("Function '" + str(target_name) + "' is not defined in your solution.")
+
         raw_args = json.loads(${JSON.stringify(jsonArgs)})
         if isinstance(raw_args, list):
-            res = fn(*raw_args)
+            try:
+                res = fn(*raw_args)
+            except TypeError as te:
+                # Handle single list argument signatures e.g. fn(nums)
+                try:
+                    res = fn(raw_args)
+                except Exception:
+                    raise te
         else:
             res = fn(raw_args)
-        
+
         print("__WIPRONIX_RESULT__" + json.dumps(res))
     except Exception as e:
         import traceback
@@ -1034,21 +1121,48 @@ if __name__ == "__main__":
         sys.exit(1)
 `;
 
-    const py = spawnSync("python", ["-c", runnerScript], {
-      encoding: "utf-8",
-      timeout: 6000,
-      maxBuffer: 1024 * 1024 * 5
-    });
+    // Try primary working binary first, with immediate candidate fallback
+    const primaryCmd = resolveWorkingPython();
+    const candidateCommands = [primaryCmd, ...getPythonBinaryCandidates().filter((c) => c !== primaryCmd)];
 
-    if (py.error) {
-      if (py.error.code === 'ETIMEDOUT') {
+    let pyResult = null;
+    let successfulCmd = null;
+
+    for (const cmd of candidateCommands) {
+      const py = spawnSync(cmd, ["-"], {
+        input: runnerScript,
+        encoding: "utf-8",
+        timeout: 6000,
+        maxBuffer: 1024 * 1024 * 5
+      });
+
+      // If binary not found, continue trying other candidates
+      if (py.error && (py.error.code === 'ENOENT' || py.error.code === 'UNKNOWN')) {
+        continue;
+      }
+
+      // If Windows store dummy stub returned 9009
+      if (py.status === 9009) {
+        continue;
+      }
+
+      pyResult = py;
+      successfulCmd = cmd;
+      cachedPythonBinary = cmd;
+      break;
+    }
+
+    if (!pyResult) {
+      error = "Python 3 compiler was not found on the execution server. Please ensure Python is installed and accessible in the system PATH.";
+    } else if (pyResult.error) {
+      if (pyResult.error.code === 'ETIMEDOUT') {
         error = "Time Limit Exceeded: Execution took longer than 6.0 seconds.";
       } else {
-        error = py.error.message || "Failed to execute Python process";
+        error = pyResult.error.message || "Failed to execute Python process";
       }
     } else {
-      const stdout = py.stdout || "";
-      const stderr = py.stderr || "";
+      const stdout = pyResult.stdout || "";
+      const stderr = pyResult.stderr || "";
 
       const resultMarker = "__WIPRONIX_RESULT__";
       const markerIdx = stdout.indexOf(resultMarker);
@@ -1067,10 +1181,10 @@ if __name__ == "__main__":
         if (stdout.trim()) logs.push(stdout.trim());
       }
 
-      if (py.status !== 0 || stderr.trim()) {
+      if (pyResult.status !== 0 || stderr.trim()) {
         let cleanErr = stderr.trim();
-        if (!cleanErr && py.status !== 0) {
-          cleanErr = "Process exited with code " + py.status;
+        if (!cleanErr && pyResult.status !== 0) {
+          cleanErr = "Process exited with code " + pyResult.status;
         }
         error = cleanErr;
       }
