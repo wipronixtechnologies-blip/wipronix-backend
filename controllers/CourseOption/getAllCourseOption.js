@@ -1,4 +1,5 @@
 const CourseOption = require('../../models/CourseOption.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 const getAllCourseOption = async (req, res) => {
   try {
@@ -7,7 +8,7 @@ const getAllCourseOption = async (req, res) => {
     if (highestEducation && highestEducation.trim()) {
       filter = {
         $or: [
-          { highestEducation: { $regex: new RegExp(`^${highestEducation.trim()}$`, 'i') } },
+          { highestEducation: { $regex: new RegExp(`^${escapeRegex(highestEducation.trim())}$`, 'i') } },
           { highestEducation: "All" },
           { highestEducation: { $exists: false } },
           { highestEducation: null },

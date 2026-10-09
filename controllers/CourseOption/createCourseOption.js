@@ -1,4 +1,5 @@
 const CourseOption = require('../../models/CourseOption.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 const createCourseOption = async (req, res) => {
   try {
@@ -14,7 +15,7 @@ const createCourseOption = async (req, res) => {
     const educationToUse = highestEducation ? highestEducation.trim() : 'B.Tech';
 
     const existingOption = await CourseOption.findOne({
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') },
       highestEducation: educationToUse
     });
     if (existingOption) {

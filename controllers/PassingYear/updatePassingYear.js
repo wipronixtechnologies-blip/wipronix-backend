@@ -1,4 +1,5 @@
 const PassingYear = require('../../models/PassingYear.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 const updatePassingYear = async (req, res) => {
   try {
@@ -16,7 +17,7 @@ const updatePassingYear = async (req, res) => {
     if (name && name.trim() && name.trim() !== option.name) {
       const existingOption = await PassingYear.findOne({
         _id: { $ne: id },
-        name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+        name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') }
       });
       if (existingOption) {
         return res.status(400).json({

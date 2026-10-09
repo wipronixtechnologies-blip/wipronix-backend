@@ -3,8 +3,13 @@ const mongoose = require('mongoose');
 const activitySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['enrollment', 'completion', 'access', 'course', 'staff_added', 'staff_updated', 'staff_deleted', 'task_assigned', 'task_completed', 'ticket_created', 'ticket_resolved', 'attendance_punch_in', 'attendance_punch_out', 'leave_applied', 'leave_approved', 'leave_rejected', 'document_uploaded', 'request_actioned', 'policy_updated'],
-    required: true
+    required: true,
+    index: true
+  },
+  category: {
+    type: String,
+    default: 'general',
+    index: true
   },
   user: {
     type: String,
@@ -15,7 +20,17 @@ const activitySchema = new mongoose.Schema({
     ref: 'Staff',
     index: true
   },
+  actorName: {
+    type: String
+  },
+  actorEmail: {
+    type: String
+  },
   actorRole: {
+    type: String,
+    index: true
+  },
+  actorDepartment: {
     type: String
   },
   action: {
@@ -30,9 +45,19 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     index: true
   },
+  targetModel: {
+    type: String
+  },
   time: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
+  },
+  ipAddress: {
+    type: String
+  },
+  userAgent: {
+    type: String
   },
   metadata: {
     type: Object,
@@ -40,7 +65,10 @@ const activitySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Index for performance
+// Composite indexes for performance & auditing queries
 activitySchema.index({ createdAt: -1 });
+activitySchema.index({ actorId: 1, createdAt: -1 });
+activitySchema.index({ category: 1, createdAt: -1 });
+activitySchema.index({ time: -1 });
 
 module.exports = mongoose.model('Activity', activitySchema);

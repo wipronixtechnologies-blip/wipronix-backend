@@ -827,6 +827,103 @@ const sendMachineRoundLinkEmail = async (studentData, token) => {
   }
 };
 
+const sendAssignedAssessmentLinkEmail = async (studentData, testLink, counselorData = {}) => {
+  try {
+    const transporter = createTransporter();
+    const recipientEmail = studentData.email || studentData.studentEmail;
+    const recipientName = studentData.fullName || studentData.studentName || 'Student';
+    const technology = studentData.technology || 'Core Technical';
+
+    // Counselor Details
+    const counselorName = counselorData?.fullName || counselorData?.name || 'Wipronix Career Counselor';
+    const counselorDesignation = counselorData?.designation || counselorData?.role || 'Academic & Career Counselor';
+    const counselorPhone = counselorData?.phoneNumber || counselorData?.phone || '+91 96467 06113';
+    const counselorEmail = counselorData?.email || GMAIL_USER || 'wipronixtechnologies@gmail.com';
+
+    const subject = `Official Skills Assessment Session - Wipronix Technologies (Assigned by ${counselorName})`;
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, Helvetica, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <div style="background: linear-gradient(135deg, #ab1428, #7f0d1d); padding: 32px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">
+            Wipronix Official Skills Assessment
+          </h1>
+          <p style="color: #fce7f3; margin-top: 8px; font-size: 14px;">
+            Specialization: <strong>${technology}</strong>
+          </p>
+        </div>
+
+        <div style="padding: 32px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-top: 0;">Dear ${recipientName},</h2>
+          <p style="font-size: 15px; color: #4b5563; line-height: 1.6;">
+            Your career counselor, <strong>${counselorName}</strong>, has initiated an official online assessment session for you at <strong>Wipronix Technologies</strong>.
+          </p>
+
+          <!-- Counselor Information Card -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+              Assigned Career Counselor
+            </p>
+            <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">
+              ${counselorName}
+            </p>
+            <p style="margin: 3px 0 0 0; font-size: 13px; color: #64748b;">
+              ${counselorDesignation}
+            </p>
+            ${counselorPhone ? `<p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">📞 Direct Phone / WhatsApp: <strong>${counselorPhone}</strong></p>` : ''}
+            ${counselorEmail ? `<p style="margin: 4px 0 0 0; font-size: 13px; color: #334155;">✉️ Counselor Email: <a href="mailto:${counselorEmail}" style="color: #2563eb; text-decoration: none;">${counselorEmail}</a></p>` : ''}
+          </div>
+
+          <!-- Important Notice -->
+          <div style="background-color: #fff1f2; border-left: 4px solid #E52328; padding: 16px; margin: 24px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: 600;">
+              ⏰ Important Notice: This link is active for <strong>2 hours only</strong>. Once started, you will have 30 minutes to complete the test.
+            </p>
+          </div>
+
+          <!-- Start Button -->
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${testLink}" style="background-color: #E52328; color: #ffffff; padding: 14px 34px; border-radius: 8px; font-size: 16px; font-weight: bold; text-decoration: none; display: inline-block; box-shadow: 0 4px 6px -1px rgba(229, 35, 40, 0.4);">
+              Start Assessment Now
+            </a>
+          </div>
+
+          <p style="font-size: 13px; color: #6b7280; text-align: center;">
+            Or copy and paste this link into your browser:<br/>
+            <a href="${testLink}" style="color: #2563eb; word-break: break-all;">${testLink}</a>
+          </p>
+
+          <!-- Counselor Sign-off -->
+          <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="font-size: 14px; color: #374151; margin: 0; line-height: 1.6;">
+              Warm regards,<br/>
+              <strong>${counselorName}</strong><br/>
+              <span style="color: #6b7280; font-size: 13px;">${counselorDesignation} • Career Counseling & Admissions</span><br/>
+              <strong style="color: #ab1428;">Wipronix Technologies Pvt. Ltd.</strong>
+            </p>
+          </div>
+        </div>
+
+        <div style="background-color: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6;">
+          <p style="margin: 0;">© ${new Date().getFullYear()} Wipronix Technologies Pvt. Ltd. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: GMAIL_USER || 'wipronixtechnologies@gmail.com',
+      to: recipientEmail,
+      subject,
+      html
+    };
+
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to send assessment link email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendTestCompletionEmail,
   sendPasswordResetEmail,
@@ -834,5 +931,6 @@ module.exports = {
   sendStaffWelcomeEmail,
   sendStaffWelcomeEmailWithOfferLetter,
   sendRegistrationSlipEmail,
-  sendMachineRoundLinkEmail
+  sendMachineRoundLinkEmail,
+  sendAssignedAssessmentLinkEmail
 };

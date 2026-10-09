@@ -56,6 +56,27 @@ const staffLogin = async (request, response) => {
     staff.isActive = true;
     await staff.save();
 
+    // Log Activity for Super Admin audit trail
+    try {
+      const { logActivity } = require('../Activity/activityController');
+      logActivity({
+        type: 'staff_login',
+        category: 'auth',
+        user: staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff',
+        actorId: staff._id,
+        actorName: staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff',
+        actorEmail: staff.email,
+        actorRole: staff.role,
+        actorDepartment: staff.department,
+        action: 'Logged into staff portal',
+        target: 'Staff Portal',
+        ipAddress: request.ip || (request.headers && request.headers['x-forwarded-for']) || '',
+        userAgent: (request.headers && request.headers['user-agent']) || ''
+      }).catch(e => console.error('[staffLogin] Activity log error:', e.message));
+    } catch (actErr) {
+      console.warn('[staffLogin] Activity log warning:', actErr.message);
+    }
+
     // Generate JWT token with all user information
     const token = jwt.sign(
       {

@@ -1,4 +1,5 @@
 const College = require('../../models/College.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 const createCollege = async (req, res) => {
   try {
@@ -13,7 +14,7 @@ const createCollege = async (req, res) => {
     } = req.body;
 
     // Check if college with same name exists
-    const existingCollege = await College.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+    const existingCollege = await College.findOne({ name: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') } });
     if (existingCollege) {
       return res.status(400).json({
         success: false,

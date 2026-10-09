@@ -4,6 +4,7 @@ const Student = require("../../models/Student.model");
 const Question = require("../../models/Question.model");
 const EventTest = require("../../models/EventTest.model");
 const Result = require("../../models/Result.model");
+const { escapeRegex } = require("../../utils/regexUtils");
 
 const TEST_DURATION_SECONDS = 30 * 60; // 30 minutes (30 * 60 seconds)
 
@@ -273,7 +274,7 @@ const startTest = async (req, res, next) => {
       event = await EventTest.findOne({ eventCode: codeToUse });
     }
     if (!event && collegeName) {
-      event = await EventTest.findOne({ collegeName: { $regex: new RegExp(`^${collegeName}$`, 'i') } });
+      event = await EventTest.findOne({ collegeName: { $regex: new RegExp(`^${escapeRegex(collegeName)}$`, 'i') } });
     }
     const eventQuestionsCount = event?.questionsCount || 30;
 

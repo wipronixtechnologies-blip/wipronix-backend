@@ -22,6 +22,12 @@ const {
   getCandidateSubmission
 } = require("../../../../controllers/Test/machineRoundController");
 const { sendMachineRoundLink, verifyMachineRoundToken } = require("../../../../controllers/Test/machineRoundFlow");
+const { verifyAssessmentToken, startAssessmentByToken, submitAssessmentByToken } = require("../../../../controllers/Test/assignedAssessmentController");
+
+// Assigned Student Assessment Routes (Protected 2-hour session)
+router.get("/assessment/verify/:token", verifyAssessmentToken);
+router.post("/assessment/start", startAssessmentByToken);
+router.post("/assessment/submit", submitAssessmentByToken);
 
 // POST /api/test/start & /api/test/public-start
 router.post("/start", startTest);

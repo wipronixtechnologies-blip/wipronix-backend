@@ -4,6 +4,7 @@ const nodemailer = require('nodemailer');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs');
 const path = require('path');
+const { escapeRegex } = require("../../utils/regexUtils");
 
 const QUALIFYING_MARKS = 70; // 70% passing threshold
 
@@ -41,45 +42,85 @@ const getTestResults = async (req, res, next) => {
       limit = 20
     } = req.query;
 
-    const query = {};
+    const conditions = [];
 
-    if (testId) query.testId = testId;
-    if (eventCode) query.eventCode = eventCode.trim().toUpperCase();
-    if (college) query.collegeName = new RegExp(college.trim(), 'i');
-    if (course) query.course = new RegExp(course.trim(), 'i');
-    if (semester) query.semester = new RegExp(semester.trim(), 'i');
-    if (technology) query.technology = new RegExp(technology.trim(), 'i');
-    if (isShortlisted === 'true') query.isShortlisted = true;
+    if (testId) {
+      conditions.push({ testId: testId.trim() });
+    }
+
+    if (college && eventCode) {
+      const collegeRegex = new RegExp(escapeRegex(college.trim()), 'i');
+      const cleanEventCode = eventCode.trim().toUpperCase();
+      conditions.push({
+        $or: [
+          { collegeName: collegeRegex },
+          { eventCode: cleanEventCode },
+          { testId: cleanEventCode }
+        ]
+      });
+    } else {
+      if (eventCode) {
+        const cleanEventCode = eventCode.trim().toUpperCase();
+        conditions.push({
+          $or: [
+            { eventCode: cleanEventCode },
+            { testId: cleanEventCode }
+          ]
+        });
+      }
+      if (college) {
+        conditions.push({ collegeName: new RegExp(escapeRegex(college.trim()), 'i') });
+      }
+    }
+
+    if (course) {
+      conditions.push({ course: new RegExp(escapeRegex(course.trim()), 'i') });
+    }
+    if (semester) {
+      conditions.push({ semester: new RegExp(escapeRegex(semester.trim()), 'i') });
+    }
+    if (technology) {
+      conditions.push({ technology: new RegExp(escapeRegex(technology.trim()), 'i') });
+    }
+    if (isShortlisted === 'true') {
+      conditions.push({ isShortlisted: true });
+    }
 
     if (minPercentage || maxPercentage) {
-      query.percentage = {};
-      if (minPercentage) query.percentage.$gte = parseFloat(minPercentage);
-      if (maxPercentage) query.percentage.$lte = parseFloat(maxPercentage);
+      const pQuery = {};
+      if (minPercentage) pQuery.$gte = parseFloat(minPercentage);
+      if (maxPercentage) pQuery.$lte = parseFloat(maxPercentage);
+      conditions.push({ percentage: pQuery });
     }
 
     if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      const dQuery = {};
+      if (startDate) dQuery.$gte = new Date(startDate);
+      if (endDate) dQuery.$lte = new Date(endDate);
+      conditions.push({ createdAt: dQuery });
     }
 
     if (status) {
-      query.status = status.toUpperCase();
+      conditions.push({ status: status.toUpperCase() });
     }
 
     if (search) {
-      const searchRegex = new RegExp(search.trim(), 'i');
-      query.$or = [
-        { studentName: searchRegex },
-        { studentEmail: searchRegex },
-        { studentPhone: searchRegex },
-        { collegeName: searchRegex },
-        { eventCode: searchRegex },
-        { course: searchRegex },
-        { semester: searchRegex },
-        { technology: searchRegex }
-      ];
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
+      conditions.push({
+        $or: [
+          { studentName: searchRegex },
+          { studentEmail: searchRegex },
+          { studentPhone: searchRegex },
+          { collegeName: searchRegex },
+          { eventCode: searchRegex },
+          { course: searchRegex },
+          { semester: searchRegex },
+          { technology: searchRegex }
+        ]
+      });
     }
+
+    const query = conditions.length === 0 ? {} : (conditions.length === 1 ? conditions[0] : { $and: conditions });
 
     const pageNum = parseInt(page) || 1;
     const isNoLimit = limit === 'all' || limit === '0' || limit === 0 || limit === '-1' || Number(limit) === 0;

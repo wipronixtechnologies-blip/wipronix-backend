@@ -1,4 +1,5 @@
 const DropdownOption = require('../../models/DropdownOption.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 // Seed defaults helper
 const DEFAULTS = {
@@ -115,7 +116,7 @@ exports.createOption = async (req, res) => {
     // Check uniqueness within the same type
     const existingOption = await DropdownOption.findOne({
       type,
-      name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+      name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') }
     });
 
     if (existingOption) {
@@ -167,7 +168,7 @@ exports.updateOption = async (req, res) => {
       const existingOption = await DropdownOption.findOne({
         _id: { $ne: id },
         type: option.type,
-        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+        name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') }
       });
 
       if (existingOption) {

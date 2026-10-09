@@ -4,8 +4,11 @@ const Staff = require('../../models/Staff.model');
 const College = require('../../models/College.model');
 const EventTest = require('../../models/EventTest.model');
 const RegistrationSlip = require('../../models/RegistrationSlip.model');
+const Result = require('../../models/Result.model');
 const crypto = require('crypto');
 const emailService = require('../../src/services/emailService');
+const { logActivity } = require('../Activity/activityController');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 // 1. Get BDE Staff List with Assignment Metrics
 exports.getBDEs = async (req, res) => {
@@ -122,7 +125,7 @@ exports.getCollegesStudentStats = async (req, res) => {
         // Query matching students by collegeName or eventCode/testId
         const matchCollegeFilter = {
           $or: [
-            { college: { $regex: new RegExp(`^${collegeName}$`, 'i') } },
+            { college: { $regex: new RegExp(`^${escapeRegex(collegeName)}$`, 'i') } },
             { testId: eventCode },
             { testId: event._id.toString() }
           ]
@@ -228,18 +231,18 @@ exports.getPoolBreakdown = async (req, res) => {
 
     const event = await EventTest.findOne({
       $or: [
-        { collegeName: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+        { collegeName: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
         { eventCode: collegeName.trim() }
       ]
     });
 
     const baseCollegeMatch = {
       $or: [
-        { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+        { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
         ...(event ? [
           { testId: event.eventCode },
           { testId: event._id.toString() },
-          { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
+          { college: { $regex: new RegExp(`^${escapeRegex(event.collegeName.trim())}$`, 'i') } }
         ] : [])
       ]
     };
@@ -321,13 +324,13 @@ exports.getPoolBreakdown = async (req, res) => {
 
     if (course && course !== 'all' && course.trim()) {
       filteredConditions.push({
-        course: { $regex: new RegExp(`^${course.trim()}$`, 'i') }
+        course: { $regex: new RegExp(`^${escapeRegex(course.trim())}$`, 'i') }
       });
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
       filteredConditions.push({
-        semester: { $regex: new RegExp(`^${semester.trim()}$`, 'i') }
+        semester: { $regex: new RegExp(`^${escapeRegex(semester.trim())}$`, 'i') }
       });
     }
 
@@ -388,7 +391,7 @@ exports.assignStudents = async (req, res) => {
     // Find unassigned students for this college / event drive (FIFO: oldest registered first)
     const event = await EventTest.findOne({
       $or: [
-        { collegeName: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+        { collegeName: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
         { eventCode: collegeName.trim() }
       ]
     });
@@ -396,11 +399,11 @@ exports.assignStudents = async (req, res) => {
     const andConditions = [
       {
         $or: [
-          { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+          { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
           ...(event ? [
             { testId: event.eventCode },
             { testId: event._id.toString() },
-            { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
+            { college: { $regex: new RegExp(`^${escapeRegex(event.collegeName.trim())}$`, 'i') } }
           ] : [])
         ]
       },
@@ -414,13 +417,13 @@ exports.assignStudents = async (req, res) => {
 
     if (course && course !== 'all' && course.trim()) {
       andConditions.push({
-        course: { $regex: new RegExp(`^${course.trim()}$`, 'i') }
+        course: { $regex: new RegExp(`^${escapeRegex(course.trim())}$`, 'i') }
       });
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
       andConditions.push({
-        semester: { $regex: new RegExp(`^${semester.trim()}$`, 'i') }
+        semester: { $regex: new RegExp(`^${escapeRegex(semester.trim())}$`, 'i') }
       });
     }
 
@@ -521,15 +524,15 @@ exports.getAssignedStudents = async (req, res) => {
     const query = {};
 
     if (college) {
-      query.college = { $regex: new RegExp(college.trim(), 'i') };
+      query.college = { $regex: new RegExp(escapeRegex(college.trim()), 'i') };
     }
 
     if (course && course !== 'all' && course.trim()) {
-      query.course = { $regex: new RegExp(course.trim(), 'i') };
+      query.course = { $regex: new RegExp(escapeRegex(course.trim()), 'i') };
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
-      query.semester = { $regex: new RegExp(semester.trim(), 'i') };
+      query.semester = { $regex: new RegExp(escapeRegex(semester.trim()), 'i') };
     }
 
     if (bdeId) {
@@ -566,7 +569,7 @@ exports.getAssignedStudents = async (req, res) => {
     }
 
     if (search) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { fullName: searchRegex },
         { email: searchRegex },
@@ -593,8 +596,8 @@ exports.getAssignedStudents = async (req, res) => {
         .limit(limitNum)
         .lean(),
       Student.countDocuments(query),
-      Student.distinct('course', college ? { college: { $regex: new RegExp(college.trim(), 'i') } } : {}),
-      Student.distinct('semester', college ? { college: { $regex: new RegExp(college.trim(), 'i') } } : {})
+      Student.distinct('course', college ? { college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } } : {}),
+      Student.distinct('semester', college ? { college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } } : {})
     ]);
 
     res.status(200).json({
@@ -628,7 +631,7 @@ exports.unassignStudents = async (req, res) => {
     } else if (collegeName && bdeId) {
       const event = await EventTest.findOne({
         $or: [
-          { collegeName: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+          { collegeName: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
           { eventCode: collegeName.trim() }
         ]
       });
@@ -637,11 +640,11 @@ exports.unassignStudents = async (req, res) => {
         $and: [
           {
             $or: [
-              { college: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } },
+              { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
               ...(event ? [
                 { testId: event.eventCode },
                 { testId: event._id.toString() },
-                { college: { $regex: new RegExp(`^${event.collegeName.trim()}$`, 'i') } }
+                { college: { $regex: new RegExp(`^${escapeRegex(event.collegeName.trim())}$`, 'i') } }
               ] : [])
             ]
           },
@@ -739,6 +742,26 @@ exports.updateCounselingStatus = async (req, res) => {
 
     const student = await Student.findByIdAndUpdate(id, { $set: updates }, { new: true })
       .populate('assignedTo', 'fullName email designation');
+    // Log activity for Super Admin
+    logActivity({
+      type: 'status_updated',
+      category: 'counselor',
+      user: req.staff?.fullName || 'Staff',
+      actorId: req.staff?._id,
+      actorName: req.staff?.fullName,
+      actorEmail: req.staff?.email,
+      actorRole: req.staff?.role,
+      actorDepartment: req.staff?.department,
+      action: `Updated counseling status to "${counselingStatus || 'updated'}"`,
+      target: student?.fullName || 'Student',
+      targetId: id,
+      targetModel: 'Student',
+      metadata: {
+        newStatus: counselingStatus,
+        notes: counselingNotes,
+        studentEmail: student?.email
+      }
+    }).catch(err => console.error('Error logging status activity:', err));
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
@@ -858,15 +881,15 @@ exports.getMyAssignedStudents = async (req, res) => {
     const query = { ...baseCounselorFilter };
 
     if (college && college !== 'all') {
-      query.college = { $regex: new RegExp(college.trim(), 'i') };
+      query.college = { $regex: new RegExp(escapeRegex(college.trim()), 'i') };
     }
 
     if (course && course !== 'all' && course.trim()) {
-      query.course = { $regex: new RegExp(course.trim(), 'i') };
+      query.course = { $regex: new RegExp(escapeRegex(course.trim()), 'i') };
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
-      query.semester = { $regex: new RegExp(semester.trim(), 'i') };
+      query.semester = { $regex: new RegExp(escapeRegex(semester.trim()), 'i') };
     }
 
 
@@ -891,7 +914,7 @@ exports.getMyAssignedStudents = async (req, res) => {
     }
 
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { fullName: searchRegex },
         { email: searchRegex },
@@ -954,6 +977,41 @@ exports.getMyAssignedStudents = async (req, res) => {
       Student.distinct('semester', baseCounselorFilter)
     ]);
 
+
+
+    // Automatically attach test results from Result collection for drive / internship students if missing
+    try {
+      const studentEmails = students.map(s => s.email?.toLowerCase()).filter(Boolean);
+      const studentIds = students.map(s => s._id);
+
+      const results = await Result.find({
+        $or: [
+          { studentEmail: { $in: studentEmails } },
+          { studentId: { $in: studentIds } }
+        ]
+      }).lean();
+
+      const resultMap = new Map();
+      results.forEach(r => {
+        if (r.studentEmail) resultMap.set(r.studentEmail.toLowerCase(), r);
+        if (r.studentId) resultMap.set(r.studentId.toString(), r);
+      });
+
+      students.forEach(s => {
+        const r = resultMap.get(s.email?.toLowerCase()) || resultMap.get(s._id.toString());
+        if (r) {
+          if (s.testScore === undefined || s.testScore === null) s.testScore = r.score;
+          if (s.testPercentage === undefined || s.testPercentage === null) s.testPercentage = r.percentage;
+          if (!s.testStatus) s.testStatus = r.status;
+          if (s.testTotalQuestions === undefined || s.testTotalQuestions === null) s.testTotalQuestions = r.totalQuestions;
+          if (!s.testTrack && r.testTrack) s.testTrack = r.testTrack;
+          s.resultDeclared = true;
+        }
+      });
+    } catch (rErr) {
+      console.warn('Error attaching test results to assigned students:', rErr.message);
+    }
+
     // Build status breakdown
     const statusBreakdown = {
       assigned: 0,
@@ -992,6 +1050,9 @@ exports.getMyAssignedStudents = async (req, res) => {
           not_interested: statusBreakdown.not_interested || 0,
           rejected: statusBreakdown.rejected || 0,
           other: statusBreakdown.other || 0,
+          follow_up: statusBreakdown.follow_up || 0,
+          ringing: statusBreakdown.ringing || 0,
+          registered: statusBreakdown.registered || 0,
           conversionRate,
           totalColleges: distinctColleges.filter(Boolean).length
         },
@@ -1118,6 +1179,28 @@ exports.addLead = async (req, res) => {
     });
 
     await newStudent.save();
+    // Log activity for Super Admin
+    logActivity({
+      type: 'lead_added',
+      category: 'leads',
+      user: loggedInStaff.fullName || 'Staff',
+      actorId: loggedInStaff._id,
+      actorName: loggedInStaff.fullName,
+      actorEmail: loggedInStaff.email,
+      actorRole: loggedInStaff.role,
+      actorDepartment: loggedInStaff.department,
+      action: 'Added new student lead',
+      target: newStudent.fullName,
+      targetId: newStudent._id,
+      targetModel: 'Student',
+      metadata: {
+        email: newStudent.email,
+        phone: newStudent.phoneNumber,
+        technology: newStudent.technology,
+        college: newStudent.college,
+        counselingStatus: newStudent.counselingStatus
+      }
+    }).catch(err => console.error('Error logging lead add activity:', err));
     await newStudent.populate('assignedTo', 'firstName lastName fullName email designation department role');
     await newStudent.populate('assignedBy', 'firstName lastName fullName email designation department role');
     await newStudent.populate('createdBy', 'firstName lastName fullName email designation department role');
@@ -1186,6 +1269,25 @@ exports.generateRegistrationSlip = async (req, res) => {
     });
 
     await newSlip.save();
+    // Log activity for Super Admin
+    logActivity({
+      type: 'registration_slip_generated',
+      category: 'finance',
+      user: counselorName || req.staff?.fullName || 'Counselor',
+      actorId: counselorId || req.staff?._id,
+      actorRole: req.staff?.role || 'counselor',
+      actorDepartment: req.staff?.department || 'Counseling',
+      action: `Generated registration slip (${registrationNo}) with paid amount ₹${paidAmount}`,
+      target: studentName,
+      targetId: studentId,
+      targetModel: 'Student',
+      metadata: {
+        registrationNo,
+        paidAmount,
+        totalFee,
+        technology
+      }
+    }).catch(err => console.error('Error logging slip activity:', err));
 
     console.log("Slip saved. Sending Email via template...");
 
@@ -1204,5 +1306,264 @@ exports.generateRegistrationSlip = async (req, res) => {
   } catch (error) {
     console.error('Error generating registration slip:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// 12. Generate 2-Hour Protected Assessment Link for Student
+exports.generateTestLink = async (req, res) => {
+  try {
+    const { studentId, sendEmail = false } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Only Organic Leads and Excel Leads need a 2-hour assessment link (Non-organic internship leads already took the test)
+    if (student.source !== 'organic' && student.source !== 'import') {
+      return res.status(400).json({
+        success: false,
+        message: 'Assessment link can only be generated for Organic Leads and Excel Leads. Internship / Campus Drive leads have already completed their test.'
+      });
+    }
+
+    // Generate 48-char secure crypto hex token
+    const token = crypto.randomBytes(24).toString('hex');
+    // 2-hour validity window
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+
+    student.testToken = token;
+    student.testTokenExpires = expiresAt;
+    student.testTokenStatus = 'generated';
+    student.testLinkGeneratedAt = new Date();
+    await student.save();
+
+    // Helper to get staff display name safely
+    const getStaffDisplayName = (staffDoc) => {
+      if (!staffDoc) return '';
+      if (staffDoc.fullName && staffDoc.fullName.trim()) return staffDoc.fullName.trim();
+      const combined = `${staffDoc.firstName || ''} ${staffDoc.lastName || ''}`.trim();
+      return combined || '';
+    };
+
+    // Determine counselor details - the staff member who sent/generated the test link
+    let counselorDetails = {
+      fullName: getStaffDisplayName(req.staff) || 'Wipronix Career Counselor',
+      email: req.staff?.email || '',
+      phoneNumber: req.staff?.phoneNumber || '',
+      designation: req.staff?.designation || (req.staff?.role === 'counselor' ? 'Academic & Career Counselor' : 'Career Counseling & Admissions')
+    };
+
+    // If an administrative user generated it and this student is assigned to a specific counselor, attribute to the assigned counselor
+    if (['super_admin', 'admin'].includes(req.staff?.role) && student.assignedTo) {
+      try {
+        const assignedStaff = await Staff.findById(student.assignedTo).select('firstName lastName fullName email phoneNumber designation role');
+        if (assignedStaff) {
+          const assignedName = getStaffDisplayName(assignedStaff);
+          if (assignedName) {
+            counselorDetails = {
+              fullName: assignedName,
+              email: assignedStaff.email || counselorDetails.email,
+              phoneNumber: assignedStaff.phoneNumber || counselorDetails.phoneNumber,
+              designation: assignedStaff.designation || 'Academic & Career Counselor'
+            };
+          }
+        }
+      } catch (stErr) {}
+    }
+
+    // Log activity for Super Admin
+    logActivity({
+      type: 'test_link_generated',
+      category: 'counselor',
+      user: counselorDetails.fullName || req.staff?.fullName || 'Counselor',
+      actorId: req.staff?._id,
+      actorName: req.staff?.fullName || counselorDetails.fullName,
+      actorEmail: req.staff?.email || counselorDetails.email,
+      actorRole: req.staff?.role || 'counselor',
+      actorDepartment: req.staff?.department || 'Counseling',
+      action: `Generated 2-Hour Assessment Link (Counselor: ${counselorDetails.fullName})`,
+      target: student.fullName,
+      targetId: student._id,
+      targetModel: 'Student',
+      metadata: {
+        technology: student.technology,
+        college: student.college,
+        expiresAt,
+        sentEmail: sendEmail,
+        studentEmail: student.email,
+        counselorName: counselorDetails.fullName,
+        counselorEmail: counselorDetails.email
+      }
+    }).catch(err => console.error('Error logging test link activity:', err));
+
+    // Frontend URL
+    let websiteUrl = process.env.NODE_ENV === 'development'
+      ? (process.env.LOCAL_WEBSITE_URL || 'http://localhost:5173')
+      : (process.env.FRONTEND_URL || process.env.WEBSITE_URL || 'https://www.wipronix.com');
+    const cleanWebsiteUrl = websiteUrl.replace(/\/auth\/?$/, '').replace(/\/+$/, '');
+    const testLink = `${cleanWebsiteUrl}/assessment/${token}`;
+
+    let emailSent = false;
+    if (sendEmail && student.email) {
+      try {
+        const mailRes = await emailService.sendAssignedAssessmentLinkEmail(student, testLink, counselorDetails);
+        emailSent = Boolean(mailRes?.success);
+      } catch (emErr) {
+        console.warn('Error sending test link email:', emErr.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: emailSent
+        ? `Test link generated and emailed to student from ${counselorDetails.fullName} (Valid for 2 Hours)!`
+        : 'Test link generated successfully (Valid for 2 Hours)!',
+      data: {
+        token,
+        testLink,
+        expiresAt,
+        emailSent,
+        counselor: counselorDetails,
+        student: {
+          _id: student._id,
+          fullName: student.fullName,
+          email: student.email,
+          phoneNumber: student.phoneNumber,
+          technology: student.technology,
+          course: student.course,
+          college: student.college
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error generating test link:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 13. Log Call & Follow-up Details
+exports.logCallAndFollowUp = async (req, res) => {
+  try {
+    const { studentId, callOutcome, notes, nextFollowUpDate, counselingStatus } = req.body;
+    const loggedInStaff = req.staff || {};
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const outcome = callOutcome || 'connected';
+    const cleanNotes = notes || '';
+    const followUpDate = nextFollowUpDate ? new Date(nextFollowUpDate) : null;
+
+    const newLog = {
+      calledAt: new Date(),
+      calledBy: loggedInStaff._id || null,
+      calledByName: loggedInStaff.fullName || `${loggedInStaff.firstName || ''} ${loggedInStaff.lastName || ''}`.trim() || 'Counselor',
+      callOutcome: outcome,
+      notes: cleanNotes,
+      nextFollowUpDate: followUpDate
+    };
+
+    if (!Array.isArray(student.callLogs)) {
+      student.callLogs = [];
+    }
+    student.callLogs.unshift(newLog);
+
+    student.lastContactedAt = new Date();
+    if (followUpDate) {
+      student.nextFollowUpDate = followUpDate;
+    }
+    if (cleanNotes) {
+      student.counselingNotes = cleanNotes;
+    }
+
+    if (counselingStatus) {
+      student.counselingStatus = counselingStatus;
+    } else {
+      if (outcome.includes('interested')) {
+        student.counselingStatus = 'interested';
+      } else if (outcome.includes('follow_up') || followUpDate) {
+        student.counselingStatus = 'follow_up';
+      } else if (outcome.includes('not_interested')) {
+        student.counselingStatus = 'not_interested';
+      } else if (outcome.includes('registered') || outcome.includes('enrolled')) {
+        student.counselingStatus = 'enrolled';
+      } else if (outcome.includes('ringing') || outcome.includes('no_answer')) {
+        student.counselingStatus = 'ringing';
+      } else {
+        student.counselingStatus = 'contacted';
+      }
+    }
+
+    await student.save();
+
+    // Log activity for Super Admin
+    logActivity({
+      type: 'call_logged',
+      category: 'counselor',
+      user: newLog.calledByName || 'Counselor',
+      actorId: newLog.calledBy,
+      actorName: newLog.calledByName,
+      actorRole: loggedInStaff?.role || 'counselor',
+      actorDepartment: loggedInStaff?.department || 'Counseling',
+      action: `Called student: ${outcome}`,
+      target: student.fullName,
+      targetId: student._id,
+      targetModel: 'Student',
+      metadata: {
+        callOutcome: outcome,
+        counselingStatus: student.counselingStatus,
+        nextFollowUpDate: followUpDate,
+        notes: cleanNotes,
+        studentPhone: student.phoneNumber,
+        studentEmail: student.email,
+        college: student.college
+      }
+    }).catch(err => console.error('Error logging call activity:', err));
+
+    return res.status(200).json({
+      success: true,
+      message: 'Calling details & follow-up saved successfully!',
+      data: student
+    });
+  } catch (error) {
+    console.error('Error logging call and follow-up:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 14. Get Call History & Follow-ups Timeline
+exports.getCallHistory = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findById(studentId)
+      .select('fullName email phoneNumber college callLogs nextFollowUpDate counselingStatus counselingNotes assignedAt')
+      .populate('callLogs.calledBy', 'firstName lastName fullName email');
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        student,
+        callLogs: student.callLogs || []
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching call history:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

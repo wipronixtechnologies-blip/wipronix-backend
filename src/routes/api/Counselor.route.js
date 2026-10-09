@@ -40,7 +40,13 @@ router.patch('/student-status/:id', counselorController.updateCounselingStatus);
 // Add Lead directly by Counselor / Admin
 router.post('/add-lead', counselorController.addLead);
 
-// Generate Registration Slip
-router.post('/registration-slip', counselorController.generateRegistrationSlip);
+// Generate 2-Hour Protected Assessment Link
+router.post('/generate-test-link', counselorController.generateTestLink);
+
+// Log Call Details and Schedule Follow-Up
+router.post('/log-call', counselorController.logCallAndFollowUp);
+
+// Get Call History Timeline
+router.get('/call-history/:studentId', counselorController.getCallHistory);
 
 module.exports = router;

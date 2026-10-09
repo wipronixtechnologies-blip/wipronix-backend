@@ -115,13 +115,50 @@ const studentSchema = new mongoose.Schema(
     },
     counselingStatus: {
       type: String,
-      enum: ['unassigned', 'assigned', 'contacted', 'interested', 'not_interested', 'enrolled', 'rejected', 'other'],
+      enum: [
+        'unassigned', 'assigned', 'contacted', 'interested', 
+        'not_interested', 'enrolled', 'rejected', 'other',
+        'follow_up', 'ringing', 'registered'
+      ],
       default: 'unassigned'
     },
     counselingNotes: {
       type: String,
       default: ''
-    }
+    },
+
+    // Call Logs & Follow-up History
+    callLogs: [
+      {
+        calledAt: { type: Date, default: Date.now },
+        calledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
+        calledByName: { type: String, default: '' },
+        callOutcome: { type: String, default: 'connected' },
+        notes: { type: String, default: '' },
+        nextFollowUpDate: { type: Date, default: null }
+      }
+    ],
+    lastContactedAt: { type: Date, default: null },
+    nextFollowUpDate: { type: Date, default: null },
+    followUpRemarks: { type: String, default: '' },
+
+    // Counselor Generated Assessment Session Token & Results
+    testToken: { type: String, default: null, index: true },
+    testTokenExpires: { type: Date, default: null },
+    testTokenStatus: {
+      type: String,
+      enum: ['none', 'generated', 'started', 'completed', 'expired'],
+      default: 'none'
+    },
+    testLinkGeneratedAt: { type: Date, default: null },
+    testScore: { type: Number, default: null },
+    testPercentage: { type: Number, default: null },
+    testStatus: { type: String, default: null },
+    testTotalQuestions: { type: Number, default: null },
+    testCorrect: { type: Number, default: null },
+    testAttempted: { type: Number, default: null },
+    testCompletedAt: { type: Date, default: null },
+    testResultId: { type: mongoose.Schema.Types.ObjectId, ref: 'Result', default: null }
   },
   { timestamps: true }
 );

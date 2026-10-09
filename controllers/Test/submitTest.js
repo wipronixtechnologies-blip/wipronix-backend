@@ -4,6 +4,7 @@ const Result = require("../../models/Result.model");
 const Student = require("../../models/Student.model");
 const Question = require("../../models/Question.model");
 const MachineConfig = require("../../models/MachineConfig.model");
+const { escapeRegex } = require("../../utils/regexUtils");
 
 const PASS_PERCENTAGE = 70; // 70% passing threshold
 
@@ -193,7 +194,7 @@ const submitTest = async (req, res, next) => {
     try {
       const cleanTech = technology.trim();
       const techConfig = await MachineConfig.findOne({
-        technology: { $regex: new RegExp(`^${cleanTech}$`, 'i') }
+        technology: { $regex: new RegExp(`^${escapeRegex(cleanTech)}$`, 'i') }
       });
 
       if (techConfig) {
@@ -272,6 +273,35 @@ const submitTest = async (req, res, next) => {
         if (orphanIds.length > 0) {
           await Result.deleteMany({ _id: { $in: orphanIds } });
         }
+      }
+
+      // Update Student document with test evaluation marks and completed status
+      try {
+        const studentQuery = [];
+        if (targetStudentId) studentQuery.push({ _id: targetStudentId });
+        if (effectiveEmail) studentQuery.push({ email: effectiveEmail });
+
+        if (studentQuery.length > 0) {
+          await Student.updateMany(
+            { $or: studentQuery },
+            {
+              $set: {
+                resultDeclared: true,
+                testScore: score,
+                testPercentage: percentage,
+                testStatus: status,
+                testTotalQuestions: totalQuestions,
+                testCorrect: correct,
+                testAttempted: attempted,
+                testCompletedAt: new Date(),
+                testResultId: savedResult?._id,
+                testTokenStatus: 'completed'
+              }
+            }
+          );
+        }
+      } catch (stErr) {
+        console.warn("Student update in submitTest warning:", stErr.message);
       }
     } catch (dbErr) {
       console.warn("Result save fallback in submitTest:", dbErr.message);

@@ -1,4 +1,5 @@
 const PassingYear = require('../../models/PassingYear.model');
+const { escapeRegex } = require('../../utils/regexUtils');
 
 const createPassingYear = async (req, res) => {
   try {
@@ -11,7 +12,7 @@ const createPassingYear = async (req, res) => {
       });
     }
 
-    const existingOption = await PassingYear.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+    const existingOption = await PassingYear.findOne({ name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') } });
     if (existingOption) {
       return res.status(400).json({
         success: false,
