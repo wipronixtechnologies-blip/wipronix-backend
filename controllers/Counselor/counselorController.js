@@ -10,9 +10,23 @@ const emailService = require('../../src/services/emailService');
 const { logActivity } = require('../Activity/activityController');
 const { escapeRegex } = require('../../utils/regexUtils');
 
+const isSuperAdminOrAdmin = (staff) => {
+  if (!staff) return false;
+  const roles = ['super_admin', 'admin', 'hr', 'hr_manager'];
+  return roles.includes(staff.role) || roles.includes(staff.systemRole);
+};
+
+const isTLRole = (staff) => {
+  if (!staff) return false;
+  return staff.role === 'tl' || staff.systemRole === 'tl';
+};
+
 // 1. Get BDE Staff List with Assignment Metrics
 exports.getBDEs = async (req, res) => {
   try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
     // Find all BDEs (only staff whose role/systemRole is bde or designation is BDE)
     const bdes = await Staff.find({
       $or: [
@@ -25,11 +39,18 @@ exports.getBDEs = async (req, res) => {
 
     // Aggregate assignment counts and colleges per BDE
     const bdeIds = bdes.map(b => b._id);
+    const matchFilter = {
+      assignedTo: { $in: bdeIds }
+    };
+
+    // If TL, only count students assigned by this TL to the BDEs
+    if (isTL) {
+      matchFilter.assignedBy = tlId;
+    }
+
     const assignmentStats = await Student.aggregate([
       {
-        $match: {
-          assignedTo: { $in: bdeIds }
-        }
+        $match: matchFilter
       },
       {
         $group: {
@@ -113,12 +134,55 @@ exports.getBDEs = async (req, res) => {
 // 2. Get College-wise Student Stats from EventTests (eventtests collection)
 exports.getCollegesStudentStats = async (req, res) => {
   try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
     // 1. Fetch all events from eventtests collection
     const eventTests = await EventTest.find({}).sort({ createdAt: -1 }).lean();
 
-    // 2. For each event in eventtests, compute total, assigned, and unassigned students
+    let targetEvents = eventTests;
+
+    if (isTL) {
+      // Find distinct colleges where students are assigned to this TL or assigned by this TL
+      const tlCollegesList = await Student.distinct('college', {
+        $or: [{ assignedTo: tlId }, { assignedBy: tlId }]
+      });
+
+      if (!tlCollegesList || tlCollegesList.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: []
+        });
+      }
+
+      const tlCollegesNormalized = tlCollegesList.map(c => (c || '').trim().toLowerCase());
+
+      targetEvents = eventTests.filter(event => {
+        const cName = (event.collegeName || '').trim().toLowerCase();
+        const eCode = (event.eventCode || '').trim().toLowerCase();
+        return tlCollegesNormalized.includes(cName) || tlCollegesNormalized.includes(eCode);
+      });
+
+      // If TL has assigned students in a college not listed in EventTest, add a entry for it
+      const matchedCollegeNames = targetEvents.map(e => (e.collegeName || '').trim().toLowerCase());
+      tlCollegesList.forEach(cName => {
+        if (cName && !matchedCollegeNames.includes(cName.trim().toLowerCase())) {
+          targetEvents.push({
+            _id: new mongoose.Types.ObjectId(),
+            eventCode: 'CAMPUS-POOL',
+            testTitle: 'Allocated Student Pool',
+            technology: 'Campus Leads',
+            eventType: 'Allocated Leads',
+            conductedBy: 'Admin Allocation',
+            collegeName: cName.trim()
+          });
+        }
+      });
+    }
+
+    // 2. For each event, compute total, assigned, and unassigned students
     const collegesList = await Promise.all(
-      eventTests.map(async (event) => {
+      targetEvents.map(async (event) => {
         const collegeName = event.collegeName?.trim() || '';
         const eventCode = event.eventCode?.trim() || '';
 
@@ -126,11 +190,97 @@ exports.getCollegesStudentStats = async (req, res) => {
         const matchCollegeFilter = {
           $or: [
             { college: { $regex: new RegExp(`^${escapeRegex(collegeName)}$`, 'i') } },
-            { testId: eventCode },
-            { testId: event._id.toString() }
+            ...(eventCode ? [{ testId: eventCode }] : []),
+            ...(event._id ? [{ testId: event._id.toString() }] : [])
           ]
         };
 
+        if (isTL) {
+          // For TL:
+          // totalStudents: all students allocated to this TL in this college
+          // assignedStudents: students delegated by this TL to counselors
+          // unassignedStudents: students currently waiting with this TL to be assigned
+          const [totalStudents, assignedStudents, unassignedStudents, bdeBreakdown] = await Promise.all([
+            Student.countDocuments({
+              $and: [
+                matchCollegeFilter,
+                { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] }
+              ]
+            }),
+            Student.countDocuments({
+              $and: [
+                matchCollegeFilter,
+                { assignedBy: tlId, assignedTo: { $nin: [tlId, null] } }
+              ]
+            }),
+            Student.countDocuments({
+              $and: [
+                matchCollegeFilter,
+                { assignedTo: tlId }
+              ]
+            }),
+            Student.aggregate([
+              {
+                $match: {
+                  $and: [
+                    matchCollegeFilter,
+                    { assignedBy: tlId, assignedTo: { $nin: [tlId, null] } }
+                  ]
+                }
+              },
+              {
+                $group: {
+                  _id: '$assignedTo',
+                  count: { $sum: 1 }
+                }
+              },
+              {
+                $lookup: {
+                  from: 'staffs',
+                  localField: '_id',
+                  foreignField: '_id',
+                  as: 'bdeInfo'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$bdeInfo',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $project: {
+                  bdeId: '$_id',
+                  bdeName: '$bdeInfo.fullName',
+                  bdeEmail: '$bdeInfo.email',
+                  count: 1
+                }
+              }
+            ])
+          ]);
+
+          return {
+            _id: event._id,
+            eventId: event._id,
+            eventCode: event.eventCode,
+            testTitle: event.testTitle,
+            technology: event.technology,
+            eventType: event.eventType,
+            conductedBy: event.conductedBy,
+            collegeName: collegeName,
+            totalStudents,
+            assignedStudents,
+            unassignedStudents,
+            assignedBDEs: bdeBreakdown.map(b => ({
+              bdeId: b.bdeId,
+              bdeName: b.bdeName || 'BDE',
+              bdeEmail: b.bdeEmail || '',
+              count: b.count
+            }))
+          };
+        }
+
+        // For Super Admin / Admin: global system numbers
         const [totalStudents, assignedStudents, unassignedStudents, bdeBreakdown] = await Promise.all([
           Student.countDocuments(matchCollegeFilter),
           Student.countDocuments({
@@ -207,12 +357,18 @@ exports.getCollegesStudentStats = async (req, res) => {
       })
     );
 
+    // If TL, only show colleges where totalStudents > 0
+    let resultList = collegesList;
+    if (isTL) {
+      resultList = collegesList.filter(c => c.totalStudents > 0);
+    }
+
     // Sort by total students descending
-    collegesList.sort((a, b) => b.totalStudents - a.totalStudents);
+    resultList.sort((a, b) => b.totalStudents - a.totalStudents);
 
     res.status(200).json({
       success: true,
-      data: collegesList
+      data: resultList
     });
   } catch (error) {
     console.error('Error fetching eventtests college stats:', error);
@@ -224,6 +380,8 @@ exports.getCollegesStudentStats = async (req, res) => {
 exports.getPoolBreakdown = async (req, res) => {
   try {
     const { collegeName, course, semester } = req.query;
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
 
     if (!collegeName) {
       return res.status(400).json({ success: false, message: 'collegeName is required' });
@@ -247,21 +405,39 @@ exports.getPoolBreakdown = async (req, res) => {
       ]
     };
 
-    const unassignedMatch = {
-      $and: [
-        baseCollegeMatch,
-        {
-          $or: [
-            { assignedTo: null },
-            { assignedTo: { $exists: false } }
+    // For TL: Available pool to assign = students currently assigned to this TL
+    // For Admin: Available pool to assign = global unassigned students
+    const unassignedMatch = isTL
+      ? {
+          $and: [
+            baseCollegeMatch,
+            { assignedTo: tlId }
           ]
         }
-      ]
-    };
+      : {
+          $and: [
+            baseCollegeMatch,
+            {
+              $or: [
+                { assignedTo: null },
+                { assignedTo: { $exists: false } }
+              ]
+            }
+          ]
+        };
+
+    const tlScopeMatch = isTL
+      ? {
+          $and: [
+            baseCollegeMatch,
+            { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] }
+          ]
+        }
+      : baseCollegeMatch;
 
     // Aggregate unique courses with total and unassigned counts
     const coursesStats = await Student.aggregate([
-      { $match: baseCollegeMatch },
+      { $match: tlScopeMatch },
       {
         $group: {
           _id: { $ifNull: ['$course', 'General'] },
@@ -269,12 +445,14 @@ exports.getPoolBreakdown = async (req, res) => {
           unassigned: {
             $sum: {
               $cond: [
-                {
-                  $or: [
-                    { $eq: ['$assignedTo', null] },
-                    { $not: ['$assignedTo'] }
-                  ]
-                },
+                isTL
+                  ? { $eq: ['$assignedTo', tlId] }
+                  : {
+                      $or: [
+                        { $eq: ['$assignedTo', null] },
+                        { $not: ['$assignedTo'] }
+                      ]
+                    },
                 1,
                 0
               ]
@@ -287,7 +465,7 @@ exports.getPoolBreakdown = async (req, res) => {
 
     // Aggregate unique semesters with total and unassigned counts
     const semestersStats = await Student.aggregate([
-      { $match: baseCollegeMatch },
+      { $match: tlScopeMatch },
       {
         $group: {
           _id: { $ifNull: ['$semester', 'General'] },
@@ -295,12 +473,14 @@ exports.getPoolBreakdown = async (req, res) => {
           unassigned: {
             $sum: {
               $cond: [
-                {
-                  $or: [
-                    { $eq: ['$assignedTo', null] },
-                    { $not: ['$assignedTo'] }
-                  ]
-                },
+                isTL
+                  ? { $eq: ['$assignedTo', tlId] }
+                  : {
+                      $or: [
+                        { $eq: ['$assignedTo', null] },
+                        { $not: ['$assignedTo'] }
+                      ]
+                    },
                 1,
                 0
               ]
@@ -314,12 +494,14 @@ exports.getPoolBreakdown = async (req, res) => {
     // Filtered count based on selected course and semester
     const filteredConditions = [
       baseCollegeMatch,
-      {
-        $or: [
-          { assignedTo: null },
-          { assignedTo: { $exists: false } }
-        ]
-      }
+      isTL
+        ? { assignedTo: tlId }
+        : {
+            $or: [
+              { assignedTo: null },
+              { assignedTo: { $exists: false } }
+            ]
+          }
     ];
 
     if (course && course !== 'all' && course.trim()) {
@@ -335,7 +517,7 @@ exports.getPoolBreakdown = async (req, res) => {
     }
 
     const [totalPool, unassignedPool, filteredUnassigned] = await Promise.all([
-      Student.countDocuments(baseCollegeMatch),
+      Student.countDocuments(tlScopeMatch),
       Student.countDocuments(unassignedMatch),
       Student.countDocuments({ $and: filteredConditions })
     ]);
@@ -373,6 +555,8 @@ exports.getPoolBreakdown = async (req, res) => {
 exports.assignStudents = async (req, res) => {
   try {
     const { collegeName, bdeId, count, course, semester, assignmentMode } = req.body;
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
 
     if (!collegeName) {
       return res.status(400).json({ success: false, message: 'College name is required' });
@@ -388,7 +572,7 @@ exports.assignStudents = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Selected BDE employee not found' });
     }
 
-    // Find unassigned students for this college / event drive (FIFO: oldest registered first)
+    // Find students for this college / event drive (FIFO: oldest registered first)
     const event = await EventTest.findOne({
       $or: [
         { collegeName: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
@@ -396,23 +580,31 @@ exports.assignStudents = async (req, res) => {
       ]
     });
 
+    const collegeMatch = {
+      $or: [
+        { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
+        ...(event ? [
+          { testId: event.eventCode },
+          { testId: event._id.toString() },
+          { college: { $regex: new RegExp(`^${escapeRegex(event.collegeName.trim())}$`, 'i') } }
+        ] : [])
+      ]
+    };
+
+    // For TL: can ONLY assign students currently assigned to THIS TL
+    // For Admin: can assign from global unassigned pool
+    const unassignCondition = isTL
+      ? { assignedTo: tlId }
+      : {
+          $or: [
+            { assignedTo: null },
+            { assignedTo: { $exists: false } }
+          ]
+        };
+
     const andConditions = [
-      {
-        $or: [
-          { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
-          ...(event ? [
-            { testId: event.eventCode },
-            { testId: event._id.toString() },
-            { college: { $regex: new RegExp(`^${escapeRegex(event.collegeName.trim())}$`, 'i') } }
-          ] : [])
-        ]
-      },
-      {
-        $or: [
-          { assignedTo: null },
-          { assignedTo: { $exists: false } }
-        ]
-      }
+      collegeMatch,
+      unassignCondition
     ];
 
     if (course && course !== 'all' && course.trim()) {
@@ -436,9 +628,10 @@ exports.assignStudents = async (req, res) => {
       if (course && course !== 'all') filters.push(`Course: "${course}"`);
       if (semester && semester !== 'all') filters.push(`Semester: "${semester}"`);
       const filterStr = filters.length > 0 ? ` with ${filters.join(', ')}` : '';
+      const poolType = isTL ? 'assigned to you' : 'unassigned';
       return res.status(400).json({
         success: false,
-        message: `No unassigned students available for ${collegeName}${filterStr}. All matching students have already been assigned.`
+        message: `No ${poolType} students available for ${collegeName}${filterStr}. All matching students have already been assigned.`
       });
     }
 
@@ -461,7 +654,7 @@ exports.assignStudents = async (req, res) => {
 
     const studentIds = studentsToAssign.map(s => s._id);
 
-    // Update students
+    // Update students: assign to BDE, set assignedBy to the current user (TL or Admin)
     await Student.updateMany(
       { _id: { $in: studentIds } },
       {
@@ -485,9 +678,13 @@ exports.assignStudents = async (req, res) => {
       filterSummary = ` (${semester})`;
     }
 
+    const successMsg = isTL
+      ? `Successfully assigned ${numberToAssign} student(s)${filterSummary} from your pool (${collegeName}) to ${bde.fullName}. ${remainingUnassigned} student(s) remain in your pool.`
+      : `Successfully assigned ${numberToAssign} student(s)${filterSummary} from ${collegeName} to ${bde.fullName}. ${remainingUnassigned} matching unassigned student(s) remain in the pool.`;
+
     res.status(200).json({
       success: true,
-      message: `Successfully assigned ${numberToAssign} student(s)${filterSummary} from ${collegeName} to ${bde.fullName}. ${remainingUnassigned} matching unassigned student(s) remain in the pool.`,
+      message: successMsg,
       data: {
         assignedCount: numberToAssign,
         requestedCount: count,
@@ -509,6 +706,9 @@ exports.assignStudents = async (req, res) => {
 // 4. Get Assigned Students with Filters & Search
 exports.getAssignedStudents = async (req, res) => {
   try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
     const {
       college,
       bdeId,
@@ -521,69 +721,108 @@ exports.getAssignedStudents = async (req, res) => {
       limit = 25
     } = req.query;
 
-    const query = {};
+    const andConditions = [];
 
     if (college) {
-      query.college = { $regex: new RegExp(escapeRegex(college.trim()), 'i') };
+      andConditions.push({ college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } });
     }
 
     if (course && course !== 'all' && course.trim()) {
-      query.course = { $regex: new RegExp(escapeRegex(course.trim()), 'i') };
+      andConditions.push({ course: { $regex: new RegExp(escapeRegex(course.trim()), 'i') } });
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
-      query.semester = { $regex: new RegExp(escapeRegex(semester.trim()), 'i') };
+      andConditions.push({ semester: { $regex: new RegExp(escapeRegex(semester.trim()), 'i') } });
     }
 
-    if (bdeId) {
-      if (bdeId === 'unassigned') {
-        query.$or = [{ assignedTo: null }, { assignedTo: { $exists: false } }];
+    if (isTL) {
+      // Scope to this TL's students
+      if (bdeId) {
+        if (bdeId === 'unassigned') {
+          // In TL view, unassigned means still with the TL to be assigned
+          andConditions.push({ assignedTo: tlId });
+        } else {
+          andConditions.push({
+            assignedTo: new mongoose.Types.ObjectId(bdeId),
+            assignedBy: tlId
+          });
+        }
+      } else if (assignmentState === 'assigned') {
+        // Students delegated by the TL to counselors
+        andConditions.push({
+          assignedBy: tlId,
+          assignedTo: { $nin: [tlId, null] }
+        });
+      } else if (assignmentState === 'unassigned') {
+        // Students still in TL's available pool
+        andConditions.push({ assignedTo: tlId });
       } else {
-        query.assignedTo = new mongoose.Types.ObjectId(bdeId);
+        // All students belonging to this TL
+        andConditions.push({
+          $or: [
+            { assignedTo: tlId },
+            { assignedBy: tlId }
+          ]
+        });
       }
-    } else if (assignmentState === 'assigned') {
-      query.assignedTo = { $ne: null };
-    } else if (assignmentState === 'unassigned') {
-      query.$or = [{ assignedTo: null }, { assignedTo: { $exists: false } }];
+    } else {
+      // Super Admin / Admin view
+      if (bdeId) {
+        if (bdeId === 'unassigned') {
+          andConditions.push({ $or: [{ assignedTo: null }, { assignedTo: { $exists: false } }] });
+        } else {
+          andConditions.push({ assignedTo: new mongoose.Types.ObjectId(bdeId) });
+        }
+      } else if (assignmentState === 'assigned') {
+        andConditions.push({ assignedTo: { $ne: null } });
+      } else if (assignmentState === 'unassigned') {
+        andConditions.push({ $or: [{ assignedTo: null }, { assignedTo: { $exists: false } }] });
+      }
     }
 
-
-        const sourceParam = req.query.source;
+    const sourceParam = req.query.source;
     if (sourceParam && sourceParam !== 'all') {
       const source = sourceParam;
-      if (source === 'organic') query.source = 'organic';
-      else if (source === 'import') query.source = 'import';
+      if (source === 'organic') andConditions.push({ source: 'organic' });
+      else if (source === 'import') andConditions.push({ source: 'import' });
       else if (source === 'test') { 
-        query.source = { $nin: ['organic', 'import'] }; 
-        // student taken test usually means technology assigned or eventCode exists
+        andConditions.push({ source: { $nin: ['organic', 'import'] } }); 
       }
       else if (source === 'internship') { 
-        query.source = { $nin: ['organic', 'import'] }; 
-        query.technology = { $exists: true, $ne: '' }; 
+        andConditions.push({ source: { $nin: ['organic', 'import'] }, technology: { $exists: true, $ne: '' } }); 
       }
-      else query.source = source;
+      else andConditions.push({ source: source });
     }
   
     if (counselingStatus && counselingStatus !== 'all') {
-      query.counselingStatus = counselingStatus;
+      andConditions.push({ counselingStatus });
     }
 
     if (search) {
       const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
-      query.$or = [
-        { fullName: searchRegex },
-        { email: searchRegex },
-        { phoneNumber: searchRegex },
-        { course: searchRegex },
-        { semester: searchRegex },
-        { technology: searchRegex },
-        { city: searchRegex }
-      ];
+      andConditions.push({
+        $or: [
+          { fullName: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { course: searchRegex },
+          { semester: searchRegex },
+          { technology: searchRegex },
+          { city: searchRegex }
+        ]
+      });
     }
+
+    const query = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(limit, 10) || 25;
     const skip = (pageNum - 1) * limitNum;
+
+    const distinctScope = isTL ? { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] } : {};
+    if (college) {
+      distinctScope.college = { $regex: new RegExp(escapeRegex(college.trim()), 'i') };
+    }
 
     const [students, totalCount, distinctCourses, distinctSemesters] = await Promise.all([
       Student.find(query)
@@ -596,8 +835,8 @@ exports.getAssignedStudents = async (req, res) => {
         .limit(limitNum)
         .lean(),
       Student.countDocuments(query),
-      Student.distinct('course', college ? { college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } } : {}),
-      Student.distinct('semester', college ? { college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } } : {})
+      Student.distinct('course', distinctScope),
+      Student.distinct('semester', distinctScope)
     ]);
 
     res.status(200).json({
@@ -620,9 +859,11 @@ exports.getAssignedStudents = async (req, res) => {
   }
 };
 
-// 5. Unassign Students (Move back to college unassigned pool)
+// 5. Unassign Students (Move back to pool)
 exports.unassignStudents = async (req, res) => {
   try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
     const { studentIds, collegeName, bdeId } = req.body;
 
     let filter = {};
@@ -657,21 +898,40 @@ exports.unassignStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide studentIds or collegeName & bdeId to unassign' });
     }
 
-    const result = await Student.updateMany(
-      filter,
-      {
-        $set: {
+    // If TL, only allow unassigning students that were assigned by this TL
+    if (isTL) {
+      filter.assignedBy = tlId;
+    }
+
+    // For TL: return the student back to the TL's available pool (assignedTo: tlId)
+    // For Admin: return student to global unassigned pool (assignedTo: null, assignedBy: null)
+    const updateFields = isTL
+      ? {
+          assignedTo: tlId,
+          assignedAt: new Date(),
+          counselingStatus: 'assigned'
+        }
+      : {
           assignedTo: null,
           assignedBy: null,
           assignedAt: null,
           counselingStatus: 'unassigned'
-        }
+        };
+
+    const result = await Student.updateMany(
+      filter,
+      {
+        $set: updateFields
       }
     );
 
+    const message = isTL
+      ? `Successfully unassigned ${result.modifiedCount} student(s) and returned them to your available pool.`
+      : `Successfully unassigned ${result.modifiedCount} student(s). They are now returned to the unassigned pool.`;
+
     res.status(200).json({
       success: true,
-      message: `Successfully unassigned ${result.modifiedCount} student(s). They are now returned to the unassigned pool.`,
+      message,
       modifiedCount: result.modifiedCount
     });
   } catch (error) {
@@ -781,6 +1041,60 @@ exports.updateCounselingStatus = async (req, res) => {
 // 8. Get Counselor Overall Stats
 exports.getCounselorOverview = async (req, res) => {
   try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
+    if (isTL) {
+      const [
+        totalStudents,
+        assignedStudents,
+        unassignedStudents,
+        totalBDEs,
+        statusCounts
+      ] = await Promise.all([
+        Student.countDocuments({ $or: [{ assignedTo: tlId }, { assignedBy: tlId }] }),
+        Student.countDocuments({ assignedBy: tlId, assignedTo: { $nin: [tlId, null] } }),
+        Student.countDocuments({ assignedTo: tlId }),
+        Staff.countDocuments({
+          $or: [
+            { role: 'bde' },
+            { systemRole: 'bde' },
+            { designation: { $regex: /^bde\b|business development executive/i } }
+          ],
+          isActive: true
+        }),
+        Student.aggregate([
+          {
+            $match: {
+              $or: [{ assignedTo: tlId }, { assignedBy: tlId }]
+            }
+          },
+          {
+            $group: {
+              _id: '$counselingStatus',
+              count: { $sum: 1 }
+            }
+          }
+        ])
+      ]);
+
+      const statusMap = {};
+      statusCounts.forEach(s => {
+        statusMap[s._id || 'unassigned'] = s.count;
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalStudents,
+          assignedStudents,
+          unassignedStudents,
+          totalBDEs,
+          statusBreakdown: statusMap
+        }
+      });
+    }
+
     const [
       totalStudents,
       assignedStudents,
