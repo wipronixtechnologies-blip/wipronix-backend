@@ -10,15 +10,219 @@ const Student = require("../../models/Student.model");
 const DropdownOption = require("../../models/DropdownOption.model");
 const Question = require("../../models/Question.model");
 
-const { DEFAULT_TECH_CONFIGS, DEFAULT_CHALLENGES } = require("./machineRoundChallenges.data");
+// Default Technology Toggles Mapping
+const DEFAULT_TECH_CONFIGS = [
+  { technology: "React & Node.js (MERN)", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "Next.js & Tailwind CSS", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "Python & Django/FastAPI", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "Java Spring Boot & Microservices", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "Mobile App (Flutter / React Native)", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "AI / ML & Data Science", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "Core Technical", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "DSA & Problem Solving", hasMachineRound: true, category: "Technical", durationMinutes: 30 },
+  { technology: "UI/UX & Product Design", hasMachineRound: false, category: "Design", durationMinutes: 30 },
+  { technology: "Sales & Business Development", hasMachineRound: false, category: "Non-Technical", durationMinutes: 30 },
+  { technology: "Digital Marketing", hasMachineRound: false, category: "Non-Technical", durationMinutes: 30 },
+  { technology: "Other", hasMachineRound: false, category: "General", durationMinutes: 30 }
+];
+
+// Pre-seeded rich coding challenges for various technologies
+const DEFAULT_CHALLENGES = [
+  {
+    title: "Array Transformation & Target Pair Sum",
+    technology: "React & Node.js (MERN)",
+    difficulty: "Medium",
+    timeMinutes: 30,
+    solutionFunctionName: "twoSum",
+    defaultLanguage: "javascript",
+    description: `### Problem Description
+Given an array of integers \`numbers\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
+
+You may assume that each input would have **exactly one solution**, and you may not use the same element twice.
+You can return the answer in any order, or as a sorted array \`[index1, index2]\`.
+
+### Example 1
+- **Input:** \`numbers = [2, 7, 11, 15], target = 9\`
+- **Output:** \`[0, 1]\`
+- **Explanation:** Because \`numbers[0] + numbers[1] == 9\`, we return \`[0, 1]\`.
+
+### Example 2
+- **Input:** \`numbers = [3, 2, 4], target = 6\`
+- **Output:** \`[1, 2]\`
+
+### Constraints
+- \`2 <= numbers.length <= 10^4\`
+- \`-10^9 <= numbers[i] <= 10^9\`
+- \`-10^9 <= target <= 10^9\`
+- Only one valid answer exists.`,
+    starterCodes: {
+      javascript: `/**
+ * @param {number[]} numbers
+ * @param {number} target
+ * @return {number[]}
+ */
+function twoSum(numbers, target) {
+  // Write your code here
+  
+}`,
+      python: `def twoSum(numbers, target):
+    # Write your python code here
+    pass`
+    },
+    testCases: [
+      { input: JSON.stringify([[2, 7, 11, 15], 9]), expectedOutput: JSON.stringify([0, 1]), isHidden: false, explanation: "2 + 7 = 9" },
+      { input: JSON.stringify([[3, 2, 4], 6]), expectedOutput: JSON.stringify([1, 2]), isHidden: false, explanation: "2 + 4 = 6" },
+      { input: JSON.stringify([[3, 3], 6]), expectedOutput: JSON.stringify([0, 1]), isHidden: false, explanation: "3 + 3 = 6" },
+      { input: JSON.stringify([[1, 5, 8, 12, 19], 20]), expectedOutput: JSON.stringify([0, 4]), isHidden: true, explanation: "1 + 19 = 20" },
+      { input: JSON.stringify([[10, -2, 5, -8, 14], -10]), expectedOutput: JSON.stringify([1, 3]), isHidden: true, explanation: "-2 + -8 = -10" }
+    ]
+  },
+  {
+    title: "String Compression & Character Frequency Counter",
+    technology: "Python & Django/FastAPI",
+    difficulty: "Medium",
+    timeMinutes: 30,
+    solutionFunctionName: "compressString",
+    defaultLanguage: "javascript",
+    description: `### Problem Description
+Implement a method to perform basic string compression using the counts of repeated characters.
+For example, the string \`"aabcccccaaa"\` would become \`"a2b1c5a3"\`.
+
+If the "compressed" string would not become smaller than the original string, your method should return the original string.
+You can assume the string has only uppercase and lowercase letters (\`a-z\`, \`A-Z\`).
+
+### Example 1
+- **Input:** \`"aabcccccaaa"\`
+- **Output:** \`"a2b1c5a3"\`
+
+### Example 2
+- **Input:** \`"abcdef"\`
+- **Output:** \`"abcdef"\`
+- **Explanation:** Compressed string \`"a1b1c1d1e1f1"\` is length 12, which is longer than original 6. Hence return original string.
+
+### Constraints
+- \`1 <= string.length <= 10^5\`
+- Case sensitive (\`'A'\` is different from \`'a'\`).`,
+    starterCodes: {
+      javascript: `/**
+ * @param {string} str
+ * @return {string}
+ */
+function compressString(str) {
+  // Write your code here
+  
+}`,
+      python: `def compressString(s: str) -> str:
+    # Write your python code here
+    pass`
+    },
+    testCases: [
+      { input: JSON.stringify(["aabcccccaaa"]), expectedOutput: JSON.stringify("a2b1c5a3"), isHidden: false, explanation: "Counts: a:2, b:1, c:5, a:3" },
+      { input: JSON.stringify(["abcdef"]), expectedOutput: JSON.stringify("abcdef"), isHidden: false, explanation: "Original returned as compressed is longer" },
+      { input: JSON.stringify(["WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWW"]), expectedOutput: JSON.stringify("W12B1W12B3W12"), isHidden: false },
+      { input: JSON.stringify(["aabbcc"]), expectedOutput: JSON.stringify("aabbcc"), isHidden: true },
+      { input: JSON.stringify(["aaaaaa"]), expectedOutput: JSON.stringify("a6"), isHidden: true }
+    ]
+  },
+  {
+    title: "Valid Parentheses & Bracket Sequence Validator",
+    technology: "Java Spring Boot & Microservices",
+    difficulty: "Easy",
+    timeMinutes: 30,
+    solutionFunctionName: "isValid",
+    defaultLanguage: "javascript",
+    description: `### Problem Description
+Given a string \`s\` containing just the characters \`'('\`, \`')'\`, \`'{'\`, \`'}'\`, \`'['\` and \`']'\`, determine if the input string is valid.
+
+An input string is valid if:
+1. Open brackets must be closed by the same type of brackets.
+2. Open brackets must be closed in the correct order.
+3. Every close bracket has a corresponding open bracket of the same type.
+
+### Example 1
+- **Input:** \`s = "()[]{}"\`
+- **Output:** \`true\`
+
+### Example 2
+- **Input:** \`s = "(]"\`
+- **Output:** \`false\`
+
+### Constraints
+- \`1 <= s.length <= 10^4\`
+- \`s\` consists of parentheses only \`'()[]{}'\`.`,
+    starterCodes: {
+      javascript: `/**
+ * @param {string} s
+ * @return {boolean}
+ */
+function isValid(s) {
+  // Write your code here
+  
+}`,
+      python: `def isValid(s: str) -> bool:
+    # Write your python code here
+    pass`
+    },
+    testCases: [
+      { input: JSON.stringify(["()"]), expectedOutput: JSON.stringify(true), isHidden: false },
+      { input: JSON.stringify(["()[]{}"]), expectedOutput: JSON.stringify(true), isHidden: false },
+      { input: JSON.stringify(["(]"]), expectedOutput: JSON.stringify(false), isHidden: false },
+      { input: JSON.stringify(["([{}])"]), expectedOutput: JSON.stringify(true), isHidden: true },
+      { input: JSON.stringify(["[(])"]), expectedOutput: JSON.stringify(false), isHidden: true }
+    ]
+  },
+  {
+    title: "Longest Substring Without Repeating Characters",
+    technology: "All",
+    difficulty: "Medium",
+    timeMinutes: 30,
+    solutionFunctionName: "lengthOfLongestSubstring",
+    defaultLanguage: "javascript",
+    description: `### Problem Description
+Given a string \`s\`, find the length of the **longest substring** without duplicate characters.
+
+### Example 1
+- **Input:** \`s = "abcabcbb"\`
+- **Output:** \`3\`
+- **Explanation:** The answer is \`"abc"\`, with the length of 3.
+
+### Example 2
+- **Input:** \`s = "bbbbb"\`
+- **Output:** \`1\`
+- **Explanation:** The answer is \`"b"\`, with the length of 1.
+
+### Example 3
+- **Input:** \`s = "pwwkew"\`
+- **Output:** \`3\`
+- **Explanation:** The answer is \`"wke"\`, with the length of 3. Notice that \`"pwke"\` is a subsequence and not a substring.`,
+    starterCodes: {
+      javascript: `/**
+ * @param {string} s
+ * @return {number}
+ */
+function lengthOfLongestSubstring(s) {
+  // Write your code here
+  
+}`,
+      python: `def lengthOfLongestSubstring(s: str) -> int:
+    # Write your python code here
+    pass`
+    },
+    testCases: [
+      { input: JSON.stringify(["abcabcbb"]), expectedOutput: JSON.stringify(3), isHidden: false, explanation: "abc -> len 3" },
+      { input: JSON.stringify(["bbbbb"]), expectedOutput: JSON.stringify(1), isHidden: false, explanation: "b -> len 1" },
+      { input: JSON.stringify(["pwwkew"]), expectedOutput: JSON.stringify(3), isHidden: false, explanation: "wke -> len 3" },
+      { input: JSON.stringify([""]), expectedOutput: JSON.stringify(0), isHidden: true, explanation: "Empty string length 0" },
+      { input: JSON.stringify(["dvdf"]), expectedOutput: JSON.stringify(3), isHidden: true, explanation: "vdf -> len 3" }
+    ]
+  }
+];
 
 // Helper: Ensure default configs and challenges are seeded in MongoDB
 async function ensureSeed() {
   try {
     for (const conf of DEFAULT_TECH_CONFIGS) {
-      const existing = await MachineConfig.findOne({
-        technology: { $regex: new RegExp(`^${escapeRegex(conf.technology)}$`, 'i') }
-      });
+      const existing = await MachineConfig.findOne({ technology: conf.technology });
       if (!existing) {
         await MachineConfig.create(conf);
       }
@@ -54,7 +258,7 @@ async function ensureSeed() {
       for (const qTech of distinctQuestionTechs) {
         if (!qTech || typeof qTech !== 'string') continue;
         const name = qTech.trim();
-        if (/aptitude|quant|reasoning|general awareness|computer network|client handling/i.test(name)) continue;
+        if (/aptitude|quant|reasoning|general awareness|computer network|problem solving|client handling/i.test(name)) continue;
         const existing = await MachineConfig.findOne({
           technology: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') }
         });
@@ -65,7 +269,7 @@ async function ensureSeed() {
             technology: name,
             hasMachineRound: !isNonTech && !isDesign,
             category: isNonTech ? "Non-Technical" : isDesign ? "Design" : "Technical",
-            durationMinutes: 35
+            durationMinutes: 30
           });
         }
       }
@@ -73,19 +277,13 @@ async function ensureSeed() {
       console.warn("Question tech sync to MachineConfig warning:", e.message);
     }
 
-    // Upsert all default challenges (including new tough ones)
     for (const ch of DEFAULT_CHALLENGES) {
       const existing = await MachineChallenge.findOne({ title: ch.title });
       if (!existing) {
         await MachineChallenge.create(ch);
       } else {
-        existing.technology = ch.technology;
-        existing.difficulty = ch.difficulty;
-        existing.timeMinutes = ch.timeMinutes;
-        existing.description = ch.description;
-        existing.solutionFunctionName = ch.solutionFunctionName;
+        // Sync starterCodes in DB to ensure no solution code is shown
         existing.starterCodes = ch.starterCodes;
-        existing.testCases = ch.testCases;
         await existing.save();
       }
     }
@@ -190,80 +388,40 @@ exports.startMachineSession = async (req, res) => {
       });
     }
 
-    // 1. Check if candidate already has an assigned challenge for this test
+    // Find appropriate challenge for this technology
     let challenge = null;
-    const effectiveStudentId = student?._id ? String(student._id) : (studentId ? String(studentId) : '');
-    const effectiveEmail = (student?.email || email || '').trim().toLowerCase();
-    const candidateSearchConditions = [];
-    if (effectiveStudentId) {
-      candidateSearchConditions.push({ studentId: effectiveStudentId });
-      if (effectiveStudentId.length === 24) {
-        try { candidateSearchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) }); } catch (e) { }
-      }
-    }
-    if (effectiveEmail) {
-      candidateSearchConditions.push({ studentEmail: effectiveEmail });
-    }
-
-    if (candidateSearchConditions.length > 0) {
-      try {
-        const existingResult = await Result.findOne({
-          $or: candidateSearchConditions,
-          machineRoundChallengeId: { $exists: true, $ne: null }
-        });
-        if (existingResult?.machineRoundChallengeId) {
-          challenge = await MachineChallenge.findById(existingResult.machineRoundChallengeId);
-        }
-      } catch (findErr) { }
-    }
-
-    // 2. Find matching challenge for this technology
-    if (!challenge) {
-      try {
-        const matchingChallenges = await MachineChallenge.find({
-          technology: { $regex: new RegExp(escapeRegex(cleanTech), 'i') },
-          isActive: true
-        });
-        if (matchingChallenges.length > 0) {
-          challenge = matchingChallenges[Math.floor(Math.random() * matchingChallenges.length)];
-        }
-      } catch (e) { }
-    }
+    try {
+      challenge = await MachineChallenge.findOne({
+        technology: { $regex: new RegExp(escapeRegex(cleanTech), 'i') },
+        isActive: true
+      });
+    } catch (e) { }
 
     if (!challenge) {
-      // Try matching by domain key terms (e.g. Dynamic Programming, Recursion, Trees, Graphs, Python, React, Java)
-      const keywords = cleanTech.replace(/[()&/]/g, ' ').split(/\s+/).filter(w => w.length >= 4);
-      for (const kw of keywords) {
+      // Try matching by first keyword (e.g. React, Python, Java, Next)
+      const firstKeyword = cleanTech.split(/[\s&/]+/)[0];
+      if (firstKeyword && firstKeyword.length >= 3) {
         try {
-          const matchingChallenges = await MachineChallenge.find({
-            technology: { $regex: new RegExp(escapeRegex(kw), 'i') },
+          challenge = await MachineChallenge.findOne({
+            technology: { $regex: new RegExp(escapeRegex(firstKeyword), 'i') },
             isActive: true
           });
-          if (matchingChallenges.length > 0) {
-            challenge = matchingChallenges[Math.floor(Math.random() * matchingChallenges.length)];
-            break;
-          }
         } catch (e) { }
       }
     }
 
     if (!challenge) {
-      // Fallback to "All" or active challenges
-      try {
-        const allChallenges = await MachineChallenge.find({ technology: "All", isActive: true });
-        if (allChallenges.length > 0) {
-          challenge = allChallenges[Math.floor(Math.random() * allChallenges.length)];
-        }
-      } catch (e) { }
+      // Fallback to "All" or first active challenge
+      challenge = await MachineChallenge.findOne({ technology: "All", isActive: true }) ||
+        await MachineChallenge.findOne({ isActive: true });
     }
 
     if (!challenge) {
-      try {
-        const anyChallenges = await MachineChallenge.find({ isActive: true });
-        if (anyChallenges.length > 0) {
-          challenge = anyChallenges[Math.floor(Math.random() * anyChallenges.length)];
-        }
-      } catch (e) { }
+      // Re-seed challenges immediately and pick the first one
+      for (const ch of DEFAULT_CHALLENGES) {
+        await MachineChallenge.create(ch);
+      }
+      challenge = await MachineChallenge.findOne({ isActive: true });
     }
 
     if (!challenge) {
@@ -820,23 +978,6 @@ function checkTestCasePassed(output, expectedOutputRaw, funcName, parsedArgs) {
         if (actualClean.length === 2 && actualClean[0] !== actualClean[1]) {
           const sum = nums[actualClean[0]] + nums[actualClean[1]];
           if (sum === target) return true;
-        }
-      }
-
-      // For findOrder (Course Schedule II), verify any valid topological order satisfying all prerequisites
-      if (funcName === 'findOrder' && Array.isArray(parsedArgs?.[1])) {
-        const numCourses = parsedArgs[0];
-        const prereqs = parsedArgs[1];
-        if (expectedClean.length === 0) {
-          return actualClean.length === 0;
-        }
-        if (actualClean.length === numCourses) {
-          const pos = new Map();
-          actualClean.forEach((c, idx) => pos.set(c, idx));
-          if (pos.size === numCourses) {
-            const isValidTopo = prereqs.every(([course, pre]) => pos.has(course) && pos.has(pre) && pos.get(pre) < pos.get(course));
-            if (isValidTopo) return true;
-          }
         }
       }
 
