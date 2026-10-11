@@ -7,6 +7,8 @@ const submitAnswer = require("../../../../controllers/Test/submitAnswer");
 const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
 const { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter, generateStudentOfferLetterDownload } = require("../../../../controllers/Test/getTestResults");
+const deleteCandidateResult = require("../../../../controllers/Test/deleteCandidateResult");
+const { authenticateStaff } = require("../../../../controllers/Auth/staffProfile");
 
 const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
 const { getAllQuestions, updateQuestion, deleteQuestion } = require("../../../../controllers/Test/manageQuestions");
@@ -76,6 +78,9 @@ router.post("/update-interview-marks", updateInterviewMarks);
 router.post("/toggle-selection", toggleSelection);
 router.post("/send-student-offer-letter", sendStudentOfferLetter);
 router.get("/generate-student-offer-letter/:resultId", generateStudentOfferLetterDownload);
+
+// Superadmin only candidate test record deletion (purges results and student to allow retest)
+router.delete("/candidate-record/:resultId", authenticateStaff, deleteCandidateResult);
 
 module.exports = router;
 
