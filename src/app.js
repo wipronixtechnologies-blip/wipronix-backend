@@ -38,94 +38,44 @@ app.use(cookieParser());
 // No need for static file serving since files are in Firebase Cloud Storage
 
 // =============================================================================
-// CORS CONFIGURATION (Secured with Domain Whitelisting)
+// CORS CONFIGURATION
 // =============================================================================
-// Build list of allowed origins from environment and known trusted domains
-
-  // "https://internship-1b6cd.web.app",
-  // "https://wipronix-website.web.app",
-  // "https://wipronix-frontend.vercel.app",
-  // "http://localhost:3000",
-  // "http://localhost:3001",
-  // "http://127.0.0.1:3000",
-  // "https://admin.wipronix.com",
-
-
-  
-const trustedOrigins = [
-  "https://wipronix.com",
-  "https://www.wipronix.com",
-  "https://wipronix-admin-pannel.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:8080"
-];
-
-// Add environment URLs if set
-if (process.env.CLIENT_URL) trustedOrigins.push(process.env.CLIENT_URL.trim().replace(/\/+$/, ''));
-if (process.env.WEBSITE_URL) {
-  try {
-    const origin = new URL(process.env.WEBSITE_URL).origin;
-    trustedOrigins.push(origin);
-  } catch (e) { }
-}
-if (process.env.FRONTEND_URL) {
-  try {
-    const origin = new URL(process.env.FRONTEND_URL).origin;
-    trustedOrigins.push(origin);
-  } catch (e) { }
-}
-if (process.env.ALLOWED_ORIGINS) {
-  process.env.ALLOWED_ORIGINS.split(',').forEach(o => {
-    if (o.trim()) trustedOrigins.push(o.trim().replace(/\/+$/, ''));
-  });
-}
-
-function isOriginAllowed(origin) {
-  if (!origin) return true; // Allow non-browser agents (cURL, Postman, mobile apps)
-
-  const clean = origin.trim().replace(/\/+$/, '');
-
-  // Exact match in trusted list
-  if (trustedOrigins.includes(clean)) return true;
-
-  try {
-    const url = new URL(clean);
-    const hostname = url.hostname.toLowerCase();
-
-    // Allow any localhost / 127.0.0.1 port (for local dev across different ports)
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
-      return true;
-    }
-
-    // Allow official subdomains
-    if (
-      hostname === 'wipronix.com' ||
-      hostname.endsWith('.wipronix.com') ||
-      hostname === 'wipronix-website.web.app' ||
-      hostname === 'internship-1b6cd.web.app' ||
-      hostname.endsWith('.web.app') ||
-      hostname.endsWith('.vercel.app')
-    ) {
-      return true;
-    }
-  } catch (e) {
-    return false;
-  }
-
-  return false;
-}
+// Allowed origins - add your frontend URLs here (commented out to allow all origins)
+// const allowedOrigins = [
+//   "https://internship-1b6cd.web.app",
+//   "https://wipronix-website.web.app",
+//   "http://localhost:3000",
+//   "http://localhost:3001",
+//   "http://localhost:8080",
+//   "http://localhost:5173"
+// ];
 
 // CORS options
 const corsOptions = {
+  /*
   origin: function (origin, callback) {
-    if (isOriginAllowed(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS BLOCKED] Rejected unauthorized origin: "${origin}"`);
-      callback(new Error(`Blocked by CORS policy: Origin "${origin}" is not authorized.`));
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    // In development mode, allow all origins (remove this in production for security)
+    if (env.IS_DEVELOPMENT) {
+      console.log(`[CORS DEBUG] Development mode - allowing origin: "${origin}"`);
+      return callback(null, true);
+    }
+    
+    // Block origin in production if not in allowed list
+    console.log(`[CORS ERROR] Blocked origin: "${origin}"`);
+    callback(new Error('Not allowed by CORS'));
+  },
+  */
+  origin: function (origin, callback) {
+    // Allow all origins
+    callback(null, true);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
