@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const { allowedOrigins } = require('../config/corsOrigins');
 
 let io = null;
 
@@ -6,8 +7,9 @@ let io = null;
 const initSocketServer = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 

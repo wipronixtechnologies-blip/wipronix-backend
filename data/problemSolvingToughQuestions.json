@@ -1,0 +1,2234 @@
+[
+  {
+    "_id": "6a9af1c79c8dd27f4c362721",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "What is the time complexity of finding a pair of numbers in a sorted array that sum to a target value using the Two-Pointers technique?",
+    "codeSnippet": "",
+    "options": [
+      "O(n^2)",
+      "O(n)",
+      "O(n log n)",
+      "O(log n)"
+    ],
+    "__v": 1,
+    "createdAt": "2026-09-04T16:28:55.026Z",
+    "updatedAt": "2026-10-08T11:12:10.249Z"
+  },
+  {
+    "_id": "6a9af1c79c8dd27f4c362724",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Dynamic Programming problems with optimal substructure and overlapping subproblems, what is the primary role of 'Memoization'?",
+    "codeSnippet": "",
+    "options": [
+      "Caching computed subproblem results in memory to avoid duplicate computations",
+      "Converting recursion into iterative loops",
+      "Compressing memory footprint",
+      "Parallelizing code execution across threads"
+    ],
+    "__v": 0,
+    "createdAt": "2026-09-04T16:28:55.026Z",
+    "updatedAt": "2026-09-04T16:28:55.026Z"
+  },
+  {
+    "_id": "6a9af1c79c8dd27f4c362728",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the time complexity of a naive recursive Fibonacci calculation without memoization: fib(n) = fib(n-1) + fib(n-2)?",
+    "codeSnippet": "",
+    "options": [
+      "O(log n) Logarithmic",
+      "O(2^n) Exponential",
+      "O(n^2) Quadratic",
+      "O(n) Linear"
+    ],
+    "__v": 1,
+    "createdAt": "2026-09-04T16:28:55.026Z",
+    "updatedAt": "2026-10-08T11:12:12.617Z"
+  },
+  {
+    "_id": "6a9af1c79c8dd27f4c362727",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Which tree traversal technique visits all nodes level-by-level using a Queue data structure?",
+    "codeSnippet": "",
+    "options": [
+      "Post-order Traversal",
+      "Pre-order Traversal (DFS)",
+      "In-order Traversal",
+      "Breadth-First Search (BFS) / Level-Order Traversal"
+    ],
+    "__v": 1,
+    "createdAt": "2026-09-04T16:28:55.026Z",
+    "updatedAt": "2026-10-08T11:12:14.969Z"
+  },
+  {
+    "_id": "6ace5d73d5e220966d38580f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "When optimizing the 0/1 Knapsack dynamic programming table from 2D O(N*W) space to 1D O(W) space, why must the inner capacity loop iterate backward (from W down to weight[i])?",
+    "codeSnippet": "",
+    "options": [
+      "To prevent using the current item multiple times in the same step, as a forward loop references already-updated values of the same item",
+      "To guarantee cache locality and avoid CPU branch mispredictions",
+      "To satisfy the optimal substructure requirement of Greedy choice",
+      "Because 1D arrays in C++/Java can only be allocated backward"
+    ],
+    "createdAt": "2026-10-13T16:33:55.643Z",
+    "updatedAt": "2026-10-13T16:40:50.728Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d73d5e220966d385812",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Longest Increasing Subsequence (LIS) problem, patience sorting using an auxiliary tails array with binary search achieves which optimal time and space complexity?",
+    "codeSnippet": "",
+    "options": [
+      "O(N log N) time and O(N) auxiliary space",
+      "O(N^2) time and O(1) auxiliary space",
+      "O(N) time and O(N^2) auxiliary space",
+      "O(N log^2 N) time and O(log N) auxiliary space"
+    ],
+    "createdAt": "2026-10-13T16:33:55.754Z",
+    "updatedAt": "2026-10-13T16:40:51.060Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d74d5e220966d385815",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "For Matrix Chain Multiplication with matrices A1, A2, ..., An where matrix Ai has dimensions p[i-1] x p[i], what is the total number of subproblems and the standard DP time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "O(N^2) subproblems and O(N^3) time complexity",
+      "O(2^N) subproblems and O(N * 2^N) time complexity",
+      "O(N^3) subproblems and O(N^4) time complexity",
+      "O(N) subproblems and O(N log N) time complexity"
+    ],
+    "createdAt": "2026-10-13T16:33:56.247Z",
+    "updatedAt": "2026-10-13T16:40:51.297Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d74d5e220966d385818",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Traveling Salesperson Problem (TSP) on N cities, what is the state representation and time complexity using Bitmask Dynamic Programming?",
+    "codeSnippet": "",
+    "options": [
+      "State dp[mask][u] where mask represents visited cities and u is current city; Time complexity O(N^2 * 2^N)",
+      "State dp[mask] where mask is visited cities; Time complexity O(N * 2^N)",
+      "State dp[u][v] of shortest pairwise paths; Time complexity O(N^3)",
+      "State dp[depth][mask]; Time complexity O(N! / 2)"
+    ],
+    "createdAt": "2026-10-13T16:33:56.560Z",
+    "updatedAt": "2026-10-13T16:40:51.399Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d74d5e220966d38581b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Coin Change 2 problem (finding the total number of combinations to make an amount), why must the outer loop iterate over coins and the inner loop iterate over amount?",
+    "codeSnippet": "",
+    "options": [
+      "Outer loop over coins ensures each coin is considered in sequence, preventing distinct permutations of the same combination from being counted multiple times",
+      "Outer loop over coins minimizes memory consumption by freeing the DP table",
+      "Outer loop over amount would cause an infinite recursion depth",
+      "Because coins can have negative values that require sorting"
+    ],
+    "createdAt": "2026-10-13T16:33:56.862Z",
+    "updatedAt": "2026-10-13T16:40:51.495Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d75d5e220966d38581e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Tree DP, to find the Maximum Weight Independent Set (no two adjacent nodes chosen) on a tree rooted at node u with children v, which state recurrence is correct?",
+    "codeSnippet": "",
+    "options": [
+      "dp[u][0] = sum(max(dp[v][0], dp[v][1])) and dp[u][1] = weight[u] + sum(dp[v][0])",
+      "dp[u][0] = min(dp[v][0]) and dp[u][1] = weight[u] + max(dp[v][1])",
+      "dp[u][0] = sum(dp[v][1]) and dp[u][1] = weight[u] + sum(dp[v][1])",
+      "dp[u][1] = weight[u] + max(dp[v][0], dp[v][1])"
+    ],
+    "createdAt": "2026-10-13T16:33:57.353Z",
+    "updatedAt": "2026-10-13T16:40:51.588Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d75d5e220966d385821",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "Hirschberg's Algorithm computes the Longest Common Subsequence (LCS) of two strings of lengths M and N by combining Dynamic Programming with Divide and Conquer. What are its exact asymptotic bounds?",
+    "codeSnippet": "",
+    "options": [
+      "O(M * N) time and O(min(M, N)) auxiliary space",
+      "O(M + N) time and O(M * N) auxiliary space",
+      "O(M * N log N) time and O(1) space",
+      "O(min(M, N)^2) time and O(M + N) space"
+    ],
+    "createdAt": "2026-10-13T16:33:57.888Z",
+    "updatedAt": "2026-10-13T16:40:51.684Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d76d5e220966d385824",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "Under Knuth's Optimization for interval DP (like Optimal Binary Search Trees), if the optimal split point satisfies opt[i][j-1] <= opt[i][j] <= opt[i+1][j], what is the reduced time complexity from standard O(N^3)?",
+    "codeSnippet": "",
+    "options": [
+      "O(N^2)",
+      "O(N log N)",
+      "O(N^2 log N)",
+      "O(N * sqrt(N))"
+    ],
+    "createdAt": "2026-10-13T16:33:58.404Z",
+    "updatedAt": "2026-10-13T16:40:51.795Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d76d5e220966d385827",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Egg Dropping puzzle with K eggs and N floors, what does the state recurrence dp[k][n] represent, and what is its optimal time complexity after applying binary search on the drop floor?",
+    "codeSnippet": "",
+    "options": [
+      "dp[k][n] = 1 + min_x(max(dp[k-1][x-1], dp[k][n-x])) solved in O(K * N log N) time",
+      "dp[k][n] = min(dp[k-1][n], dp[k][n-1]) solved in O(N^2) time",
+      "dp[k][n] = K * log2(N) solved in O(1) time",
+      "dp[k][n] = n / k solved in O(K) time"
+    ],
+    "createdAt": "2026-10-13T16:33:58.766Z",
+    "updatedAt": "2026-10-13T16:40:51.915Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d76d5e220966d38582a",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "When applying the Convex Hull Trick (CHT) to optimize DP transitions of the form dp[i] = min_{j < i} (dp[j] + m_j * x_i + c_j), what property must the slopes m_j have to achieve O(1) amortized per transition?",
+    "codeSnippet": "",
+    "options": [
+      "Slopes m_j and query points x_i must be strictly monotonic (monotonically increasing or decreasing)",
+      "Slopes m_j must be positive integers strictly bounded by N",
+      "Query points x_i must form an arithmetic progression",
+      "The cost matrix must satisfy the Triangle Inequality"
+    ],
+    "createdAt": "2026-10-13T16:33:58.912Z",
+    "updatedAt": "2026-10-13T16:40:52.010Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d77d5e220966d38582d",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Burst Balloons problem (nums array), why does choosing the LAST balloon k to burst in subinterval (i, j) allow valid DP decomposition, whereas choosing the first balloon fails?",
+    "codeSnippet": "",
+    "options": [
+      "The last balloon k is guaranteed to have boundaries nums[i] and nums[j] as neighbors, keeping subproblems (i, k) and (k, j) completely independent",
+      "Choosing the first balloon requires O(N!) memory allocations",
+      "The balloon burst order must follow a topological sort on trees",
+      "Bursting the first balloon violates optimal substructure due to overlapping bitmasks"
+    ],
+    "createdAt": "2026-10-13T16:33:59.325Z",
+    "updatedAt": "2026-10-13T16:40:52.105Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d77d5e220966d385830",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Digit DP to count numbers <= N satisfying a property, what is the purpose of the 'tight' boolean flag in the state memoization table dp(index, sum, tight)?",
+    "codeSnippet": "",
+    "options": [
+      "It indicates whether the prefix chosen so far is restricted by the exact digits of upper bound N, preventing counting numbers greater than N",
+      "It ensures that memory consumption stays tightly within the L1 cache",
+      "It verifies if leading zeros have been stripped from the current digit",
+      "It enforces that adjacent digits cannot be identical"
+    ],
+    "createdAt": "2026-10-13T16:33:59.830Z",
+    "updatedAt": "2026-10-13T16:40:52.199Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d78d5e220966d385833",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "What is the time complexity of iterating over all submasks of all masks for a set of size N using the trick: for (int s = m; s > 0; s = (s - 1) & m)?",
+    "codeSnippet": "",
+    "options": [
+      "O(3^N)",
+      "O(4^N)",
+      "O(2^N * N)",
+      "O(N^3)"
+    ],
+    "createdAt": "2026-10-13T16:34:00.108Z",
+    "updatedAt": "2026-10-13T16:40:52.295Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d78d5e220966d385836",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Matrix Exponentiation to compute the N-th term of a linear recurrence relation of order K (e.g. k-step Fibonacci), what is the overall time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "O(K^3 * log N)",
+      "O(K^2 * N)",
+      "O(K * log^2 N)",
+      "O(N * log K)"
+    ],
+    "createdAt": "2026-10-13T16:34:00.342Z",
+    "updatedAt": "2026-10-13T16:40:52.386Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d78d5e220966d385839",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In SOS (Sum Over Subsets) DP, what is the time complexity to compute F(mask) = sum_{submask in mask} A[submask] for all 2^N masks?",
+    "codeSnippet": "",
+    "options": [
+      "O(N * 2^N)",
+      "O(3^N)",
+      "O(N^2 * 2^N)",
+      "O(4^N)"
+    ],
+    "createdAt": "2026-10-13T16:34:00.893Z",
+    "updatedAt": "2026-10-13T16:40:52.483Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d79d5e220966d38583c",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Edit Distance between strings S1 (length m) and S2 (length n), if substitutions, insertions, and deletions have costs Cs, Ci, and Cd respectively, what is the state transition when S1[i] != S2[j]?",
+    "codeSnippet": "",
+    "options": [
+      "dp[i][j] = min(dp[i-1][j-1] + Cs, dp[i][j-1] + Ci, dp[i-1][j] + Cd)",
+      "dp[i][j] = min(dp[i-1][j-1], dp[i][j-1], dp[i-1][j]) + Cs + Ci + Cd",
+      "dp[i][j] = dp[i-1][j-1] + max(Ci, Cd)",
+      "dp[i][j] = min(dp[i-1][j], dp[i][j-1]) + Cs"
+    ],
+    "createdAt": "2026-10-13T16:34:01.162Z",
+    "updatedAt": "2026-10-13T16:40:52.576Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d79d5e220966d38583f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Partition Equal Subset Sum problem with sum S and array size N, how does using a Bitset (std::bitset<S/2>) optimize the transition dp = dp | (dp << num)?",
+    "codeSnippet": "",
+    "options": [
+      "It processes 64 state transitions per CPU instruction, speeding up execution by a factor of 64 and reducing space to S / 8 bytes",
+      "It eliminates the need for allocating memory in RAM by utilizing GPU registers",
+      "It converts the NP-complete problem into polynomial O(log N) time",
+      "It performs automatic branch pruning using SIMD float vectors"
+    ],
+    "createdAt": "2026-10-13T16:34:01.571Z",
+    "updatedAt": "2026-10-13T16:40:52.665Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d79d5e220966d385842",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In the Buy and Sell Stock with Cooldown problem (cannot buy on day after sell), which set of state transitions correctly models the three states: Hold, Sold, and Rest?",
+    "codeSnippet": "",
+    "options": [
+      "Hold[i] = max(Hold[i-1], Rest[i-1] - price); Sold[i] = Hold[i-1] + price; Rest[i] = max(Rest[i-1], Sold[i-1])",
+      "Hold[i] = max(Hold[i-1], Sold[i-1] - price); Sold[i] = Rest[i-1] + price; Rest[i] = Hold[i-1]",
+      "Hold[i] = Rest[i-1] - price; Sold[i] = Hold[i-1] + price; Rest[i] = Sold[i-1]",
+      "Hold[i] = Sold[i-1]; Sold[i] = Rest[i-1]; Rest[i] = max(Hold[i-1], Sold[i-1])"
+    ],
+    "createdAt": "2026-10-13T16:34:01.871Z",
+    "updatedAt": "2026-10-13T16:40:52.757Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d79d5e220966d385845",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Longest Palindromic Subsequence (LPS) for string S of length N, what is the space-optimized DP complexity if we only need the length of the LPS?",
+    "codeSnippet": "",
+    "options": [
+      "O(N^2) time and O(N) space",
+      "O(N) time and O(1) space",
+      "O(N log N) time and O(N) space",
+      "O(N^3) time and O(N^2) space"
+    ],
+    "createdAt": "2026-10-13T16:34:01.951Z",
+    "updatedAt": "2026-10-13T16:40:52.848Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385848",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Divide and Conquer Optimization for DP of the form dp[i][j] = min_{k < j} (dp[i-1][k] + C(k, j)), what condition must the cost function C(k, j) satisfy?",
+    "codeSnippet": "",
+    "options": [
+      "Monge Property / Quadrangle Inequality: C(a, c) + C(b, d) <= C(a, d) + C(b, c) for all a <= b <= c <= d",
+      "Subadditivity: C(a, b) + C(b, c) = C(a, c)",
+      "Strict Concavity: C''(x) < 0 across all subsegments",
+      "Linear Homogeneity: C(ka, kb) = k * C(a, b)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.028Z",
+    "updatedAt": "2026-10-13T16:40:52.944Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d38584b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Using the Master Theorem, what is the tight asymptotic solution to the recurrence T(n) = 2T(n/2) + n * log(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(n * log^2(n))",
+      "Theta(n * log(n))",
+      "Theta(n^2)",
+      "Theta(n * sqrt(log n))"
+    ],
+    "createdAt": "2026-10-13T16:34:02.109Z",
+    "updatedAt": "2026-10-13T16:40:53.035Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d38584e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the asymptotic time complexity of the recurrence T(n) = T(n/3) + T(2n/3) + O(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(n * log n)",
+      "Theta(n)",
+      "Theta(n^2)",
+      "Theta(n^(log_3 2))"
+    ],
+    "createdAt": "2026-10-13T16:34:02.187Z",
+    "updatedAt": "2026-10-13T16:40:53.142Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385851",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Why cannot the standard Master Theorem be directly applied to the recurrence T(n) = 2T(n/2) + n / log(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Because f(n) = n/log(n) is asymptotically smaller than n^(log_b a) = n by a factor of 1/log(n), which is not polynomially smaller (i.e. no epsilon > 0 exists such that f(n) = O(n^(1-epsilon)))",
+      "Because log(n) is undefined at n = 0 in recursive step",
+      "Because b = 2 and a = 2 violates the branching condition a >= 1",
+      "Because f(n) is not a monotonic function"
+    ],
+    "createdAt": "2026-10-13T16:34:02.266Z",
+    "updatedAt": "2026-10-13T16:40:53.237Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385854",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the solution to the recurrence T(n) = T(sqrt(n)) + Theta(1) with base case T(2) = 1?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(log(log n))",
+      "Theta(log n)",
+      "Theta(sqrt(n))",
+      "Theta(1)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.342Z",
+    "updatedAt": "2026-10-13T16:40:53.335Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385857",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In the Median-of-Medians (Deterministic QuickSelect) algorithm, elements are divided into groups of 5. The recurrence is T(n) <= T(n/5) + T(7n/10) + O(n). Why does this solve to O(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Because the sum of subproblem fractions is 1/5 + 7/10 = 9/10 < 1, which strictly converges to a geometric series with O(n) sum",
+      "Because Master Theorem Case 1 guarantees linear performance",
+      "Because medians of 5 eliminate all recursive calls after depth 5",
+      "Because 7n/10 is bounded by the cache line width"
+    ],
+    "createdAt": "2026-10-13T16:34:02.428Z",
+    "updatedAt": "2026-10-13T16:40:53.506Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d38585a",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In amortized analysis of a dynamic array that doubles its capacity from N to 2N upon filling, using the Potential Method with potential function Phi = 2 * (size - capacity / 2), what is the amortized cost per insertion?",
+    "codeSnippet": "",
+    "options": [
+      "O(1)",
+      "O(log N)",
+      "O(N)",
+      "O(1 / N)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.509Z",
+    "updatedAt": "2026-10-13T16:40:53.858Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d38585d",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the time complexity of the Karatsuba integer multiplication algorithm, governed by the recurrence T(n) = 3T(n/2) + O(n)?",
+    "codeSnippet": "",
+    "options": [
+      "O(n^(log_2 3)) approx O(n^1.585)",
+      "O(n^2)",
+      "O(n log n)",
+      "O(n^(log_2 7)) approx O(n^2.807)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.603Z",
+    "updatedAt": "2026-10-13T16:40:54.164Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385860",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the asymptotic growth rate of the recurrence T(n) = T(n - 1) + 1/n, with T(1) = 1?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(log n) as it represents the Harmonic series H_n",
+      "Theta(n)",
+      "Theta(n^2)",
+      "Theta(1)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.690Z",
+    "updatedAt": "2026-10-13T16:40:54.574Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385863",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In comparison-based sorting, what is the information-theoretic lower bound on the worst-case number of comparisons required to sort N elements?",
+    "codeSnippet": "",
+    "options": [
+      "ceil(log2(N!)) >= N * log2(N) - N * log2(e) = Omega(N log N)",
+      "Omega(N^2) comparisons",
+      "Omega(N log(log N)) comparisons",
+      "Omega(N * sqrt(N)) comparisons"
+    ],
+    "createdAt": "2026-10-13T16:34:02.770Z",
+    "updatedAt": "2026-10-13T16:40:54.885Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385866",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the solution to the recurrence T(n) = 2T(sqrt(n)) + log(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(log(n) * log(log n))",
+      "Theta(log^2(n))",
+      "Theta(sqrt(n) * log n)",
+      "Theta(n)"
+    ],
+    "createdAt": "2026-10-13T16:34:02.848Z",
+    "updatedAt": "2026-10-13T16:40:55.295Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ad5e220966d385869",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In the Divide and Conquer Closest Pair of Points algorithm running in O(N log N), at most how many points in the delta-strip around the dividing line must be compared with any given point?",
+    "codeSnippet": "",
+    "options": [
+      "At most 7 (or 8) points, because any square of side delta can contain at most 4 points separated by at least delta",
+      "All N points in the strip",
+      "At most log(N) points",
+      "At most sqrt(N) points"
+    ],
+    "createdAt": "2026-10-13T16:34:02.924Z",
+    "updatedAt": "2026-10-13T16:40:55.506Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38586c",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Under Tail Call Optimization (TCO), which condition must a recursive function satisfy for the compiler to reuse the current stack frame?",
+    "codeSnippet": "",
+    "options": [
+      "The recursive call must be in tail position: its return value is immediately returned without any pending computations (such as + 1 or * n)",
+      "The function must be declared with the inline keyword in C++",
+      "The recursion depth must be known at compile time",
+      "The function must not accept any pointer or reference arguments"
+    ],
+    "createdAt": "2026-10-13T16:34:03.002Z",
+    "updatedAt": "2026-10-13T16:40:55.600Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38586f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the exact number of recursive calls made by Heap's Algorithm to generate all permutations of N distinct items?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(N!) total calls with exactly O(1) amortized work between each permutation",
+      "Theta(2^N) calls",
+      "Theta(N^N) calls",
+      "Theta(N^2) calls"
+    ],
+    "createdAt": "2026-10-13T16:34:03.078Z",
+    "updatedAt": "2026-10-13T16:40:55.834Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385872",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Strassen's matrix multiplication algorithm solves T(n) = 7T(n/2) + O(n^2). What is the exact asymptotic exponent of its time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "log_2(7) approx 2.807",
+      "log_2(8) = 3",
+      "log_2(4) = 2",
+      "2.5"
+    ],
+    "createdAt": "2026-10-13T16:34:03.157Z",
+    "updatedAt": "2026-10-13T16:40:55.934Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385875",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In an N-bit binary counter, incrementing from 0 to 2^N - 1 flips individual bits. What is the amortized number of bit flips per increment operation?",
+    "codeSnippet": "",
+    "options": [
+      "O(1) amortized bit flips, since bit i flips every 2^i operations leading to a total sum < 2N",
+      "O(N) amortized bit flips",
+      "O(log N) amortized bit flips",
+      "O(N * log N) amortized bit flips"
+    ],
+    "createdAt": "2026-10-13T16:34:03.237Z",
+    "updatedAt": "2026-10-13T16:40:56.039Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385878",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the maximum call stack depth for recursive MergeSort on an array of size N?",
+    "codeSnippet": "",
+    "options": [
+      "O(log N)",
+      "O(N)",
+      "O(N log N)",
+      "O(1)"
+    ],
+    "createdAt": "2026-10-13T16:34:03.317Z",
+    "updatedAt": "2026-10-13T16:40:56.133Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38587b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In Backtracking search, Knuth's Algorithm X implemented using Dancing Links (DLX) achieves optimal performance for Exact Cover problems by utilizing which data structure technique?",
+    "codeSnippet": "",
+    "options": [
+      "A circular doubly linked toroidal 2D mesh that allows O(1) removal and O(1) restoration of matrix rows and columns during backtracking",
+      "A persistent segment tree with lazy propagation",
+      "A randomized Skip List with exponential backoff",
+      "A trie with Aho-Corasick failure links"
+    ],
+    "createdAt": "2026-10-13T16:34:03.393Z",
+    "updatedAt": "2026-10-13T16:40:56.245Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38587e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "For the recurrence T(n) = 3T(n/4) + n * log(n), which case of the Master Theorem applies and what is the resulting bound?",
+    "codeSnippet": "",
+    "options": [
+      "Case 3: f(n) = n log(n) dominates n^(log_4 3) approx n^0.793, yielding Theta(n * log n)",
+      "Case 1: n^(log_4 3) dominates, yielding Theta(n^0.793)",
+      "Case 2: yielding Theta(n * log^2 n)",
+      "Master Theorem fails due to the log factor"
+    ],
+    "createdAt": "2026-10-13T16:34:03.487Z",
+    "updatedAt": "2026-10-13T16:40:56.337Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385881",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In QuickSelect, when using a uniformly random pivot, what is the expected number of comparisons to find the k-th smallest element in an array of size N?",
+    "codeSnippet": "",
+    "options": [
+      "O(N)",
+      "O(N log N)",
+      "O(N^2)",
+      "O(log N)"
+    ],
+    "createdAt": "2026-10-13T16:34:03.566Z",
+    "updatedAt": "2026-10-13T16:40:56.429Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385884",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the time complexity of the recursive Fibonacci function fib(n) = fib(n-1) + fib(n-2) without memoization, based on the characteristic polynomial roots?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(((1 + sqrt(5)) / 2)^n) approx Theta(1.618^n)",
+      "Theta(2^n)",
+      "Theta(n^2)",
+      "Theta(n!)"
+    ],
+    "createdAt": "2026-10-13T16:34:03.658Z",
+    "updatedAt": "2026-10-13T16:40:56.517Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385887",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Tarjan's algorithm for finding Bridges in an undirected graph, an edge (u, v) is a bridge if and only if which condition holds (where disc is discovery time and low is lowest reachable discovery time)?",
+    "codeSnippet": "",
+    "options": [
+      "low[v] > disc[u]",
+      "low[v] >= disc[u]",
+      "low[v] == disc[u]",
+      "low[u] > disc[v]"
+    ],
+    "createdAt": "2026-10-13T16:34:03.739Z",
+    "updatedAt": "2026-10-13T16:40:56.606Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38588a",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Using Binary Lifting to compute the Lowest Common Ancestor (LCA) in a tree with N nodes, what are the preprocessing time/space and query time complexities?",
+    "codeSnippet": "",
+    "options": [
+      "Preprocessing O(N log N) time and space, Query time O(log N)",
+      "Preprocessing O(N) time and space, Query time O(1)",
+      "Preprocessing O(N^2) time and space, Query time O(log N)",
+      "Preprocessing O(N log^2 N) time and space, Query time O(log^2 N)"
+    ],
+    "createdAt": "2026-10-13T16:34:03.831Z",
+    "updatedAt": "2026-10-13T16:40:56.712Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d38588d",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the time complexity of the Disjoint Set Union (DSU / Union-Find) data structure on M operations over N elements when using BOTH Path Compression and Union by Rank?",
+    "codeSnippet": "",
+    "options": [
+      "O(M * alpha(N)) where alpha is the Inverse Ackermann function (effectively O(1) per operation)",
+      "O(M * log N)",
+      "O(M * log* N)",
+      "O(M * N)"
+    ],
+    "createdAt": "2026-10-13T16:34:03.915Z",
+    "updatedAt": "2026-10-13T16:40:56.806Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7bd5e220966d385890",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Why must the intermediate vertex k loop in the Floyd-Warshall All-Pairs Shortest Path algorithm be the OUTERMOST loop?",
+    "codeSnippet": "",
+    "options": [
+      "Because dp[k][i][j] relies on shortest paths using only vertices {1, 2, ..., k-1}; running k inside would use vertices before their optimal paths are computed",
+      "Because compilers vectorize the innermost loops for SIMD registers",
+      "To prevent division by zero in negative cycles",
+      "Because matrix multiplication requires row-by-column iteration"
+    ],
+    "createdAt": "2026-10-13T16:34:03.997Z",
+    "updatedAt": "2026-10-13T16:40:56.900Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d385893",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Heavy-Light Decomposition (HLD) of a tree with N nodes, what is the maximum number of heavy paths traversed when querying any simple path between two nodes u and v?",
+    "codeSnippet": "",
+    "options": [
+      "O(log N) heavy path transitions",
+      "O(sqrt(N)) heavy path transitions",
+      "O(log^2 N) heavy path transitions",
+      "O(1) heavy path transitions"
+    ],
+    "createdAt": "2026-10-13T16:34:04.076Z",
+    "updatedAt": "2026-10-13T16:40:56.989Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d385896",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the worst-case time complexity of Dinic's Algorithm for Maximum Flow on a general network with V vertices and E edges?",
+    "codeSnippet": "",
+    "options": [
+      "O(V^2 * E)",
+      "O(V * E^2)",
+      "O(E * sqrt(V))",
+      "O(V^3)"
+    ],
+    "createdAt": "2026-10-13T16:34:04.155Z",
+    "updatedAt": "2026-10-13T16:40:57.087Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d385899",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In a directed graph, what property distinguishes Kosaraju's two-pass algorithm for finding Strongly Connected Components (SCCs)?",
+    "codeSnippet": "",
+    "options": [
+      "First DFS records finishing order in a stack on the original graph, and second DFS traverses the transposed graph (reversed edges) in decreasing finishing order",
+      "It uses Dijkstra's priority queue to contract cycles into supernodes",
+      "It runs BFS from all in-degree 0 nodes simultaneously",
+      "It computes the minimum cut using maximum bipartite matching"
+    ],
+    "createdAt": "2026-10-13T16:34:04.239Z",
+    "updatedAt": "2026-10-13T16:40:57.175Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d38589c",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In an undirected graph, an Euler Path exists if and only if the graph is connected (excluding isolated vertices) and satisfies which vertex degree condition?",
+    "codeSnippet": "",
+    "options": [
+      "Either all vertices have even degree, or exactly 2 vertices have odd degree",
+      "All vertices must have odd degree",
+      "The sum of degrees must be a prime number",
+      "At least half the vertices must have degree >= V/2"
+    ],
+    "createdAt": "2026-10-13T16:34:04.319Z",
+    "updatedAt": "2026-10-13T16:40:57.262Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d38589f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the time complexity of the Hopcroft-Karp algorithm for finding Maximum Bipartite Matching in a bipartite graph G = (V1 + V2, E)?",
+    "codeSnippet": "",
+    "options": [
+      "O(E * sqrt(V))",
+      "O(V * E)",
+      "O(V^2 * E)",
+      "O(E * log V)"
+    ],
+    "createdAt": "2026-10-13T16:34:04.396Z",
+    "updatedAt": "2026-10-13T16:40:57.543Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858a2",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Morris Inorder Traversal visits all nodes in a binary tree in O(N) time without recursion and without a stack. What memory overhead does it require?",
+    "codeSnippet": "",
+    "options": [
+      "O(1) auxiliary space by temporarily modifying null right pointers of predecessors to point to current node (Threaded Binary Tree)",
+      "O(log N) space by storing ancestor pointers in bitmasks",
+      "O(N) space by allocating thread handles",
+      "O(sqrt(N)) space"
+    ],
+    "createdAt": "2026-10-13T16:34:04.480Z",
+    "updatedAt": "2026-10-13T16:40:58.125Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858a5",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Johnson's algorithm finds all-pairs shortest paths in sparse graphs with negative edge weights in O(V^2 log V + VE) time. How does it eliminate negative edge weights before running Dijkstra?",
+    "codeSnippet": "",
+    "options": [
+      "By running Bellman-Ford from a dummy node to compute potentials h(u), then reweighting edges: w'(u, v) = w(u, v) + h(u) - h(v) >= 0",
+      "By adding the absolute value of the minimum negative edge to all edges in the graph",
+      "By squaring all edge weights and taking their square root afterwards",
+      "By removing all back-edges in the DFS tree"
+    ],
+    "createdAt": "2026-10-13T16:34:04.573Z",
+    "updatedAt": "2026-10-13T16:40:58.342Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858a8",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Centroid Decomposition of a tree with N nodes, what is guaranteed about the size of each subtree formed when a centroid node is removed?",
+    "codeSnippet": "",
+    "options": [
+      "Each resulting component has at most N / 2 nodes, bounding the decomposition tree height to O(log N)",
+      "All resulting components have identical node counts",
+      "The tree height is reduced to O(sqrt(N))",
+      "The diameter of each component is halved"
+    ],
+    "createdAt": "2026-10-13T16:34:04.677Z",
+    "updatedAt": "2026-10-13T16:40:58.776Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858ab",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In a Fenwick Tree (Binary Indexed Tree / BIT), what bitwise operation identifies the parent index when updating index i in update(i, delta)?",
+    "codeSnippet": "",
+    "options": [
+      "i += (i & (-i))",
+      "i -= (i & (-i))",
+      "i = i >> 1",
+      "i = i ^ (i - 1)"
+    ],
+    "createdAt": "2026-10-13T16:34:04.810Z",
+    "updatedAt": "2026-10-13T16:40:59.362Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858ae",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Why does running two consecutive BFS/DFS traversals correctly compute the Diameter of an unweighted or positive-weight tree?",
+    "codeSnippet": "",
+    "options": [
+      "The first traversal from any arbitrary node u is proven to terminate at an extreme leaf node v that is an endpoint of the longest path in the tree",
+      "Because trees are always planar graphs",
+      "Because the center of a tree always coincides with the root",
+      "Because BFS explores edges in topological order"
+    ],
+    "createdAt": "2026-10-13T16:34:04.901Z",
+    "updatedAt": "2026-10-13T16:40:59.456Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7cd5e220966d3858b1",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In an AVL Tree compared to a Red-Black Tree, which statement is true regarding balancing constraints and real-world performance?",
+    "codeSnippet": "",
+    "options": [
+      "AVL trees have a stricter balance factor (|hL - hR| <= 1), resulting in shallower height and faster lookups, while Red-Black trees allow height up to 2*log(N), providing faster insertions and deletions",
+      "AVL trees only allow left-skewed rotations",
+      "Red-Black trees require O(log^2 N) rotations per deletion",
+      "AVL trees can only store unique integer keys"
+    ],
+    "createdAt": "2026-10-13T16:34:04.984Z",
+    "updatedAt": "2026-10-13T16:40:59.584Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858b4",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In a Segment Tree with Lazy Propagation supporting range additions and range sum queries, what is the time complexity of both operations?",
+    "codeSnippet": "",
+    "options": [
+      "O(log N) for both range update and range sum query",
+      "O(1) update and O(log N) query",
+      "O(log^2 N) update and O(1) query",
+      "O(N) update and O(1) query"
+    ],
+    "createdAt": "2026-10-13T16:34:05.064Z",
+    "updatedAt": "2026-10-13T16:40:59.707Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858b7",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the time complexity of constructing a Cartesian Tree from an array of N numbers using a monotonic stack?",
+    "codeSnippet": "",
+    "options": [
+      "O(N) linear time",
+      "O(N log N)",
+      "O(N^2)",
+      "O(N * sqrt(N))"
+    ],
+    "createdAt": "2026-10-13T16:34:05.142Z",
+    "updatedAt": "2026-10-13T16:40:59.795Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858ba",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Kahn's Algorithm for Topological Sorting, what indicates that the given directed graph contains a cycle?",
+    "codeSnippet": "",
+    "options": [
+      "The count of processed nodes when the queue becomes empty is strictly less than V",
+      "The queue ever contains more than V/2 elements",
+      "A vertex with in-degree 0 has an outgoing edge to itself",
+      "The adjacency list size exceeds 2*V"
+    ],
+    "createdAt": "2026-10-13T16:34:05.225Z",
+    "updatedAt": "2026-10-13T16:40:59.885Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858bd",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In the 2-SAT problem with N variables and M clauses, how is satisfiability determined in linear O(N + M) time using graph algorithms?",
+    "codeSnippet": "",
+    "options": [
+      "Construct an implication graph where each clause (A or B) generates edges (~A -> B) and (~B -> A); the formula is satisfiable iff no variable x lies in the same SCC as ~x",
+      "Run Dijkstra's shortest path from True to False",
+      "Find the maximum spanning tree and count odd cycles",
+      "Apply Hopcroft-Karp matching between variables and negations"
+    ],
+    "createdAt": "2026-10-13T16:34:05.308Z",
+    "updatedAt": "2026-10-13T16:40:59.984Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858c0",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In the Aho-Corasick automaton for multiple string matching, what is the role of a failure link from node u to node v?",
+    "codeSnippet": "",
+    "options": [
+      "It points to the node representing the longest proper suffix of the string represented by u that exists as a prefix in the trie",
+      "It redirects to the root whenever an invalid character is read",
+      "It marks the lexicographically smallest transition",
+      "It deletes the unmatched keyword from the trie in O(1)"
+    ],
+    "createdAt": "2026-10-13T16:34:05.386Z",
+    "updatedAt": "2026-10-13T16:41:00.075Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858c3",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Sliding Window Maximum problem on an array of size N with window size K, what is the time complexity achieved using a Monotonic Deque?",
+    "codeSnippet": "",
+    "options": [
+      "O(N) time because each element is pushed and popped from the deque at most once",
+      "O(N log K) time using binary search inside the deque",
+      "O(N * K) time in the worst case",
+      "O(N log N) time"
+    ],
+    "createdAt": "2026-10-13T16:34:05.467Z",
+    "updatedAt": "2026-10-13T16:41:00.170Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858c6",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Knuth-Morris-Pratt (KMP) string search algorithm, what does the prefix function pi[i] represent for a pattern of length M?",
+    "codeSnippet": "",
+    "options": [
+      "The length of the longest proper prefix of pattern[0..i] that is also a suffix of pattern[0..i]",
+      "The count of distinct characters in pattern[0..i]",
+      "The hash value of pattern[0..i] under modulo 10^9+7",
+      "The index of the first character mismatch"
+    ],
+    "createdAt": "2026-10-13T16:34:05.544Z",
+    "updatedAt": "2026-10-13T16:41:00.259Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858c9",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "Finding the median of two sorted arrays of lengths M and N can be solved in O(log(min(M, N))) time by binary searching on which value?",
+    "codeSnippet": "",
+    "options": [
+      "The partition cut index in the smaller array such that all elements on the left half of both arrays are <= all elements on the right half",
+      "The value of the average of the two median candidates",
+      "The difference M - N",
+      "The index of the maximum element in the merged array"
+    ],
+    "createdAt": "2026-10-13T16:34:05.629Z",
+    "updatedAt": "2026-10-13T16:41:00.353Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858cc",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "What is the optimal data structure to design an LRU (Least Recently Used) Cache supporting get() and put() in strictly O(1) time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "A Hash Map paired with a Doubly Linked List",
+      "A Hash Map paired with a Binary Heap",
+      "An AVL Tree indexed by timestamp",
+      "A Skip List with doubly linked pointers"
+    ],
+    "createdAt": "2026-10-13T16:34:05.713Z",
+    "updatedAt": "2026-10-13T16:41:00.444Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7dd5e220966d3858cf",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Trapping Rain Water problem on an elevation array of size N, what are the optimal time and auxiliary space bounds using the Two Pointers technique?",
+    "codeSnippet": "",
+    "options": [
+      "O(N) time and O(1) auxiliary space",
+      "O(N) time and O(N) auxiliary space",
+      "O(N log N) time and O(1) auxiliary space",
+      "O(N^2) time and O(1) auxiliary space"
+    ],
+    "createdAt": "2026-10-13T16:34:05.793Z",
+    "updatedAt": "2026-10-13T16:41:00.533Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ed5e220966d3858d2",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "To continuously maintain the median of an incoming numerical stream in O(log N) insertion and O(1) lookup, which data structure combination is standardly employed?",
+    "codeSnippet": "",
+    "options": [
+      "Two heaps: a Max-Heap for the smaller half of numbers and a Min-Heap for the larger half, kept balanced within size difference <= 1",
+      "A single Min-Heap of size N/2",
+      "A circular queue paired with quickselect",
+      "Two Fenwick trees storing binary prefixes"
+    ],
+    "createdAt": "2026-10-13T16:34:06.076Z",
+    "updatedAt": "2026-10-13T16:41:00.626Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7ed5e220966d3858d5",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "Why are B+ Trees preferred over standard B-Trees and Binary Search Trees for disk-based relational database indexing (like MySQL InnoDB)?",
+    "codeSnippet": "",
+    "options": [
+      "All satellite data records reside strictly in leaf nodes which are linked sequentially, maximizing cache line utilization and range scan performance while keeping internal branch nodes compact",
+      "B+ Trees have O(1) worst-case lookup time",
+      "B+ Trees require zero disk I/O operations",
+      "B+ Trees eliminate the need for write-ahead logging (WAL)"
+    ],
+    "createdAt": "2026-10-13T16:34:06.692Z",
+    "updatedAt": "2026-10-13T16:41:00.719Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7fd5e220966d3858d8",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "What is the time complexity of Sparse Table for Range Minimum Query (RMQ) after O(N log N) preprocessing?",
+    "codeSnippet": "",
+    "options": [
+      "O(1) query time because minimum is an idempotent operation: min(range) = min(ST[k][L], ST[k][R - 2^k + 1])",
+      "O(log N) query time",
+      "O(sqrt(N)) query time",
+      "O(log^2 N) query time"
+    ],
+    "createdAt": "2026-10-13T16:34:07.100Z",
+    "updatedAt": "2026-10-13T16:41:00.822Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7fd5e220966d3858db",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "Brian Kernighan's bitwise algorithm counts set bits in an integer N by executing N = N & (N - 1) in a loop. What is its exact iteration count?",
+    "codeSnippet": "",
+    "options": [
+      "Exactly equal to the number of set bits (1s) in N",
+      "Always 32 or 64 iterations",
+      "Equal to floor(log2(N))",
+      "Equal to the number of zero bits in N"
+    ],
+    "createdAt": "2026-10-13T16:34:07.626Z",
+    "updatedAt": "2026-10-13T16:41:00.913Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d7fd5e220966d3858de",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In Manacher's Algorithm for finding the Longest Palindromic Substring in O(N) time, how are even-length palindromes handled uniformly with odd-length palindromes?",
+    "codeSnippet": "",
+    "options": [
+      "By inserting a special delimiter (such as '#') between every character and at both ends of the string, ensuring all palindromes become odd-length centered on a character or delimiter",
+      "By reversing the string and concatenating with a null byte",
+      "By running dynamic programming on even indices only",
+      "By hashing the string using Rabin-Karp polynomial rolling hash"
+    ],
+    "createdAt": "2026-10-13T16:34:07.817Z",
+    "updatedAt": "2026-10-13T16:41:01.004Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d80d5e220966d3858e1",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "Counting the number of inversions in an array of size N (pairs where i < j and arr[i] > arr[j]) can be efficiently accomplished in O(N log N) time by modifying which algorithm?",
+    "codeSnippet": "",
+    "options": [
+      "Merge Sort, counting inversions whenever an element from the right subarray is placed into the merged array before elements from the left subarray",
+      "QuickSort, counting swaps during partition",
+      "HeapSort, counting bubble-down operations",
+      "Binary Search on every prefix"
+    ],
+    "createdAt": "2026-10-13T16:34:08.131Z",
+    "updatedAt": "2026-10-13T16:41:01.094Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d80d5e220966d3858e4",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In an array with negative numbers, to count the total number of continuous subarrays whose sum equals K, what is the optimal algorithm and time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "Hash Map storing running Prefix Sum frequencies, achieving O(N) time and O(N) space",
+      "Two Pointers sliding window in O(N) time",
+      "Nested loops in O(N^2) time",
+      "Sorting the array then binary searching in O(N log N) time"
+    ],
+    "createdAt": "2026-10-13T16:34:08.331Z",
+    "updatedAt": "2026-10-13T16:41:01.185Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d80d5e220966d3858e7",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "Why does the Fisher-Yates (Knuth) shuffle algorithm guarantee an unbiased, uniform distribution (each of the N! permutations has probability 1/N!)?",
+    "codeSnippet": "",
+    "options": [
+      "Because at step i (from 0 to N-2), it selects a random index j from [i, N-1], ensuring each remaining candidate has equal 1/(N-i) chance of being chosen",
+      "Because it swaps every element with a random index in [0, N-1]",
+      "Because it applies a cryptographic hash function to indices",
+      "Because it sorts the array using random comparison keys"
+    ],
+    "createdAt": "2026-10-13T16:34:08.843Z",
+    "updatedAt": "2026-10-13T16:41:01.271Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d81d5e220966d3858ea",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Next Greater Element problem for an array of size N, why does a Monotonic Stack take strictly O(N) total time rather than O(N^2)?",
+    "codeSnippet": "",
+    "options": [
+      "Because each element is pushed onto the stack exactly once and popped at most once, bounding the total stack operations across the entire loop to 2*N",
+      "Because stack operations utilize O(1) L1 cache memory",
+      "Because elements are sorted in non-increasing order prior to traversal",
+      "Because binary search locates the insertion index inside the stack"
+    ],
+    "createdAt": "2026-10-13T16:34:09.227Z",
+    "updatedAt": "2026-10-13T16:41:01.362Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d81d5e220966d3858ed",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Z-Algorithm for string matching, what does the Z-array entry Z[i] represent for a string S of length N?",
+    "codeSnippet": "",
+    "options": [
+      "The length of the longest substring starting at S[i] that is also a prefix of S",
+      "The count of occurrences of character S[i] in S",
+      "The hash of the suffix starting at index i",
+      "The edit distance between prefix S[0..i] and suffix S[i..N-1]"
+    ],
+    "createdAt": "2026-10-13T16:34:09.688Z",
+    "updatedAt": "2026-10-13T16:41:01.454Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d81d5e220966d3858f0",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "To find the Top K Frequent Elements in an array of size N in strictly O(N) time complexity without comparison sorting, which technique is optimal?",
+    "codeSnippet": "",
+    "options": [
+      "Bucket Sort, where index i of the bucket array stores a list of elements that appear with frequency i (frequencies are bounded by N)",
+      "Max-Heap of size N",
+      "QuickSort on element frequencies",
+      "Binary Search on frequency values"
+    ],
+    "createdAt": "2026-10-13T16:34:09.875Z",
+    "updatedAt": "2026-10-13T16:41:01.545Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d81d5e220966d3858f3",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "When finding the Minimum Window Substring containing all characters of pattern T in string S, which algorithmic technique achieves optimal O(|S| + |T|) time?",
+    "codeSnippet": "",
+    "options": [
+      "Sliding Window with two pointers and a character frequency map tracking match count",
+      "Generating all substrings in O(|S|^2) time",
+      "Trie matching on suffix array",
+      "Dynamic programming table of size |S| x |T|"
+    ],
+    "createdAt": "2026-10-13T16:34:09.960Z",
+    "updatedAt": "2026-10-13T16:41:01.637Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d82d5e220966d3858f6",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Dutch National Flag problem (sorting an array of 0s, 1s, and 2s in-place in a single pass O(N) time and O(1) space), what are the three pointers maintaining?",
+    "codeSnippet": "",
+    "options": [
+      "low (boundary of 0s), mid (current element), and high (boundary of 2s); elements < mid are 0s, elements > high are 2s",
+      "left, center, and right tracking prefix sums",
+      "slow, fast, and head pointers for cycle detection",
+      "read_ptr, write_ptr, and pivot_ptr"
+    ],
+    "createdAt": "2026-10-13T16:34:10.041Z",
+    "updatedAt": "2026-10-13T16:41:01.731Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d82d5e220966d3858f9",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In double hashing for open addressing collision resolution: h(k, i) = (h1(k) + i * h2(k)) % m, what condition must the secondary hash function h2(k) satisfy?",
+    "codeSnippet": "",
+    "options": [
+      "h2(k) must never evaluate to 0 and must be relatively prime (coprime) to the table size m to ensure that all hash slots can be probed",
+      "h2(k) must evaluate strictly to prime numbers greater than m",
+      "h2(k) must be identical to h1(k) to prevent infinite loops",
+      "h2(k) must equal i^2"
+    ],
+    "createdAt": "2026-10-13T16:34:10.128Z",
+    "updatedAt": "2026-10-13T16:41:01.825Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5d82d5e220966d3858fc",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In finding the Maximum XOR of Two Numbers in an array of size N, what data structure and time complexity achieves the optimal solution?",
+    "codeSnippet": "",
+    "options": [
+      "A Bitwise Binary Trie (depth 31) achieving O(N * 32) = O(N) time complexity",
+      "Brute force pairwise XOR in O(N^2) time",
+      "Sorting the array and two-pointers in O(N log N) time",
+      "Segment Tree with range XOR queries in O(N log^2 N) time"
+    ],
+    "createdAt": "2026-10-13T16:34:10.225Z",
+    "updatedAt": "2026-10-13T16:41:01.915Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5e9f3d7ed8dbd3adba32",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Digit DP, what are the canonical state parameters required to count numbers in range [0, N] whose digits satisfy a property?",
+    "codeSnippet": "",
+    "options": [
+      "dp(index, tight, leading_zeros, mask/sum)",
+      "dp(sum, product, length)",
+      "dp(left_digit, right_digit, total)",
+      "dp(mod10, mod2, count)"
+    ],
+    "createdAt": "2026-10-13T16:38:55.742Z",
+    "updatedAt": "2026-10-13T16:38:55.742Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba35",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "Using Yates's Algorithm for SOS (Sum Over Subsets) DP over a universe of size N, what is the optimal time complexity to compute the submask sums for all 2^N masks?",
+    "codeSnippet": "",
+    "options": [
+      "O(N * 2^N)",
+      "O(3^N)",
+      "O(4^N)",
+      "O(2^N)"
+    ],
+    "createdAt": "2026-10-13T16:38:56.063Z",
+    "updatedAt": "2026-10-13T16:38:56.063Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba38",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "When tiling an M x N grid with 2x1 dominoes using Profile (Broken Profile) Dynamic Programming (M <= 15), what is the state transition space complexity per cell?",
+    "codeSnippet": "",
+    "options": [
+      "O(2^M) states per cell transition",
+      "O(M * N) states",
+      "O(M!) states",
+      "O(3^N) states"
+    ],
+    "createdAt": "2026-10-13T16:38:56.204Z",
+    "updatedAt": "2026-10-13T16:38:56.204Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba3b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "Under what monotonicity condition does the Divide and Conquer DP optimization reduce the time complexity from O(K * N^2) to O(K * N log N)?",
+    "codeSnippet": "",
+    "options": [
+      "opt(i, j) <= opt(i, j + 1) for all j (Quadrangle Inequality holds for cost function)",
+      "cost(i, j) is strictly decreasing in i",
+      "The DP state satisfies submodularity only at even indices",
+      "The cost matrix is symmetric and positive definite"
+    ],
+    "createdAt": "2026-10-13T16:38:56.309Z",
+    "updatedAt": "2026-10-13T16:38:56.309Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba3e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Knuth's DP Optimization for interval DP of the form dp[i][j] = min_{i<=k<j}(dp[i][k] + dp[k+1][j]) + C[i][j], how is the runtime reduced from O(N^3) to O(N^2)?",
+    "codeSnippet": "",
+    "options": [
+      "By bounding the split point k within [opt[i][j-1], opt[i+1][j]]",
+      "By eliminating interval overlaps using binary lifting",
+      "By memoizing only prime interval lengths",
+      "By transforming interval addition into fast Fourier multiplication"
+    ],
+    "createdAt": "2026-10-13T16:38:56.398Z",
+    "updatedAt": "2026-10-13T16:38:56.398Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba41",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "How can a linear DP recurrence of order K (e.g. f(n) = c1*f(n-1) + ... + ck*f(n-k)) be computed for n up to 10^18?",
+    "codeSnippet": "",
+    "options": [
+      "Using Matrix Exponentiation with a K x K transition matrix in O(K^3 log n) time",
+      "Using iterative tabulation in O(n) space and time",
+      "Using divide-and-conquer recursion in O(K * n) time",
+      "Using memoized hash maps in O(log n) time without matrix multiplication"
+    ],
+    "createdAt": "2026-10-13T16:38:56.496Z",
+    "updatedAt": "2026-10-13T16:38:56.496Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba44",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Subtree Knapsack DP (merging knapsack tables of children v into parent u on a tree of size N), what is the total time complexity if iterations are bounded strictly by subtree sizes sz[u] and sz[v]?",
+    "codeSnippet": "",
+    "options": [
+      "O(N^2)",
+      "O(N^3)",
+      "O(N * 2^N)",
+      "O(N sqrt(N))"
+    ],
+    "createdAt": "2026-10-13T16:38:56.618Z",
+    "updatedAt": "2026-10-13T16:38:56.618Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba47",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "What is Alien's Trick (WQS Binary Search) used for in Dynamic Programming?",
+    "codeSnippet": "",
+    "options": [
+      "Optimizing DP problems with an exact constraint of choosing exactly K items by adding a penalty lambda and binary searching for lambda",
+      "Replacing 2D tables with 1D bitwise operations for NP-complete problems",
+      "Translating top-down recursive calls into parallel GPU kernels",
+      "Finding shortest path in a planar graph in linear time"
+    ],
+    "createdAt": "2026-10-13T16:38:56.794Z",
+    "updatedAt": "2026-10-13T16:38:56.794Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea03d7ed8dbd3adba4a",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "In Longest Common Subsequence of strings of lengths M and N, if only the LENGTH of the LCS is required, what is the optimal space complexity?",
+    "codeSnippet": "",
+    "options": [
+      "O(min(M, N)) auxiliary space using rolling arrays of size 2",
+      "O(M * N) auxiliary space",
+      "O(1) auxiliary space",
+      "O(log(M + N)) auxiliary space"
+    ],
+    "createdAt": "2026-10-13T16:38:56.929Z",
+    "updatedAt": "2026-10-13T16:38:56.929Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba4d",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Dynamic Programming)",
+    "question": "For a Directed Acyclic Graph (DAG) with V vertices and E edges, what is the time complexity of finding the longest weighted path using Dynamic Programming?",
+    "codeSnippet": "",
+    "options": [
+      "O(V + E) after processing vertices in Topological Sort order",
+      "O(V^3) using Floyd-Warshall with negated edges",
+      "O(V * E log V) using Dijkstra",
+      "NP-hard because longest path is undecidable on DAGs"
+    ],
+    "createdAt": "2026-10-13T16:38:57.049Z",
+    "updatedAt": "2026-10-13T16:38:57.049Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba50",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "The Akra-Bazzi method is an extension of the Master Theorem primarily designed to solve which class of recurrences?",
+    "codeSnippet": "",
+    "options": [
+      "Divide-and-conquer recurrences with unequal subproblem sizes T(n) = g(n) + sum a_i * T(b_i * n + h_i(n))",
+      "Linear recurrence relations with variable polynomial coefficients",
+      "Probabilistic recurrences arising exclusively in randomized skip lists",
+      "Recurrences with non-terminating base cases"
+    ],
+    "createdAt": "2026-10-13T16:38:57.188Z",
+    "updatedAt": "2026-10-13T16:38:57.188Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba53",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In the Master Theorem recurrence T(n) = a*T(n/b) + f(n), what is the regularity condition required for Case 3 (when f(n) dominates)?",
+    "codeSnippet": "",
+    "options": [
+      "a * f(n/b) <= c * f(n) for some constant c < 1 and all sufficiently large n",
+      "f(n) must be monotonic and strictly convex",
+      "f(n/b) >= a * f(n) for all n > b",
+      "The derivative f'(n) must be non-negative"
+    ],
+    "createdAt": "2026-10-13T16:38:57.347Z",
+    "updatedAt": "2026-10-13T16:38:57.347Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba56",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the time complexity of Strassen's algorithm for N x N matrix multiplication and its underlying recurrence?",
+    "codeSnippet": "",
+    "options": [
+      "T(N) = 7T(N/2) + O(N^2) giving O(N^{log_2 7}) ~ O(N^{2.807})",
+      "T(N) = 8T(N/2) + O(N^2) giving O(N^3)",
+      "T(N) = 6T(N/2) + O(N^2) giving O(N^{2.585})",
+      "T(N) = 4T(N/2) + O(N) giving O(N^2)"
+    ],
+    "createdAt": "2026-10-13T16:38:57.538Z",
+    "updatedAt": "2026-10-13T16:38:57.538Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba59",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the recurrence relation and asymptotic time complexity of Karatsuba's multiplication for two N-digit integers?",
+    "codeSnippet": "",
+    "options": [
+      "T(N) = 3T(N/2) + O(N), yielding O(N^{log_2 3}) ~ O(N^{1.585})",
+      "T(N) = 4T(N/2) + O(N), yielding O(N^2)",
+      "T(N) = 2T(N/2) + O(N log N), yielding O(N log^2 N)",
+      "T(N) = 3T(N/3) + O(N), yielding O(N log N)"
+    ],
+    "createdAt": "2026-10-13T16:38:57.672Z",
+    "updatedAt": "2026-10-13T16:38:57.672Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea13d7ed8dbd3adba5c",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In Tail Call Optimization (TCO), how does a compiler optimize a tail-recursive function call?",
+    "codeSnippet": "",
+    "options": [
+      "By reusing the current stack frame and replacing the call with a jump instruction, reducing auxiliary stack space to O(1)",
+      "By storing return addresses in a thread-safe heap buffer",
+      "By converting the function parameters into global variables",
+      "By running the recursive branches asynchronously on separate worker threads"
+    ],
+    "createdAt": "2026-10-13T16:38:57.882Z",
+    "updatedAt": "2026-10-13T16:38:57.882Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea23d7ed8dbd3adba5f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Using the Potential Method for amortized analysis of a dynamic array that doubles capacity when full, if potential Phi = 2*size - capacity, what is the amortized cost of an insertion?",
+    "codeSnippet": "",
+    "options": [
+      "O(1)",
+      "O(log N)",
+      "O(N)",
+      "O(1 / N)"
+    ],
+    "createdAt": "2026-10-13T16:38:58.068Z",
+    "updatedAt": "2026-10-13T16:38:58.068Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea23d7ed8dbd3adba62",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the worst-case space complexity on the call stack for recursive depth-first search on an arbitrary graph with V vertices and E edges?",
+    "codeSnippet": "",
+    "options": [
+      "O(V)",
+      "O(E)",
+      "O(V * E)",
+      "O(log V)"
+    ],
+    "createdAt": "2026-10-13T16:38:58.215Z",
+    "updatedAt": "2026-10-13T16:38:58.215Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea23d7ed8dbd3adba65",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "What is the solution to the recurrence T(n) = T(n - 1) + 1/n with base case T(1) = 1?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(log n) as it sums the Harmonic Series H_n",
+      "Theta(n)",
+      "Theta(n log n)",
+      "Theta(1)"
+    ],
+    "createdAt": "2026-10-13T16:38:58.402Z",
+    "updatedAt": "2026-10-13T16:38:58.402Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea23d7ed8dbd3adba68",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "Consider recurrence T(n) = 2T(sqrt(n)) + log n. By substituting m = log n, what is the asymptotic solution for T(n)?",
+    "codeSnippet": "",
+    "options": [
+      "Theta(log n * log log n)",
+      "Theta(log n)",
+      "Theta(sqrt(n))",
+      "Theta(n log n)"
+    ],
+    "createdAt": "2026-10-13T16:38:58.719Z",
+    "updatedAt": "2026-10-13T16:38:58.719Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea33d7ed8dbd3adba6b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Recursion & Complexity)",
+    "question": "In divide-and-conquer algorithms, why is Quickselect's worst-case time complexity O(N^2) while Median-of-Medians achieves guaranteed O(N)?",
+    "codeSnippet": "",
+    "options": [
+      "Median-of-Medians guarantees a pivot that divides elements with at least a 30/70 split, enforcing recurrence T(n) <= T(n/5) + T(7n/10) + O(n)",
+      "Median-of-Medians sorts sub-arrays of size 5 using radix sort in O(1)",
+      "Quickselect always picks the minimum element due to stack overflow",
+      "Median-of-Medians uses dynamic programming memoization tables"
+    ],
+    "createdAt": "2026-10-13T16:38:59.038Z",
+    "updatedAt": "2026-10-13T16:38:59.038Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea33d7ed8dbd3adba6e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Heavy-Light Decomposition (HLD) of a tree with N nodes, what is the maximum number of heavy chains traversed on any path between two arbitrary nodes u and v?",
+    "codeSnippet": "",
+    "options": [
+      "O(log N)",
+      "O(sqrt(N))",
+      "O(N)",
+      "O(log^2 N)"
+    ],
+    "createdAt": "2026-10-13T16:38:59.321Z",
+    "updatedAt": "2026-10-13T16:38:59.321Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea33d7ed8dbd3adba71",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the key property of Centroid Decomposition on a tree with N nodes that allows efficient path counting?",
+    "codeSnippet": "",
+    "options": [
+      "Removing the centroid breaks the tree into subtrees each having size at most N/2, guaranteeing a recursion tree depth of at most O(log N)",
+      "Every centroid is the lowest common ancestor of all leaf nodes",
+      "The centroid maximizes the tree's diameter while minimizing edge cuts",
+      "It transforms the tree into a complete binary search tree"
+    ],
+    "createdAt": "2026-10-13T16:38:59.558Z",
+    "updatedAt": "2026-10-13T16:38:59.558Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea33d7ed8dbd3adba74",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "How is the 2-Satisfiability (2-SAT) problem solved in linear O(V + E) time?",
+    "codeSnippet": "",
+    "options": [
+      "By constructing an Implication Graph and checking if any variable x and its negation ~x lie in the same Strongly Connected Component (SCC)",
+      "By converting clauses into minimum cut max flow networks",
+      "By running Dijkstra on negated truth assignments",
+      "Using recursive branch-and-bound backtracking"
+    ],
+    "createdAt": "2026-10-13T16:38:59.795Z",
+    "updatedAt": "2026-10-13T16:38:59.795Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea33d7ed8dbd3adba77",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the asymptotic time complexity of Dinic's Algorithm for Maximum Flow on a unit network (where every edge capacity is 1)?",
+    "codeSnippet": "",
+    "options": [
+      "O(E * sqrt(V))",
+      "O(V^2 * E)",
+      "O(V * E^2)",
+      "O(E log V)"
+    ],
+    "createdAt": "2026-10-13T16:38:59.998Z",
+    "updatedAt": "2026-10-13T16:38:59.998Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba7a",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Tarjan's bridge-finding algorithm, an undirected edge (u, v) in the DFS tree is a bridge if and only if:",
+    "codeSnippet": "",
+    "options": [
+      "low[v] > tin[u]",
+      "low[v] >= tin[u]",
+      "low[u] == low[v]",
+      "tin[v] > tin[u]"
+    ],
+    "createdAt": "2026-10-13T16:39:00.197Z",
+    "updatedAt": "2026-10-13T16:39:00.197Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba7d",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "Using the Euler Tour Technique (tree flattening via DFS entry and exit timestamps tin and tout), what range represents the entire subtree rooted at node u?",
+    "codeSnippet": "",
+    "options": [
+      "Contiguous interval [tin[u], tout[u]]",
+      "[0, tin[u]]",
+      "[tout[u], N]",
+      "Disjoint intervals [tin[u], tin[v]] for all children v"
+    ],
+    "createdAt": "2026-10-13T16:39:00.367Z",
+    "updatedAt": "2026-10-13T16:39:00.367Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba80",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the amortized time complexity per operation in Disjoint Set Union (DSU) when utilizing BOTH Path Compression and Union by Rank?",
+    "codeSnippet": "",
+    "options": [
+      "O(alpha(N)), where alpha is the inverse Ackermann function",
+      "O(log N)",
+      "O(1) strictly worst-case",
+      "O(log* N)"
+    ],
+    "createdAt": "2026-10-13T16:39:00.527Z",
+    "updatedAt": "2026-10-13T16:39:00.527Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba83",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "In Binary Lifting for finding the Lowest Common Ancestor (LCA) in a tree, what is the precomputation time/space complexity and query time complexity?",
+    "codeSnippet": "",
+    "options": [
+      "O(N log N) precomputation and O(log N) query time",
+      "O(N^2) precomputation and O(1) query time",
+      "O(N) precomputation and O(sqrt(N)) query time",
+      "O(1) precomputation and O(N) query time"
+    ],
+    "createdAt": "2026-10-13T16:39:00.733Z",
+    "updatedAt": "2026-10-13T16:39:00.733Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba86",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "What is the primary advantage of Johnson's algorithm over Floyd-Warshall for All-Pairs Shortest Paths in sparse graphs with negative edge weights (no negative cycles)?",
+    "codeSnippet": "",
+    "options": [
+      "It reweights edges using Bellman-Ford and then runs Dijkstra from each vertex, achieving O(V * E + V^2 log V) vs O(V^3)",
+      "It solves the problem without any graph reweighting",
+      "It works correctly even in the presence of negative cycles",
+      "It uses topological sorting on undirected cycles"
+    ],
+    "createdAt": "2026-10-13T16:39:00.854Z",
+    "updatedAt": "2026-10-13T16:39:00.854Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea43d7ed8dbd3adba89",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (Trees & Graphs)",
+    "question": "An articulation point (cut vertex) in an undirected graph DFS tree is a non-root vertex u with child v satisfying which condition?",
+    "codeSnippet": "",
+    "options": [
+      "low[v] >= tin[u]",
+      "low[v] > tin[u]",
+      "low[u] == tin[v]",
+      "deg(u) > deg(v)"
+    ],
+    "createdAt": "2026-10-13T16:39:00.937Z",
+    "updatedAt": "2026-10-13T16:39:00.937Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba8c",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "How does a Monotonic Deque achieve O(N) total time for the Sliding Window Maximum problem of window size K across an array of length N?",
+    "codeSnippet": "",
+    "options": [
+      "Each element index is pushed once and popped at most once, maintaining indices of elements in strictly decreasing value order",
+      "By maintaining elements sorted via quicksort on every step",
+      "By hashing window values into a Bloom filter",
+      "By computing prefix sums of min and max pairs"
+    ],
+    "createdAt": "2026-10-13T16:39:01.023Z",
+    "updatedAt": "2026-10-13T16:39:01.023Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba8f",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In a Persistent Segment Tree (Chairman Tree) over an array of size N, what is the space required to record N point updates?",
+    "codeSnippet": "",
+    "options": [
+      "O(N log N) space, because each point update allocates only O(log N) new nodes along the modified branch",
+      "O(N^2) space, because the entire tree is cloned on each update",
+      "O(N) space using pointer rotation",
+      "O(log N) total space"
+    ],
+    "createdAt": "2026-10-13T16:39:01.117Z",
+    "updatedAt": "2026-10-13T16:39:01.117Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba92",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In a Treap (Cartesian Tree), how are the binary search tree and heap invariants simultaneously preserved during node insertions?",
+    "codeSnippet": "",
+    "options": [
+      "Keys satisfy the Binary Search Tree property while randomly generated priorities satisfy Heap order, restored via tree rotations",
+      "Keys and priorities are both sorted in ascending order using heapsort",
+      "Only leaf nodes store priorities while internal nodes store keys",
+      "By rebalancing using red-black color markers"
+    ],
+    "createdAt": "2026-10-13T16:39:01.258Z",
+    "updatedAt": "2026-10-13T16:39:01.258Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba95",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Fenwick Tree (Binary Indexed Tree), what bitwise operation isolates the lowest set bit of index i, and how does the point update step proceed?",
+    "codeSnippet": "",
+    "options": [
+      "Lowest set bit is (i & -i); update index i advances via i += (i & -i)",
+      "Lowest set bit is (i ^ -i); update index i advances via i = i >> 1",
+      "Lowest set bit is (i | ~i); update index i advances via i += 1",
+      "Lowest set bit is (~i + 1); update index i advances via i = i & (i - 1)"
+    ],
+    "createdAt": "2026-10-13T16:39:01.349Z",
+    "updatedAt": "2026-10-13T16:39:01.349Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba98",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "What is the exact asymptotic time complexity of Manacher's Algorithm for finding the longest palindromic substring in a string of length N?",
+    "codeSnippet": "",
+    "options": [
+      "O(N) time and O(N) auxiliary space",
+      "O(N log N) time and O(1) space",
+      "O(N^2) time and O(N) space",
+      "O(N sqrt(N)) time and O(log N) space"
+    ],
+    "createdAt": "2026-10-13T16:39:01.433Z",
+    "updatedAt": "2026-10-13T16:39:01.433Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba9b",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "How can the Maximum XOR Pair among N numbers (each up to 2^30) be found efficiently?",
+    "codeSnippet": "",
+    "options": [
+      "By inserting all numbers into a Binary Trie and greedily querying opposite bits from MSB to LSB in O(30 * N) = O(N) time",
+      "By sorting the numbers and checking adjacent pairs in O(N log N) time",
+      "By computing Fast Walsh-Hadamard Transform in O(N^2) time",
+      "Using Gaussian elimination over GF(2) in O(N^3) time"
+    ],
+    "createdAt": "2026-10-13T16:39:01.527Z",
+    "updatedAt": "2026-10-13T16:39:01.527Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adba9e",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In the Z-Algorithm for string matching, what does Z[i] represent for a string S of length N?",
+    "codeSnippet": "",
+    "options": [
+      "The length of the longest substring starting at S[i] that is also a prefix of S",
+      "The count of distinct characters between index 0 and i",
+      "The length of the longest palindromic suffix ending at i",
+      "The hash value of substring S[0...i] modulo 10^9 + 7"
+    ],
+    "createdAt": "2026-10-13T16:39:01.627Z",
+    "updatedAt": "2026-10-13T16:39:01.627Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adbaa1",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "How does the Fast Fourier Transform (FFT) compute the product of two polynomials of degree N in O(N log N) time?",
+    "codeSnippet": "",
+    "options": [
+      "By evaluating both polynomials at 2N complex roots of unity, multiplying pointwise in O(N), and applying inverse FFT (IFFT) to interpolate",
+      "By multiplying coefficients recursively in a segment tree",
+      "By approximating continuous integrals using Simpson's rule",
+      "By converting polynomial terms into modular inverses"
+    ],
+    "createdAt": "2026-10-13T16:39:01.708Z",
+    "updatedAt": "2026-10-13T16:39:01.708Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adbaa4",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "In Boyer-Moore Majority Vote Algorithm, what happens if no element appears strictly more than N / 2 times?",
+    "codeSnippet": "",
+    "options": [
+      "The algorithm returns an arbitrary candidate; a second linear O(N) verification pass is required to confirm whether the candidate is a true majority",
+      "The algorithm throws a runtime exception during the single pass",
+      "The count variable becomes negative, signaling no majority",
+      "The algorithm automatically restarts with a different seed"
+    ],
+    "createdAt": "2026-10-13T16:39:01.801Z",
+    "updatedAt": "2026-10-13T16:39:01.801Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace5ea53d7ed8dbd3adbaa7",
+    "testId": "GLOBAL",
+    "eventCode": "GLOBAL",
+    "type": "technology",
+    "technology": "Problem Solving (DSA & Algorithms)",
+    "question": "How does the Two Pointers technique on a sorted array achieve O(N) time for the 2-Sum problem, avoiding O(N^2)?",
+    "codeSnippet": "",
+    "options": [
+      "If sum < target, left pointer increments (increasing sum); if sum > target, right pointer decrements (decreasing sum); each element checked at most once",
+      "By hashing pointers in a linked list",
+      "By swapping pointers whenever an odd number is encountered",
+      "By dividing array recursively into halves"
+    ],
+    "createdAt": "2026-10-13T16:39:01.993Z",
+    "updatedAt": "2026-10-13T16:39:01.993Z",
+    "__v": 0
+  }
+]

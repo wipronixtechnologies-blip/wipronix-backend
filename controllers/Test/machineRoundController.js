@@ -287,6 +287,20 @@ async function ensureSeed() {
         await existing.save();
       }
     }
+
+    // Also auto-restore any additional challenges from data/machineRoundChallenges.json if available
+    const backupChallengesPath = path.join(__dirname, "../../data/machineRoundChallenges.json");
+    if (fs.existsSync(backupChallengesPath)) {
+      try {
+        const fileList = JSON.parse(fs.readFileSync(backupChallengesPath, "utf8"));
+        for (const item of fileList) {
+          const exists = await MachineChallenge.findOne({ title: item.title });
+          if (!exists) {
+            await MachineChallenge.create(item);
+          }
+        }
+      } catch (fErr) { }
+    }
   } catch (err) {
     console.warn("Machine round seed fallback:", err.message);
   }
@@ -296,6 +310,40 @@ exports.ensureSeed = ensureSeed;
 
 function escapeRegex(text) {
   return String(text || '').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
+// Helper: Map candidate specialization into domain regexes for challenge lookup
+function getDomainRegexes(cleanTech) {
+  const t = (cleanTech || '').toLowerCase().trim();
+
+  if (/dynamic\s*programming|\b(dp)\b/i.test(t)) {
+    return [/dynamic\s*programming/i, /dsa/i, /problem\s*solving/i];
+  }
+  if (/recursion|complexity/i.test(t)) {
+    return [/recursion/i, /dsa/i, /problem\s*solving/i];
+  }
+  if (/tree|graph/i.test(t)) {
+    return [/tree|graph/i, /dsa/i, /problem\s*solving/i];
+  }
+  if (/dsa|algorithm|problem\s*solving/i.test(t)) {
+    return [/dsa\s*&\s*algorithms/i, /problem\s*solving/i];
+  }
+  if (/\b(ai|ml)\b|data\s*science|machine\s*learning|deep\s*learning/i.test(t)) {
+    return [/ai\s*\/\s*ml/i, /data\s*science/i];
+  }
+  if (/cyber|security|infosec/i.test(t)) {
+    return [/cyber\s*security/i, /security/i];
+  }
+  if (/python|django|fastapi|flask/i.test(t)) {
+    return [/python/i];
+  }
+  if (/java|spring|springboot|microservices/i.test(t)) {
+    return [/java/i];
+  }
+  if (/mern|react|node|express|next|tailwind|javascript|frontend|web/i.test(t)) {
+    return [/react/i, /mern/i];
+  }
+  return [new RegExp(escapeRegex(t), 'i')];
 }
 
 // 1. Get Technology Machine Round Config
@@ -388,40 +436,78 @@ exports.startMachineSession = async (req, res) => {
       });
     }
 
-    // Find appropriate challenge for this technology
-    let challenge = null;
-    try {
-      challenge = await MachineChallenge.findOne({
-        technology: { $regex: new RegExp(escapeRegex(cleanTech), 'i') },
-        isActive: true
-      });
-    } catch (e) { }
+    const effectiveStudentId = student?._id ? String(student._id) : (studentId ? String(studentId) : '');
+    const effectiveEmail = (student?.email || email || '').trim().toLowerCase();
 
-    if (!challenge) {
-      // Try matching by first keyword (e.g. React, Python, Java, Next)
-      const firstKeyword = cleanTech.split(/[\s&/]+/)[0];
-      if (firstKeyword && firstKeyword.length >= 3) {
+    const searchConditions = [];
+    if (effectiveStudentId) {
+      searchConditions.push({ studentId: effectiveStudentId });
+      if (effectiveStudentId.length === 24) {
         try {
-          challenge = await MachineChallenge.findOne({
-            technology: { $regex: new RegExp(escapeRegex(firstKeyword), 'i') },
-            isActive: true
-          });
+          searchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) });
         } catch (e) { }
       }
     }
+    if (effectiveEmail) {
+      searchConditions.push({ studentEmail: effectiveEmail });
+    }
 
+    // 1. Session Persistence: If candidate already started this machine round, reuse their assigned challenge!
+    let challenge = null;
+    if (searchConditions.length > 0) {
+      try {
+        const existingResult = await Result.findOne({
+          $or: searchConditions,
+          machineRoundChallengeId: { $ne: null }
+        });
+        if (existingResult?.machineRoundChallengeId) {
+          challenge = await MachineChallenge.findById(existingResult.machineRoundChallengeId);
+        }
+      } catch (e) { }
+    }
+
+    // 2. Randomized Challenge Selection based on candidate's exact domain
     if (!challenge) {
-      // Fallback to "All" or first active challenge
-      challenge = await MachineChallenge.findOne({ technology: "All", isActive: true }) ||
-        await MachineChallenge.findOne({ isActive: true });
+      const domainRegexes = getDomainRegexes(cleanTech);
+      let candidatePool = [];
+
+      for (const rx of domainRegexes) {
+        candidatePool = await MachineChallenge.find({
+          technology: rx,
+          isActive: true
+        });
+        if (candidatePool.length > 0) break;
+      }
+
+      // If no domain-specific challenges found, use diverse generic pool "All"
+      if (candidatePool.length === 0) {
+        candidatePool = await MachineChallenge.find({
+          technology: "All",
+          isActive: true
+        });
+      }
+
+      // Final fallback to any active challenge
+      if (candidatePool.length === 0) {
+        candidatePool = await MachineChallenge.find({ isActive: true });
+      }
+
+      // Pick a random challenge from the candidate pool!
+      if (candidatePool.length > 0) {
+        const randIdx = Math.floor(Math.random() * candidatePool.length);
+        challenge = candidatePool[randIdx];
+      }
     }
 
     if (!challenge) {
-      // Re-seed challenges immediately and pick the first one
+      // Re-seed challenges immediately and pick randomly
       for (const ch of DEFAULT_CHALLENGES) {
         await MachineChallenge.create(ch);
       }
-      challenge = await MachineChallenge.findOne({ isActive: true });
+      const allActive = await MachineChallenge.find({ isActive: true });
+      if (allActive.length > 0) {
+        challenge = allActive[Math.floor(Math.random() * allActive.length)];
+      }
     }
 
     if (!challenge) {
@@ -433,22 +519,6 @@ exports.startMachineSession = async (req, res) => {
 
     // Update Result to IN_PROGRESS for machine round safely
     try {
-      const effectiveStudentId = student?._id ? String(student._id) : (studentId ? String(studentId) : '');
-      const effectiveEmail = (student?.email || email || '').trim().toLowerCase();
-
-      const searchConditions = [];
-      if (effectiveStudentId) {
-        searchConditions.push({ studentId: effectiveStudentId });
-        if (effectiveStudentId.length === 24) {
-          try {
-            searchConditions.push({ studentId: new mongoose.Types.ObjectId(effectiveStudentId) });
-          } catch (e) { }
-        }
-      }
-      if (effectiveEmail) {
-        searchConditions.push({ studentEmail: effectiveEmail });
-      }
-
       if (searchConditions.length > 0) {
         await Result.updateMany(
           { $or: searchConditions },

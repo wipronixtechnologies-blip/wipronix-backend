@@ -40,47 +40,23 @@ app.use(cookieParser());
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
-// Allowed origins - add your frontend URLs here (commented out to allow all origins)
-// const allowedOrigins = [
-//   "https://internship-1b6cd.web.app",
-//   "https://wipronix-website.web.app",
-//   "http://localhost:3000",
-//   "http://localhost:3001",
-//   "http://localhost:8080",
-//   "http://localhost:5173"
-// ];
+const { allowedOrigins, isAllowedOrigin } = require("./config/corsOrigins");
 
 // CORS options
 const corsOptions = {
-  /*
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
-    
-    // In development mode, allow all origins (remove this in production for security)
-    if (env.IS_DEVELOPMENT) {
-      console.log(`[CORS DEBUG] Development mode - allowing origin: "${origin}"`);
-      return callback(null, true);
-    }
-    
-    // Block origin in production if not in allowed list
-    console.log(`[CORS ERROR] Blocked origin: "${origin}"`);
-    callback(new Error('Not allowed by CORS'));
-  },
-  */
-  origin: function (origin, callback) {
-    // Allow all origins
-    callback(null, true);
+    const corsError = new Error(`CORS policy violation: Origin '${origin}' is not authorized.`);
+    corsError.statusCode = 403;
+    return callback(corsError);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-Student-Id"],
   exposedHeaders: ["set-cookie"],
+  optionsSuccessStatus: 204
 };
 
 // Apply CORS middleware

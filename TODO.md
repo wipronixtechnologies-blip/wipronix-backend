@@ -7,9 +7,10 @@
 - Undefined origins still allowed in production due to isNoOrigin logic
 
 ## Tasks
-- [ ] Remove CORS DEBUG console.log statements from src/app.js
-- [ ] Remove manual CORS header setting from src/middlewares/checkTestExpiry.js error handler
-- [ ] Tighten CORS logic to not allow undefined origins in production (remove isNoOrigin from shouldAllow when not in development)
+- [x] Remove CORS DEBUG console.log statements from src/app.js
+- [x] Remove manual CORS header setting from src/middlewares/checkTestExpiry.js error handler
+- [x] Restrict CORS origins strictly to trusted domains (https://wipronix.com, https://www.wipronix.com, https://wipronix-admin-pannel.vercel.app, localhost/127.0.0.1 ports 5173 & 8080)
+- [x] Centralize trusted origins in src/config/corsOrigins.js and sync across app.js, api/index.js, and socket.js
 - [ ] Test CORS behavior after deployment
 
 ## Notes

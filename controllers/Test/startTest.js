@@ -75,6 +75,22 @@ function isDomainMatch(studentTech, questionTech) {
   // Comprehensive Domain Groups
   const domainGroups = [
     {
+      aliases: ['dynamic programming', 'dp', 'problem solving (dynamic programming)', 'problem solving - dynamic programming'],
+      tags: ['dynamic programming', 'dp', 'knapsack', 'memoization', 'tabulation', 'lcs', 'lis', 'bitmask dp']
+    },
+    {
+      aliases: ['recursion & complexity', 'recursion and complexity', 'recursion', 'complexity', 'algorithm complexity', 'problem solving (recursion & complexity)'],
+      tags: ['recursion', 'complexity', 'master theorem', 'recurrence', 'amortized', 'divide & conquer', 'asymptotic']
+    },
+    {
+      aliases: ['trees & graphs', 'trees and graphs', 'tree & graph', 'trees', 'graphs', 'problem solving (trees & graphs)'],
+      tags: ['tree', 'graph', 'trees', 'graphs', 'lca', 'binary lifting', 'dsu', 'dijkstra', 'tarjan', 'topological sort', 'segment tree', 'hld']
+    },
+    {
+      aliases: ['dsa & algorithms', 'dsa and algorithms', 'problem solving (dsa & algorithms)', 'dsa', 'data structures & algorithms', 'algorithms & bitwise', 'data structures'],
+      tags: ['dsa', 'algorithm', 'data structure', 'heap', 'monotonic', 'binary search', 'sliding window', 'trie', 'bitwise', 'two pointer']
+    },
+    {
       aliases: ['mern', 'react', 'node', 'express', 'mongodb', 'full stack', 'fullstack', 'javascript', 'frontend', 'web development'],
       tags: ['mern', 'react', 'node', 'express', 'mongo', 'javascript', 'js', 'frontend', 'full stack']
     },
@@ -366,20 +382,36 @@ const startTest = async (req, res, next) => {
         // Take all matched domain questions first
         sampledQuestions = shuffleArray(matchedDomainQuestions);
 
-        // Supplement remaining needed strictly from other technical pools (core/general technical first)
         const remainingNeeded = requiredCount - sampledQuestions.length;
-        const generalTechnicalPool = techPool.filter(q =>
-          !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
-          /general|core|basic|problem\s*solving|dsa|algorithm|computer\s*network/i.test(q.technology || '')
-        );
+        const isProblemSolving = /problem\s*solving|dynamic\s*programming|recursion|complexity|trees|graphs|dsa|algorithm/i.test(normalizedTech);
 
-        const otherTechPool = techPool.filter(q =>
-          !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
-          !generalTechnicalPool.some(g => g._id.toString() === q._id.toString())
-        );
+        if (isProblemSolving) {
+          // For problem-solving track, supplement STRICTLY from other tough problem-solving pools first!
+          const otherProblemSolvingPool = techPool.filter(q =>
+            !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+            /problem\s*solving|dsa|algorithm|dynamic\s*programming|recursion|tree|graph/i.test(q.technology || '')
+          );
+          const otherTechPool = techPool.filter(q =>
+            !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+            !otherProblemSolvingPool.some(p => p._id.toString() === q._id.toString())
+          );
+          const supplement = [...shuffleArray(otherProblemSolvingPool), ...shuffleArray(otherTechPool)].slice(0, remainingNeeded);
+          sampledQuestions = [...sampledQuestions, ...supplement];
+        } else {
+          // Supplement remaining needed strictly from other technical pools (core/general technical first)
+          const generalTechnicalPool = techPool.filter(q =>
+            !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+            /general|core|basic|problem\s*solving|dsa|algorithm|computer\s*network/i.test(q.technology || '')
+          );
 
-        const supplement = [...shuffleArray(generalTechnicalPool), ...shuffleArray(otherTechPool)].slice(0, remainingNeeded);
-        sampledQuestions = [...sampledQuestions, ...supplement];
+          const otherTechPool = techPool.filter(q =>
+            !sampledQuestions.some(s => s._id.toString() === q._id.toString()) &&
+            !generalTechnicalPool.some(g => g._id.toString() === q._id.toString())
+          );
+
+          const supplement = [...shuffleArray(generalTechnicalPool), ...shuffleArray(otherTechPool)].slice(0, remainingNeeded);
+          sampledQuestions = [...sampledQuestions, ...supplement];
+        }
       }
 
       // Safety fallback ensuring requiredCount questions strictly within technical pool

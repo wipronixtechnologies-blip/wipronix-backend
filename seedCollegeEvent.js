@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const EventTest = require("./models/EventTest.model");
@@ -547,9 +549,21 @@ async function seed() {
     await Question.deleteMany({});
     console.log("Cleared old question collection.");
 
-    // Insert fresh 30-question bank across all 5 sections
-    await Question.insertMany(questionBank);
-    console.log(`✅ Successfully seeded ${questionBank.length} questions into MongoDB Question collection!`);
+    // Combine questionBank with tough problem solving questions if available
+    let allQuestions = [...questionBank];
+    const toughPath = path.join(__dirname, 'data', 'problemSolvingToughQuestions.json');
+    if (fs.existsSync(toughPath)) {
+      const toughData = JSON.parse(fs.readFileSync(toughPath, 'utf8'));
+      for (const tq of toughData) {
+        if (!allQuestions.some(q => q.question === tq.question)) {
+          allQuestions.push(tq);
+        }
+      }
+    }
+
+    // Insert questions across all sections
+    await Question.insertMany(allQuestions);
+    console.log(`✅ Successfully seeded ${allQuestions.length} questions into MongoDB Question collection!`);
 
     // Helper functions matching startTest.js
     const isApt = q => q.type === 'aptitude' || /aptitude|quant|reasoning/i.test(q.technology || '');
@@ -559,12 +573,12 @@ async function seed() {
     const isTech = q => !isApt(q) && !isCN(q) && !isPS(q) && !isCH(q);
 
     console.log(`📊 Question Distribution in Database:`);
-    console.log(`- Technology: ${questionBank.filter(isTech).length}`);
-    console.log(`- Aptitude: ${questionBank.filter(isApt).length}`);
-    console.log(`- Computer Networks: ${questionBank.filter(isCN).length}`);
-    console.log(`- Problem Solving: ${questionBank.filter(isPS).length}`);
-    console.log(`- Client Handling: ${questionBank.filter(isCH).length}`);
-    console.log(`- Total: ${questionBank.length}`);
+    console.log(`- Technology: ${allQuestions.filter(isTech).length}`);
+    console.log(`- Aptitude: ${allQuestions.filter(isApt).length}`);
+    console.log(`- Computer Networks: ${allQuestions.filter(isCN).length}`);
+    console.log(`- Problem Solving: ${allQuestions.filter(isPS).length}`);
+    console.log(`- Client Handling: ${allQuestions.filter(isCH).length}`);
+    console.log(`- Total: ${allQuestions.length}`);
 
     process.exit(0);
   } catch (err) {

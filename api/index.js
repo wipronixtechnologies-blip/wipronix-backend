@@ -2,35 +2,33 @@ const app = require("../src/app");
 const connectDB = require("../src/config/db");
 const redis = require("../src/config/redis");
 
-// Allowed origins for CORS (commented out to allow all origins)
-// const allowedOrigins = [
-//   "https://www.wipronix.com",
-//   "https://www.wipronix.com/",
-//   "https://wipronix.com/",
-//   "https://internship-1b6cd.web.app",
-//   "https://wipronix-frontend.vercel.app",
-//   "http://localhost:5173",
-//   "http://localhost:3000"
-// ];
+// Allowed origins for CORS
+const { allowedOrigins, isAllowedOrigin } = require("../src/config/corsOrigins");
 
-// CORS handling function for serverless environment - allow all origins
+// CORS handling function for serverless environment
 const handleCors = (req, res, next) => {
   const origin = req.headers.origin;
 
-  // Previous restricted origin validation (commented out):
-  // const isAllowedOrigin = !origin || allowedOrigins.includes(origin);
-  // const allowedOrigin = isAllowedOrigin ? (origin || allowedOrigins[0]) : allowedOrigins[0];
-  // res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-
-  // Allow all origins (*)
-  res.setHeader("Access-Control-Allow-Origin", origin || "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Student-Id, X-Requested-With, Accept, Origin");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (origin && isAllowedOrigin(origin)) {
+    const normalized = origin.trim().replace(/\/+$/, "");
+    res.setHeader("Access-Control-Allow-Origin", normalized);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Student-Id, X-Requested-With, Accept, Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+  }
 
   // Handle preflight OPTIONS request
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    if (origin && !isAllowedOrigin(origin)) {
+      return res.status(403).json({ success: false, message: "CORS policy violation: Origin not allowed" });
+    }
+    return res.status(204).end();
+  }
+
+  // Block unauthorized cross-origin requests
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ success: false, message: "CORS policy violation: Origin not allowed" });
   }
 
   next();
