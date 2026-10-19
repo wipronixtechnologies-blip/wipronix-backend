@@ -131,7 +131,50 @@ exports.getBDEs = async (req, res) => {
   }
 };
 
-// 2. Get College-wise Student Stats from EventTests (eventtests collection)
+// 1.5 Get All Distinct College Names in the System
+exports.getAllCollegeNames = async (req, res) => {
+  try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
+    let studentCollegesQuery = {};
+    if (isTL) {
+      studentCollegesQuery = { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] };
+    }
+
+    const [studentColleges, eventColleges, collegeDocs] = await Promise.all([
+      Student.distinct('college', studentCollegesQuery),
+      EventTest.distinct('collegeName'),
+      College.distinct('name')
+    ]);
+
+    const collegeSet = new Set();
+    const addClean = (name) => {
+      if (name && typeof name === 'string' && name.trim()) {
+        collegeSet.add(name.trim());
+      }
+    };
+
+    (studentColleges || []).forEach(addClean);
+    (eventColleges || []).forEach(addClean);
+    (collegeDocs || []).forEach(addClean);
+
+    // Sort case-insensitively
+    const sortedColleges = Array.from(collegeSet).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: sortedColleges
+    });
+  } catch (error) {
+    console.error('Error fetching college names:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 2. Get College-wise Student Stats from EventTests and Student collections
 exports.getCollegesStudentStats = async (req, res) => {
   try {
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
@@ -163,7 +206,7 @@ exports.getCollegesStudentStats = async (req, res) => {
         return tlCollegesNormalized.includes(cName) || tlCollegesNormalized.includes(eCode);
       });
 
-      // If TL has assigned students in a college not listed in EventTest, add a entry for it
+      // If TL has assigned students in a college not listed in EventTest, add an entry for it
       const matchedCollegeNames = targetEvents.map(e => (e.collegeName || '').trim().toLowerCase());
       tlCollegesList.forEach(cName => {
         if (cName && !matchedCollegeNames.includes(cName.trim().toLowerCase())) {
@@ -176,6 +219,25 @@ exports.getCollegesStudentStats = async (req, res) => {
             conductedBy: 'Admin Allocation',
             collegeName: cName.trim()
           });
+          matchedCollegeNames.push(cName.trim().toLowerCase());
+        }
+      });
+    } else {
+      // For Admin / Super Admin: also include all distinct colleges from students that don't have an EventTest
+      const studentColleges = await Student.distinct('college');
+      const matchedCollegeNames = targetEvents.map(e => (e.collegeName || '').trim().toLowerCase());
+      studentColleges.forEach(cName => {
+        if (cName && cName.trim() && !matchedCollegeNames.includes(cName.trim().toLowerCase())) {
+          targetEvents.push({
+            _id: new mongoose.Types.ObjectId(),
+            eventCode: 'CAMPUS-POOL',
+            testTitle: `${cName.trim()} Student Pool`,
+            technology: 'Campus Leads',
+            eventType: 'Direct / Campus Leads',
+            conductedBy: 'Direct Entry',
+            collegeName: cName.trim()
+          });
+          matchedCollegeNames.push(cName.trim().toLowerCase());
         }
       });
     }
@@ -1153,12 +1215,12 @@ exports.getMyAssignedStudents = async (req, res) => {
     }
 
     // Determine target counselor:
-    // If admin/HR and counselorId is specified, allow switching; otherwise use logged in staff ID
+    // If admin/HR/TL and counselorId is specified, allow switching; otherwise use logged in staff ID
     let targetStaffId = loggedInStaff._id;
-    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
-      ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager', 'tl'].includes(loggedInStaff.role) ||
+      ['super_admin', 'admin', 'hr', 'hr_manager', 'tl'].includes(loggedInStaff.systemRole);
 
-    if (req.query.counselorId && isPrivileged) {
+    if (req.query.counselorId && req.query.counselorId !== 'all' && isPrivileged) {
       targetStaffId = req.query.counselorId;
     }
 
@@ -1175,6 +1237,7 @@ exports.getMyAssignedStudents = async (req, res) => {
       counselingStatus,
       course,
       semester,
+      inactivity,
       search,
       page = 1,
       limit = 25,
@@ -1184,7 +1247,7 @@ exports.getMyAssignedStudents = async (req, res) => {
 
     // Base match filter for this counselor's assignments
     let baseCounselorFilter = { assignedTo: counselorObjectId };
-    if (loggedInStaff.role === 'tl' || loggedInStaff.systemRole === 'tl') {
+    if ((loggedInStaff.role === 'tl' || loggedInStaff.systemRole === 'tl') && (!req.query.counselorId || req.query.counselorId === 'all')) {
         baseCounselorFilter = {
             $or: [
                 { assignedTo: counselorObjectId },
@@ -1225,6 +1288,33 @@ exports.getMyAssignedStudents = async (req, res) => {
   
     if (counselingStatus && counselingStatus !== 'all') {
       query.counselingStatus = counselingStatus;
+    }
+
+    if (inactivity && inactivity !== 'all') {
+      const now = new Date();
+      if (inactivity === 'never_contacted') {
+        query.lastContactedAt = null;
+      } else if (inactivity === 'not_contacted_2_days') {
+        const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+        query.$or = [
+          { lastContactedAt: null },
+          { lastContactedAt: { $lte: twoDaysAgo } }
+        ];
+      } else if (inactivity === 'not_contacted_5_days') {
+        const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+        query.$or = [
+          { lastContactedAt: null },
+          { lastContactedAt: { $lte: fiveDaysAgo } }
+        ];
+      } else if (inactivity === 'not_contacted_7_days') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        query.$or = [
+          { lastContactedAt: null },
+          { lastContactedAt: { $lte: sevenDaysAgo } }
+        ];
+      } else if (inactivity === 'contacted_active') {
+        query.lastContactedAt = { $ne: null };
+      }
     }
 
     if (search && search.trim()) {
@@ -1320,6 +1410,18 @@ exports.getMyAssignedStudents = async (req, res) => {
           if (s.testTotalQuestions === undefined || s.testTotalQuestions === null) s.testTotalQuestions = r.totalQuestions;
           if (!s.testTrack && r.testTrack) s.testTrack = r.testTrack;
           s.resultDeclared = true;
+          s.isSelected = Boolean(r.isSelected);
+          s.isShortlisted = Boolean(r.isShortlisted);
+          s.machineRoundStatus = r.machineRoundStatus || 'NOT_APPLICABLE';
+          s.machineRoundScore = r.machineRoundScore;
+          s.machineRoundPassedTestCases = r.machineRoundPassedTestCases;
+          s.machineRoundTotalTestCases = r.machineRoundTotalTestCases;
+          s.machineRoundSubmittedAt = r.machineRoundSubmittedAt;
+          s.machineRoundTechnology = r.machineRoundTechnology;
+          s.offerLetterSent = Boolean(r.offerLetterSent);
+          s.offerLetterSentDate = r.offerLetterSentDate;
+          s.technicalRoundMarks = r.technicalRoundMarks;
+          s.screeningRoundMarks = r.screeningRoundMarks;
         }
       });
     } catch (rErr) {
@@ -1424,11 +1526,28 @@ exports.addLead = async (req, res) => {
 
     // Determine target counselor
     let targetCounselorId = loggedInStaff._id;
-    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.role) ||
-      ['super_admin', 'admin', 'hr', 'hr_manager'].includes(loggedInStaff.systemRole);
+    const canAssignToOthers = isSuperAdminOrAdmin(loggedInStaff) || isTLRole(loggedInStaff);
 
-    if (assignedTo && isPrivileged) {
+    if (assignedTo && canAssignToOthers) {
       targetCounselorId = assignedTo;
+    }
+
+    const cleanCollege = college && college.trim() ? college.trim() : 'Direct Lead';
+
+    // If new college provided, ensure it exists in College model
+    if (cleanCollege && cleanCollege !== 'Direct Lead') {
+      try {
+        const colExists = await College.findOne({ name: { $regex: new RegExp(`^${escapeRegex(cleanCollege)}$`, 'i') } });
+        if (!colExists) {
+          await College.create({
+            name: cleanCollege,
+            status: 'active',
+            createdBy: loggedInStaff._id
+          });
+        }
+      } catch (colErr) {
+        console.warn('Could not auto-register College:', colErr.message);
+      }
     }
 
     // Check if duplicate student with email exists
@@ -1440,19 +1559,23 @@ exports.addLead = async (req, res) => {
     let existingStudent = await Student.findOne(query);
 
     if (existingStudent) {
-      if (!existingStudent.assignedTo) {
+      const isSelfAssigned = existingStudent.assignedTo && existingStudent.assignedTo.toString() === loggedInStaff._id.toString();
+      const isUnassigned = !existingStudent.assignedTo;
+
+      if (canAssignToOthers || isSelfAssigned || isUnassigned) {
         existingStudent.fullName = fullName.trim() || existingStudent.fullName;
         if (phoneNumber) existingStudent.phoneNumber = phoneNumber.trim();
-        if (college) existingStudent.college = college.trim();
+        existingStudent.college = cleanCollege;
         if (course) existingStudent.course = course.trim();
         if (semester) existingStudent.semester = semester.trim();
         if (city) existingStudent.city = city.trim();
         if (passingYear) existingStudent.passingYear = passingYear.toString().trim();
+        if (cleanTech) existingStudent.technology = cleanTech;
         existingStudent.assignedTo = targetCounselorId;
         existingStudent.assignedBy = loggedInStaff._id;
         existingStudent.createdBy = existingStudent.createdBy || loggedInStaff._id;
         existingStudent.assignedAt = new Date();
-        existingStudent.counselingStatus = counselingStatus || 'assigned';
+        existingStudent.counselingStatus = counselingStatus || existingStudent.counselingStatus || 'assigned';
         if (counselingNotes) existingStudent.counselingNotes = counselingNotes.trim();
 
         await existingStudent.save();
@@ -1462,13 +1585,14 @@ exports.addLead = async (req, res) => {
 
         return res.status(200).json({
           success: true,
-          message: 'Existing unassigned student lead found and assigned to counselor.',
+          message: 'Student lead already in system; details updated and assigned successfully!',
           data: existingStudent
         });
       } else {
+        const currentAssignee = await Staff.findById(existingStudent.assignedTo).select('fullName email');
         return res.status(400).json({
           success: false,
-          message: `A student with this email (${cleanEmail}) is already assigned to a counselor.`
+          message: `A student with this email (${cleanEmail}) is already assigned to counselor ${currentAssignee?.fullName || 'another counselor'}.`
         });
       }
     }
@@ -1478,7 +1602,7 @@ exports.addLead = async (req, res) => {
       fullName: fullName.trim(),
       email: cleanEmail,
       phoneNumber: phoneNumber ? phoneNumber.trim() : undefined,
-      college: college ? college.trim() : 'Direct Lead',
+      college: cleanCollege,
       course: course ? course.trim() : undefined,
       semester: semester ? semester.trim() : undefined,
       technology: cleanTech || undefined,
@@ -1862,11 +1986,49 @@ exports.getCallHistory = async (req, res) => {
   try {
     const { studentId } = req.params;
     const student = await Student.findById(studentId)
-      .select('fullName email phoneNumber college callLogs nextFollowUpDate counselingStatus counselingNotes assignedAt')
-      .populate('callLogs.calledBy', 'firstName lastName fullName email');
+      .select('-password -resetPasswordToken -resetPasswordExpires')
+      .populate('callLogs.calledBy', 'firstName lastName fullName email designation department role profileImage')
+      .populate('assignedTo', 'firstName lastName fullName email designation department role profileImage phoneNumber')
+      .populate('assignedBy', 'firstName lastName fullName email designation department role profileImage')
+      .populate('createdBy', 'firstName lastName fullName email designation department role profileImage')
+      .lean();
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Attach test results from Result collection if missing or available
+    try {
+      const result = await Result.findOne({
+        $or: [
+          { studentEmail: student.email?.toLowerCase() },
+          { studentId: student._id }
+        ]
+      }).sort({ createdAt: -1 }).lean();
+
+      if (result) {
+        if (student.testScore === undefined || student.testScore === null) student.testScore = result.score;
+        if (student.testPercentage === undefined || student.testPercentage === null) student.testPercentage = result.percentage;
+        if (!student.testStatus) student.testStatus = result.status;
+        if (student.testTotalQuestions === undefined || student.testTotalQuestions === null) student.testTotalQuestions = result.totalQuestions;
+        if (!student.testTrack && result.testTrack) student.testTrack = result.testTrack;
+        if (student.testCorrect === undefined || student.testCorrect === null) student.testCorrect = result.score;
+        student.resultDeclared = true;
+        student.isSelected = Boolean(result.isSelected);
+        student.isShortlisted = Boolean(result.isShortlisted);
+        student.machineRoundStatus = result.machineRoundStatus || 'NOT_APPLICABLE';
+        student.machineRoundScore = result.machineRoundScore;
+        student.machineRoundPassedTestCases = result.machineRoundPassedTestCases;
+        student.machineRoundTotalTestCases = result.machineRoundTotalTestCases;
+        student.machineRoundSubmittedAt = result.machineRoundSubmittedAt;
+        student.machineRoundTechnology = result.machineRoundTechnology;
+        student.offerLetterSent = Boolean(result.offerLetterSent);
+        student.offerLetterSentDate = result.offerLetterSentDate;
+        student.technicalRoundMarks = result.technicalRoundMarks;
+        student.screeningRoundMarks = result.screeningRoundMarks;
+      }
+    } catch (rErr) {
+      console.warn('Error attaching result in getCallHistory:', rErr.message);
     }
 
     return res.status(200).json({

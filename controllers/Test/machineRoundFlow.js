@@ -23,8 +23,8 @@ const sendMachineRoundLink = async (request, response) => {
         // Generate 64-char token for secure URL access
         const token = crypto.randomBytes(32).toString('hex');
 
-        // Link expires in 20 minutes (20 * 60 * 1000)
-        const expires = new Date(Date.now() + 20 * 60 * 1000);
+        // Link expires in 24 hours (24 * 60 * 60 * 1000) so candidates have adequate time to attempt
+        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         result.machineRoundToken = token;
         result.machineRoundTokenExpires = expires;

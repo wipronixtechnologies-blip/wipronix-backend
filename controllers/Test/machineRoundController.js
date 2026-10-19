@@ -396,12 +396,12 @@ exports.getMachineRoundConfig = async (req, res) => {
 exports.startMachineSession = async (req, res) => {
   try {
     await ensureSeed();
-    const { studentId, email, technology, eventCode } = req.body;
+    const { studentId, email, technology, eventCode, resultId } = req.body;
 
-    if (!studentId && !email) {
+    if (!studentId && !email && !resultId) {
       return res.status(400).json({
         success: false,
-        message: "studentId or email is required to start machine round"
+        message: "studentId, email or resultId is required to start machine round"
       });
     }
 
@@ -438,8 +438,12 @@ exports.startMachineSession = async (req, res) => {
 
     const effectiveStudentId = student?._id ? String(student._id) : (studentId ? String(studentId) : '');
     const effectiveEmail = (student?.email || email || '').trim().toLowerCase();
+    const effectiveResultId = resultId ? String(resultId).trim() : '';
 
     const searchConditions = [];
+    if (effectiveResultId && mongoose.Types.ObjectId.isValid(effectiveResultId)) {
+      searchConditions.push({ _id: new mongoose.Types.ObjectId(effectiveResultId) });
+    }
     if (effectiveStudentId) {
       searchConditions.push({ studentId: effectiveStudentId });
       if (effectiveStudentId.length === 24) {
@@ -449,7 +453,7 @@ exports.startMachineSession = async (req, res) => {
       }
     }
     if (effectiveEmail) {
-      searchConditions.push({ studentEmail: effectiveEmail });
+      searchConditions.push({ studentEmail: { $regex: new RegExp(`^${escapeRegex(effectiveEmail)}$`, 'i') } });
     }
 
     // 1. Session Persistence: If candidate already started this machine round, reuse their assigned challenge!
@@ -679,7 +683,7 @@ exports.runCode = async (req, res) => {
 // 4. Submit Final Solution for Machine Round
 exports.submitMachineRound = async (req, res) => {
   try {
-    const { studentId, studentEmail, email, challengeId, code, language, timeSpentSeconds } = req.body;
+    const { studentId, studentEmail, email, challengeId, code, language, timeSpentSeconds, resultId } = req.body;
     const cleanCode = typeof code === 'string' ? code : '';
 
     let challenge = null;
@@ -762,8 +766,12 @@ exports.submitMachineRound = async (req, res) => {
     // Save submission to Result model for all matching records of this candidate
     const effectiveStudentId = studentId ? String(studentId) : '';
     const effectiveEmail = (studentEmail || email || '').trim().toLowerCase();
+    const effectiveResultId = resultId ? String(resultId).trim() : '';
 
     const searchConditions = [];
+    if (effectiveResultId && mongoose.Types.ObjectId.isValid(effectiveResultId)) {
+      searchConditions.push({ _id: new mongoose.Types.ObjectId(effectiveResultId) });
+    }
     if (effectiveStudentId) {
       searchConditions.push({ studentId: effectiveStudentId });
       if (effectiveStudentId.length === 24) {
@@ -773,7 +781,7 @@ exports.submitMachineRound = async (req, res) => {
       }
     }
     if (effectiveEmail) {
-      searchConditions.push({ studentEmail: effectiveEmail });
+      searchConditions.push({ studentEmail: { $regex: new RegExp(`^${escapeRegex(effectiveEmail)}$`, 'i') } });
     }
 
     if (searchConditions.length > 0) {

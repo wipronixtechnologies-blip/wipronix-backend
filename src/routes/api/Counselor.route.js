@@ -15,6 +15,9 @@ router.get('/bdes', counselorController.getBDEs);
 // College Student Pool Stats
 router.get('/colleges-stats', counselorController.getCollegesStudentStats);
 
+// All Unique College Names List
+router.get('/colleges-list', counselorController.getAllCollegeNames);
+
 // College Student Pool Breakdown by Course and Semester
 router.get('/pool-breakdown', counselorController.getPoolBreakdown);
 

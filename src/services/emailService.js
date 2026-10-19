@@ -790,7 +790,7 @@ const sendMachineRoundLinkEmail = async (studentData, token) => {
           
           <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0;">
             <p style="margin: 0; font-size: 14.5px; color: #991b1b; font-weight: 600;">
-              ⚠️ IMPORTANT: This secure session link will expire exactly 20 minutes from the time this email was generated. Once expired, you will not be able to access the environment.
+              ⚠️ IMPORTANT: This secure session link is valid for 24 hours from the time this email was generated. Please complete your coding round promptly.
             </p>
           </div>
 

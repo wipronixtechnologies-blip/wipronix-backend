@@ -8,6 +8,7 @@ const submitTest = require("../../../../controllers/Test/submitTest");
 const addQuestion = require("../../../../controllers/Test/addQuestion");
 const { getTestResults, toggleShortlist, getShortlistedStudents, updateInterviewMarks, toggleSelection, sendStudentOfferLetter, generateStudentOfferLetterDownload } = require("../../../../controllers/Test/getTestResults");
 const deleteCandidateResult = require("../../../../controllers/Test/deleteCandidateResult");
+const updateCandidateEmail = require("../../../../controllers/Test/updateCandidateEmail");
 const { authenticateStaff } = require("../../../../controllers/Auth/staffProfile");
 
 const { createEvent, getEvents, toggleEventStatus } = require("../../../../controllers/Test/createEvent");
@@ -81,6 +82,9 @@ router.get("/generate-student-offer-letter/:resultId", generateStudentOfferLette
 
 // Superadmin only candidate test record deletion (purges results and student to allow retest)
 router.delete("/candidate-record/:resultId", authenticateStaff, deleteCandidateResult);
+
+// Superadmin only candidate email update
+router.patch("/candidate-email/:resultId", authenticateStaff, updateCandidateEmail);
 
 module.exports = router;
 
