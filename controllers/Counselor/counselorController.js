@@ -1287,7 +1287,21 @@ exports.getMyAssignedStudents = async (req, res) => {
     }
   
     if (counselingStatus && counselingStatus !== 'all') {
-      query.counselingStatus = counselingStatus;
+      if (counselingStatus === 'machine_selected') {
+        try {
+          const selectedResults = await Result.find({ isSelected: true }).select('studentEmail studentId').lean();
+          const selectedEmails = selectedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const selectedStudentIds = selectedResults.map(r => r.studentId).filter(Boolean);
+          query.$or = [
+            { email: { $in: selectedEmails } },
+            { _id: { $in: selectedStudentIds } }
+          ];
+        } catch (selErr) {
+          console.warn('Error querying selected results for filter:', selErr.message);
+        }
+      } else {
+        query.counselingStatus = counselingStatus;
+      }
     }
 
     if (inactivity && inactivity !== 'all') {
@@ -1453,6 +1467,23 @@ exports.getMyAssignedStudents = async (req, res) => {
       ? Math.round((enrolledCount / totalAssignedCount) * 100)
       : 0;
 
+    // Count machine selected students in this counselor's pool
+    let machineSelectedCount = 0;
+    try {
+      const assignedStudentsList = await Student.find(baseCounselorFilter).select('email _id').lean();
+      const assignedEmails = assignedStudentsList.map(s => s.email?.toLowerCase()).filter(Boolean);
+      const assignedIds = assignedStudentsList.map(s => s._id);
+      machineSelectedCount = await Result.countDocuments({
+        isSelected: true,
+        $or: [
+          { studentEmail: { $in: assignedEmails } },
+          { studentId: { $in: assignedIds } }
+        ]
+      });
+    } catch (cntErr) {
+      console.warn('Error counting machine selected students:', cntErr.message);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -1469,6 +1500,7 @@ exports.getMyAssignedStudents = async (req, res) => {
           follow_up: statusBreakdown.follow_up || 0,
           ringing: statusBreakdown.ringing || 0,
           registered: statusBreakdown.registered || 0,
+          machineSelected: machineSelectedCount,
           conversionRate,
           totalColleges: distinctColleges.filter(Boolean).length
         },
