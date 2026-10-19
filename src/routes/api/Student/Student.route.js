@@ -9,7 +9,8 @@ const authenticate = require("../../../middlewares/auth");
 const getStudentByEmail = require("../../../../controllers/Student/getStudentByEmail");
 const updateStudentByEmail = require("../../../../controllers/Student/updateStudentByEmail");
 const updateStudentWithProfilePicture = require("../../../../controllers/Student/updateStudentWithProfilePicture");
-const bulkUpload = require("../../../../controllers/Student/bulkUpload");
+const { bulkUpload, checkDuplicates } = require("../../../../controllers/Student/bulkUpload");
+const { deleteStudentByEmail, bulkDeleteStudents } = require("../../../../controllers/Student/deleteStudent");
 
 // Configure multer for profile picture upload
 const storage = multer.memoryStorage();
@@ -41,8 +42,20 @@ router.get("/by-email", authenticate, getStudentByEmail);
 // PUT /api/student/by-email (basic update without file upload)
 router.put("/by-email", authenticate, updateStudentByEmail);
 
+// DELETE /api/student/by-email (Delete student lead by email or ID)
+router.delete("/by-email", authenticateStaff, deleteStudentByEmail);
+
+// POST /api/student/check-duplicates (pre-check duplicates before bulk import)
+router.post("/check-duplicates", authenticateStaff, checkDuplicates);
+
 // POST /api/student/bulk (bulk upload array of students)
 router.post("/bulk", authenticateStaff, bulkUpload);
+
+// POST /api/student/bulk-delete (bulk delete students by IDs or emails)
+router.post("/bulk-delete", authenticateStaff, bulkDeleteStudents);
+
+// DELETE /api/student/bulk (bulk delete students by IDs or emails)
+router.delete("/bulk", authenticateStaff, bulkDeleteStudents);
 
 // PUT /api/student/update-profile (update with profile picture upload)
 router.put("/update-profile", authenticate, profilePictureUpload.single('profilePicture'), updateStudentWithProfilePicture);
