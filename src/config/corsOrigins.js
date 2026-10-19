@@ -6,6 +6,8 @@
 const defaultAllowedOrigins = [
   "https://wipronix.com",
   "https://www.wipronix.com",
+  "https://admin.wipronix.com",
+  "http://admin.wipronix.com",
   "https://wipronix-admin-pannel.vercel.app",
   "http://localhost:5173",
   "http://localhost:8080",
