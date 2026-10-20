@@ -93,7 +93,14 @@ exports.getRecentActivities = async (req, res) => {
 exports.getAllStaffLogs = async (req, res) => {
   try {
     const userRole = req.staff?.role;
-    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager'].includes(userRole);
+    const isSuperAdmin = ['super_admin', 'admin'].includes(userRole) || req.staff?.systemRole === 'super_admin';
+
+    if (!isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Staff Activity & Audit Trail is exclusively accessible to Super Admin.'
+      });
+    }
 
     const {
       staffId,
@@ -108,10 +115,7 @@ exports.getAllStaffLogs = async (req, res) => {
 
     const query = {};
 
-    // Restrict non-privileged users to their own logs
-    if (!isPrivileged) {
-      query.actorId = req.staff._id;
-    } else if (staffId && staffId !== 'all') {
+    if (staffId && staffId !== 'all') {
       query.actorId = staffId;
     }
 
@@ -206,6 +210,16 @@ exports.getAllStaffLogs = async (req, res) => {
 // Super Admin: Aggregated Activity Summary Per Staff Member
 exports.getStaffActivitySummary = async (req, res) => {
   try {
+    const userRole = req.staff?.role;
+    const isSuperAdmin = ['super_admin', 'admin'].includes(userRole) || req.staff?.systemRole === 'super_admin';
+
+    if (!isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Staff Activity & Audit Trail is exclusively accessible to Super Admin.'
+      });
+    }
+
     const { startDate, endDate } = req.query;
 
     const timeMatch = {};

@@ -1351,16 +1351,30 @@ exports.getMyAssignedStudents = async (req, res) => {
           const shortlistedResults = await Result.find({
             $or: [{ isShortlisted: true }, { isSelected: true }]
           }).select('studentEmail studentId').lean();
-          const slEmails = shortlistedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
-          const slIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
-          andConditions.push({
-            $or: [
-              { isShortlisted: true },
-              { isSelected: true },
-              { email: { $in: slEmails } },
-              { _id: { $in: slIds } }
-            ]
+          const emailSet = new Set();
+          shortlistedResults.forEach(r => {
+            if (r.studentEmail) {
+              emailSet.add(r.studentEmail);
+              emailSet.add(r.studentEmail.toLowerCase());
+            }
           });
+          const slEmails = Array.from(emailSet);
+          const slIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
+          const orList = [
+            { isShortlisted: true },
+            { isSelected: true }
+          ];
+          if (slEmails.length > 0) {
+            orList.push({ email: { $in: slEmails } });
+            const emailRegexPatterns = slEmails.map(e => `^${escapeRegex(e)}$`).join('|');
+            if (emailRegexPatterns.length < 4000) {
+              orList.push({ email: { $regex: new RegExp(emailRegexPatterns, 'i') } });
+            }
+          }
+          if (slIds.length > 0) {
+            orList.push({ _id: { $in: slIds } });
+          }
+          andConditions.push({ $or: orList });
         } catch (slErr) {
           andConditions.push({
             $or: [{ isShortlisted: true }, { isSelected: true }]
@@ -1470,14 +1484,30 @@ exports.getMyAssignedStudents = async (req, res) => {
       } else if (inactivity === 'machine_shortlisted') {
         try {
           const shortlistedResults = await Result.find({ $or: [{ isShortlisted: true }, { isSelected: true }] }).select('studentEmail studentId').lean();
-          const shortlistedEmails = shortlistedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
-          const shortlistedStudentIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
-          andConditions.push({
-            $or: [
-              { email: { $in: shortlistedEmails } },
-              { _id: { $in: shortlistedStudentIds } }
-            ]
+          const emailSet = new Set();
+          shortlistedResults.forEach(r => {
+            if (r.studentEmail) {
+              emailSet.add(r.studentEmail);
+              emailSet.add(r.studentEmail.toLowerCase());
+            }
           });
+          const shortlistedEmails = Array.from(emailSet);
+          const shortlistedStudentIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
+          const orList = [
+            { isShortlisted: true },
+            { isSelected: true }
+          ];
+          if (shortlistedEmails.length > 0) {
+            orList.push({ email: { $in: shortlistedEmails } });
+            const emailRegexPatterns = shortlistedEmails.map(e => `^${escapeRegex(e)}$`).join('|');
+            if (emailRegexPatterns.length < 4000) {
+              orList.push({ email: { $regex: new RegExp(emailRegexPatterns, 'i') } });
+            }
+          }
+          if (shortlistedStudentIds.length > 0) {
+            orList.push({ _id: { $in: shortlistedStudentIds } });
+          }
+          andConditions.push({ $or: orList });
         } catch (selErr) {
           console.warn('Error querying shortlisted results:', selErr.message);
         }
