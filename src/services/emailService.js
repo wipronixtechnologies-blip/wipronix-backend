@@ -48,7 +48,7 @@ const createTestCompletionEmailTemplate = (studentData, testResult) => {
           </p>
 
           <p style="font-size: 15.5px; color: #374151; line-height: 1.7;">
-            Congratulations! 🎉 You have successfully completed your assessment for the <strong>Wipronix Internship Program</strong>.
+            Congratulations!  You have successfully completed your assessment for the <strong>Wipronix Internship Program</strong>.
           </p>
 
           <!-- Next Steps -->
@@ -924,6 +924,126 @@ const sendAssignedAssessmentLinkEmail = async (studentData, testLink, counselorD
   }
 };
 
+/**
+ * Send Smart Cut Candidate Reassessment & Discovery Invitation Email
+ */
+const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customMessage }) => {
+  try {
+    const transporter = createTransporter();
+    const targetUrl = portalUrl || 'https://smartcut.wipronix.com';
+    const recipientName = fullName || 'Aspiring Candidate';
+
+    const subject = `Exclusive Invitation: Join Wipronix Smart Cut Assessment Portal`;
+    const html = `
+      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #E52328 0%, #B91C1C 100%); padding: 36px 24px; text-align: center;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 170px; height: auto; margin-bottom: 16px; filter: brightness(0) invert(1);">
+          <div style="display: inline-block; background-color: rgba(255,255,255,0.2); padding: 4px 14px; border-radius: 9999px; margin-bottom: 10px;">
+            <span style="color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">
+              ⚡ Smart Cut Portal
+            </span>
+          </div>
+          <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">
+            You Are Invited to Wipronix Smart Cut
+          </h1>
+          <p style="color: #fee2e2; margin-top: 8px; font-size: 14px; font-weight: 400;">
+            Fast-Track Technical Reassessment & Discovery
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 36px 32px; color: #1e293b;">
+          <p style="font-size: 17px; line-height: 1.6; margin-top: 0; color: #0f172a;">
+            Dear <strong>${recipientName}</strong>,
+          </p>
+
+          <p style="font-size: 15px; color: #334155; line-height: 1.7;">
+            ${customMessage || `We are pleased to invite you to join the official <strong>Wipronix Smart Cut</strong> platform. Based on your application and profile, our leadership team has shortlisted you for an exclusive second-chance technical reassessment opportunity to demonstrate your engineering skills.`}
+          </p>
+
+          <!-- Highlights Card -->
+          <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 10px; padding: 22px; margin: 26px 0;">
+            <h4 style="margin: 0 0 14px 0; color: #b91c1c; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+              🚀 Why Participate in Smart Cut?
+            </h4>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 14px; color: #374151;">
+              <tr>
+                <td style="padding-bottom: 10px; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
+                <td style="padding-bottom: 10px; line-height: 1.5;"><strong>Live Hands-On Coding:</strong> Solve real-world challenges in interactive, sandboxed coding environments.</td>
+              </tr>
+              <tr>
+                <td style="padding-bottom: 10px; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
+                <td style="padding-bottom: 10px; line-height: 1.5;"><strong>Skill Passport:</strong> Earn verifiable technical credentials that showcase your strengths directly to hiring managers.</td>
+              </tr>
+              <tr>
+                <td style="padding-bottom: 0; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
+                <td style="padding-bottom: 0; line-height: 1.5;"><strong>Fast-Track Consideration:</strong> High performers receive immediate priority consideration for internships and full-time placement roles.</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- CTA Section -->
+          <div style="text-align: center; margin: 36px 0 24px 0;">
+            <a href="${targetUrl}" 
+               style="background: linear-gradient(135deg, #E52328 0%, #B91C1C 100%); color: #ffffff; padding: 16px 44px; text-decoration: none; font-size: 16px; font-weight: 700; border-radius: 8px; display: inline-block; box-shadow: 0 4px 14px rgba(229, 35, 40, 0.35); letter-spacing: 0.3px;">
+              Join Smart Cut Portal &rarr;
+            </a>
+            <p style="margin: 14px 0 0 0; font-size: 12.5px; color: #64748b;">
+              Or navigate directly to: <a href="${targetUrl}" style="color: #e52328; font-weight: 600; text-decoration: underline;">${targetUrl}</a>
+            </p>
+          </div>
+
+          <!-- Instructions Card -->
+          <div style="background-color: #f8fafc; border-left: 4px solid #e52328; padding: 16px 20px; border-radius: 4px; margin: 26px 0;">
+            <p style="margin: 0; font-size: 13.5px; color: #475569; line-height: 1.6;">
+              <strong>Quick Tip:</strong> Use your registered email (<strong>${email}</strong>) to sign in or get access to your assessment tasks upon visiting the portal.
+            </p>
+          </div>
+
+          <!-- Closing -->
+          <p style="font-size: 14.5px; color: #334155; margin-top: 30px; line-height: 1.6;">
+            We look forward to seeing your technical competence and welcoming you into the Wipronix ecosystem.
+          </p>
+
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 14px; color: #0f172a; margin: 0; font-weight: 700;">
+              Executive Talent Acquisition Team
+            </p>
+            <p style="font-size: 13px; color: #64748b; margin: 4px 0 0 0;">
+              Wipronix Technologies Pvt. Ltd. • <a href="mailto:info@wipronix.com" style="color: #e52328; text-decoration: none;">info@wipronix.com</a>
+            </p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 18px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
+          <p style="margin: 0;">
+            This email was sent to ${email} regarding an official Wipronix assessment invitation.
+          </p>
+          <p style="margin: 6px 0 0 0;">
+            © ${new Date().getFullYear()} Wipronix Technologies Pvt. Ltd. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: GMAIL_USER || 'wipronixtechnologies@gmail.com',
+      to: email,
+      subject,
+      html
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Smart Cut invitation email sent successfully to ${email}`);
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to send Smart Cut invitation email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendTestCompletionEmail,
   sendPasswordResetEmail,
@@ -932,5 +1052,6 @@ module.exports = {
   sendStaffWelcomeEmailWithOfferLetter,
   sendRegistrationSlipEmail,
   sendMachineRoundLinkEmail,
-  sendAssignedAssessmentLinkEmail
+  sendAssignedAssessmentLinkEmail,
+  sendSmartCutInvitationEmail
 };

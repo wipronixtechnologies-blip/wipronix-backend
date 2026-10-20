@@ -16,5 +16,7 @@ const restrictToAdmin = (req, res, next) => {
 
 router.get('/overview', restrictToAdmin, adminController.getOrganizationOverview);
 router.get('/approvals', restrictToAdmin, adminController.getPendingApprovals);
+router.post('/smart-cut/send-invite', restrictToAdmin, adminController.sendSmartCutInvite);
+router.post('/smart-cut/bulk-invite', restrictToAdmin, adminController.bulkSendSmartCutInvites);
 
 module.exports = router;

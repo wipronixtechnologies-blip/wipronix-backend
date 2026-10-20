@@ -40,6 +40,13 @@ router.post('/reassign-students', counselorController.reassignStudents);
 // Update Status & Notes
 router.patch('/student-status/:id', counselorController.updateCounselingStatus);
 
+// Update Full Student Details (info, phones, stages, demo, admission)
+router.put('/student/:id', counselorController.updateStudentDetails);
+router.patch('/student/:id', counselorController.updateStudentDetails);
+
+// TL Team Counselor Oversight & Untouched Leads Analytics
+router.get('/tl-team-performance', counselorController.getTLTeamPerformance);
+
 // Add Lead directly by Counselor / Admin
 router.post('/add-lead', counselorController.addLead);
 

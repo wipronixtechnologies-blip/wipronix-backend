@@ -26,6 +26,11 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    alternatePhoneNumber: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     city: {
       type: String,
       trim: true
@@ -115,14 +120,66 @@ const studentSchema = new mongoose.Schema(
     },
     counselingStatus: {
       type: String,
-      enum: [
-        'unassigned', 'assigned', 'contacted', 'interested', 
-        'not_interested', 'enrolled', 'rejected', 'other',
-        'follow_up', 'ringing', 'registered'
-      ],
-      default: 'unassigned'
+      default: 'assigned'
     },
     counselingNotes: {
+      type: String,
+      default: ''
+    },
+
+    // 5 Parent Lead Stages & Sub-Stages
+    leadStage: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    leadSubStage: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+
+    // Demo Session Details
+    demoTechnology: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    demoTiming: {
+      type: Date,
+      default: null
+    },
+    demoStatus: {
+      type: String,
+      default: 'pending'
+    },
+
+    // Admission Details
+    admissionTechnology: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    admissionDate: {
+      type: Date,
+      default: null
+    },
+    admissionFee: {
+      type: Number,
+      default: null
+    },
+
+    // Inactivity & Untouched Tracking
+    lastTouchedAt: {
+      type: Date,
+      default: Date.now
+    },
+    lastTouchedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null
+    },
+    lastTouchedByName: {
       type: String,
       default: ''
     },
@@ -158,7 +215,13 @@ const studentSchema = new mongoose.Schema(
     testCorrect: { type: Number, default: null },
     testAttempted: { type: Number, default: null },
     testCompletedAt: { type: Date, default: null },
-    testResultId: { type: mongoose.Schema.Types.ObjectId, ref: 'Result', default: null }
+    testResultId: { type: mongoose.Schema.Types.ObjectId, ref: 'Result', default: null },
+
+    // Smart Cut Reassessment & Discovery Invitation Tracking
+    smartCutInvited: { type: Boolean, default: false },
+    smartCutInvitedAt: { type: Date, default: null },
+    smartCutChannel: { type: String, enum: ['email', 'whatsapp', 'both', 'none'], default: 'none' },
+    smartCutInviteCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 );

@@ -53,7 +53,7 @@ async function testAddQuestionAPI() {
     // Test 1: Add multiple questions
     console.log('📝 Test 1: Adding multiple questions');
     const response = await axios.post(`${BASE_URL}/add-question`, testQuestions);
-    
+
     console.log('✅ Success! Response:');
     console.log(JSON.stringify(response.data, null, 2));
     console.log('');
@@ -103,7 +103,7 @@ async function testAddQuestionAPI() {
     }
     console.log('');
 
-    console.log('🎉 All tests completed!');
+    console.log(' All tests completed!');
 
   } catch (error) {
     console.error('❌ Test failed:', error.message);

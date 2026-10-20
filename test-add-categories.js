@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function testAddAllCategories() {
   const BASE_URL = 'http://localhost:5001/api/test';
-  
+
   const testQuestions = [
     {
       testId: 'computer-networks',
@@ -40,7 +40,7 @@ async function testAddAllCategories() {
     console.log('✅ API Response Data:', res.data);
 
     if (res.data.success && res.data.addedCount === 3) {
-      console.log('\n🎉 ALL 3 CATEGORIES (Computer Networks, Problem Solving, Client Handling) ADDED SUCCESSFULLY!');
+      console.log('\n ALL 3 CATEGORIES (Computer Networks, Problem Solving, Client Handling) ADDED SUCCESSFULLY!');
     }
   } catch (err) {
     console.error('❌ API Error:', err.response?.data || err.message);

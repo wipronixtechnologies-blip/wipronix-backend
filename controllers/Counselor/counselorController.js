@@ -1235,6 +1235,8 @@ exports.getMyAssignedStudents = async (req, res) => {
     const {
       college,
       counselingStatus,
+      leadStage,
+      leadSubStage,
       course,
       semester,
       inactivity,
@@ -1255,95 +1257,194 @@ exports.getMyAssignedStudents = async (req, res) => {
             ]
         };
     }
-    const query = { ...baseCounselorFilter };
+    const andConditions = [baseCounselorFilter];
 
     if (college && college !== 'all') {
-      query.college = { $regex: new RegExp(escapeRegex(college.trim()), 'i') };
+      andConditions.push({ college: { $regex: new RegExp(escapeRegex(college.trim()), 'i') } });
     }
 
     if (course && course !== 'all' && course.trim()) {
-      query.course = { $regex: new RegExp(escapeRegex(course.trim()), 'i') };
+      andConditions.push({ course: { $regex: new RegExp(escapeRegex(course.trim()), 'i') } });
     }
 
     if (semester && semester !== 'all' && semester.trim()) {
-      query.semester = { $regex: new RegExp(escapeRegex(semester.trim()), 'i') };
+      andConditions.push({ semester: { $regex: new RegExp(escapeRegex(semester.trim()), 'i') } });
     }
 
-
-        const sourceParam = req.query.source;
+    const sourceParam = req.query.source;
     if (sourceParam && sourceParam !== 'all') {
       const source = sourceParam;
-      if (source === 'organic') query.source = 'organic';
-      else if (source === 'import') query.source = 'import';
+      if (source === 'organic') andConditions.push({ source: 'organic' });
+      else if (source === 'import') andConditions.push({ source: 'import' });
       else if (source === 'test') { 
-        query.source = { $nin: ['organic', 'import'] }; 
-        // student taken test usually means technology assigned or eventCode exists
+        andConditions.push({ source: { $nin: ['organic', 'import'] } }); 
       }
       else if (source === 'internship') { 
-        query.source = { $nin: ['organic', 'import'] }; 
-        query.technology = { $exists: true, $ne: '' }; 
+        andConditions.push({ source: { $nin: ['organic', 'import'] }, technology: { $exists: true, $ne: '' } }); 
       }
-      else query.source = source;
+      else andConditions.push({ source: source });
     }
-  
+
+    if (leadStage && leadStage !== 'all') {
+      if (leadStage === 'Admission done') {
+        andConditions.push({
+          $or: [
+            { leadStage: 'Admission done' },
+            { counselingStatus: { $in: ['enrolled', 'registered'] } }
+          ]
+        });
+      } else if (leadStage === 'Not interested') {
+        andConditions.push({
+          $or: [
+            { leadStage: 'Not interested' },
+            { counselingStatus: { $in: ['not_interested', 'rejected'] } }
+          ]
+        });
+      } else if (leadStage === 'Not responding') {
+        andConditions.push({
+          $or: [
+            { leadStage: 'Not responding' },
+            { counselingStatus: 'ringing' }
+          ]
+        });
+      } else if (leadStage === 'Call back later') {
+        andConditions.push({
+          $or: [
+            { leadStage: 'Call back later' },
+            { counselingStatus: 'contacted' }
+          ]
+        });
+      } else if (leadStage === 'Follow up') {
+        andConditions.push({
+          $or: [
+            { leadStage: 'Follow up' },
+            { counselingStatus: { $in: ['follow_up', 'assigned', 'interested'] } },
+            { leadStage: { $exists: false }, counselingStatus: { $exists: false } }
+          ]
+        });
+      } else {
+        andConditions.push({ leadStage });
+      }
+    }
+
+    if (leadSubStage && leadSubStage !== 'all') {
+      andConditions.push({
+        leadSubStage: { $regex: new RegExp(`^${escapeRegex(leadSubStage.trim())}$`, 'i') }
+      });
+    }
+
     if (counselingStatus && counselingStatus !== 'all') {
       if (counselingStatus === 'machine_selected') {
         try {
           const selectedResults = await Result.find({ isSelected: true }).select('studentEmail studentId').lean();
           const selectedEmails = selectedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
           const selectedStudentIds = selectedResults.map(r => r.studentId).filter(Boolean);
-          query.$or = [
-            { email: { $in: selectedEmails } },
-            { _id: { $in: selectedStudentIds } }
-          ];
+          andConditions.push({
+            $or: [
+              { email: { $in: selectedEmails } },
+              { _id: { $in: selectedStudentIds } }
+            ]
+          });
         } catch (selErr) {
           console.warn('Error querying selected results for filter:', selErr.message);
         }
       } else {
-        query.counselingStatus = counselingStatus;
+        andConditions.push({ counselingStatus });
       }
     }
 
     if (inactivity && inactivity !== 'all') {
       const now = new Date();
       if (inactivity === 'never_contacted') {
-        query.lastContactedAt = null;
+        andConditions.push({ lastContactedAt: null });
       } else if (inactivity === 'not_contacted_2_days') {
         const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-        query.$or = [
-          { lastContactedAt: null },
-          { lastContactedAt: { $lte: twoDaysAgo } }
-        ];
+        andConditions.push({
+          $or: [
+            { lastContactedAt: null },
+            { lastContactedAt: { $lte: twoDaysAgo } }
+          ]
+        });
       } else if (inactivity === 'not_contacted_5_days') {
         const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-        query.$or = [
-          { lastContactedAt: null },
-          { lastContactedAt: { $lte: fiveDaysAgo } }
-        ];
+        andConditions.push({
+          $or: [
+            { lastContactedAt: null },
+            { lastContactedAt: { $lte: fiveDaysAgo } }
+          ]
+        });
       } else if (inactivity === 'not_contacted_7_days') {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        query.$or = [
-          { lastContactedAt: null },
-          { lastContactedAt: { $lte: sevenDaysAgo } }
-        ];
+        andConditions.push({
+          $or: [
+            { lastContactedAt: null },
+            { lastContactedAt: { $lte: sevenDaysAgo } }
+          ]
+        });
       } else if (inactivity === 'contacted_active') {
-        query.lastContactedAt = { $ne: null };
+        andConditions.push({ lastContactedAt: { $ne: null } });
+      } else if (inactivity === 'machine_selected') {
+        try {
+          const selectedResults = await Result.find({ isSelected: true }).select('studentEmail studentId').lean();
+          const selectedEmails = selectedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const selectedStudentIds = selectedResults.map(r => r.studentId).filter(Boolean);
+          andConditions.push({
+            $or: [
+              { email: { $in: selectedEmails } },
+              { _id: { $in: selectedStudentIds } }
+            ]
+          });
+        } catch (selErr) {
+          console.warn('Error querying selected results for inactivity filter:', selErr.message);
+        }
+      } else if (inactivity === 'machine_shortlisted') {
+        try {
+          const shortlistedResults = await Result.find({ $or: [{ isShortlisted: true }, { isSelected: true }] }).select('studentEmail studentId').lean();
+          const shortlistedEmails = shortlistedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const shortlistedStudentIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
+          andConditions.push({
+            $or: [
+              { email: { $in: shortlistedEmails } },
+              { _id: { $in: shortlistedStudentIds } }
+            ]
+          });
+        } catch (selErr) {
+          console.warn('Error querying shortlisted results:', selErr.message);
+        }
+      } else if (inactivity === 'machine_completed') {
+        try {
+          const completedResults = await Result.find({ machineRoundStatus: 'COMPLETED' }).select('studentEmail studentId').lean();
+          const completedEmails = completedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const completedStudentIds = completedResults.map(r => r.studentId).filter(Boolean);
+          andConditions.push({
+            $or: [
+              { email: { $in: completedEmails } },
+              { _id: { $in: completedStudentIds } }
+            ]
+          });
+        } catch (selErr) {
+          console.warn('Error querying completed machine round results:', selErr.message);
+        }
       }
     }
 
     if (search && search.trim()) {
       const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
-      query.$or = [
-        { fullName: searchRegex },
-        { email: searchRegex },
-        { phoneNumber: searchRegex },
-        { course: searchRegex },
-        { semester: searchRegex },
-        { technology: searchRegex },
-        { city: searchRegex },
-        { college: searchRegex }
-      ];
+      andConditions.push({
+        $or: [
+          { fullName: searchRegex },
+          { email: searchRegex },
+          { phoneNumber: searchRegex },
+          { course: searchRegex },
+          { semester: searchRegex },
+          { technology: searchRegex },
+          { city: searchRegex },
+          { college: searchRegex }
+        ]
+      });
     }
+
+    const query = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 25));
@@ -1484,6 +1585,38 @@ exports.getMyAssignedStudents = async (req, res) => {
       console.warn('Error counting machine selected students:', cntErr.message);
     }
 
+    // Aggregate 5 Main Lead Stages across all leads for this counselor
+    const allAssignedStudents = await Student.find(baseCounselorFilter).select('leadStage leadSubStage counselingStatus').lean();
+    const stageCounts = {
+      all: totalAssignedCount,
+      'Not responding': 0,
+      'Follow up': 0,
+      'Call back later': 0,
+      'Not interested': 0,
+      'Admission done': 0
+    };
+    const subStageCounts = {};
+
+    allAssignedStudents.forEach(s => {
+      let stage = s.leadStage;
+      if (!stage) {
+        const st = s.counselingStatus || 'assigned';
+        if (st === 'enrolled' || st === 'registered') stage = 'Admission done';
+        else if (st === 'not_interested' || st === 'rejected') stage = 'Not interested';
+        else if (st === 'ringing') stage = 'Not responding';
+        else if (st === 'contacted') stage = 'Call back later';
+        else stage = 'Follow up';
+      }
+      if (stageCounts[stage] !== undefined) {
+        stageCounts[stage]++;
+      } else {
+        stageCounts['Follow up']++;
+      }
+      if (s.leadSubStage) {
+        subStageCounts[s.leadSubStage] = (subStageCounts[s.leadSubStage] || 0) + 1;
+      }
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -1502,7 +1635,9 @@ exports.getMyAssignedStudents = async (req, res) => {
           registered: statusBreakdown.registered || 0,
           machineSelected: machineSelectedCount,
           conversionRate,
-          totalColleges: distinctColleges.filter(Boolean).length
+          totalColleges: distinctColleges.filter(Boolean).length,
+          stageCounts,
+          subStageCounts
         },
         colleges: distinctColleges.filter(Boolean).sort(),
         courses: distinctCourses.filter(Boolean).sort(),
@@ -2073,5 +2208,253 @@ exports.getCallHistory = async (req, res) => {
   } catch (error) {
     console.error('Error fetching call history:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 15. Update Full Student Details (Edit info, add new/alternate number, update stage, demo, admission)
+exports.updateStudentDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const loggedInStaff = req.staff || {};
+
+    const {
+      fullName,
+      email,
+      phoneNumber,
+      alternatePhoneNumber,
+      college,
+      course,
+      semester,
+      technology,
+      city,
+      passingYear,
+      counselingStatus,
+      counselingNotes,
+      leadStage,
+      leadSubStage,
+      demoTechnology,
+      demoTiming,
+      admissionTechnology,
+      admissionDate,
+      admissionFee
+    } = req.body;
+
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    if (fullName) student.fullName = fullName.trim();
+    if (email) student.email = email.trim().toLowerCase();
+    if (phoneNumber !== undefined) student.phoneNumber = phoneNumber.trim();
+    if (alternatePhoneNumber !== undefined) student.alternatePhoneNumber = alternatePhoneNumber.trim();
+    if (college) student.college = college.trim();
+    if (course) student.course = course.trim();
+    if (semester !== undefined) student.semester = semester;
+    if (technology !== undefined) student.technology = technology;
+    if (city !== undefined) student.city = city;
+    if (passingYear !== undefined) student.passingYear = passingYear;
+    if (counselingNotes !== undefined) student.counselingNotes = counselingNotes;
+
+    // Stage updates
+    let stageChanged = false;
+    if (leadStage) {
+      student.leadStage = leadStage;
+      stageChanged = true;
+    }
+    if (leadSubStage !== undefined) {
+      student.leadSubStage = leadSubStage;
+      stageChanged = true;
+    }
+
+    // Map parent stage to counselingStatus
+    if (leadStage) {
+      if (leadStage === 'Admission done') {
+        student.counselingStatus = 'enrolled';
+      } else if (leadStage === 'Not interested') {
+        student.counselingStatus = 'not_interested';
+      } else if (leadStage === 'Follow up') {
+        student.counselingStatus = 'follow_up';
+      } else if (leadStage === 'Call back later') {
+        student.counselingStatus = 'contacted';
+      } else if (leadStage === 'Not responding') {
+        student.counselingStatus = 'ringing';
+      }
+    } else if (counselingStatus) {
+      student.counselingStatus = counselingStatus;
+    }
+
+    // Demo Session Details
+    if (demoTechnology) student.demoTechnology = demoTechnology;
+    if (demoTiming) student.demoTiming = new Date(demoTiming);
+
+    // Admission Details
+    if (admissionTechnology) {
+      student.admissionTechnology = admissionTechnology;
+      student.technology = admissionTechnology; // Set student track
+    }
+    if (admissionDate) student.admissionDate = new Date(admissionDate);
+    if (admissionFee !== undefined) student.admissionFee = admissionFee;
+
+    // Inactivity tracking: touch the student
+    student.lastTouchedAt = new Date();
+    student.lastContactedAt = new Date();
+    student.lastTouchedBy = loggedInStaff._id || null;
+    student.lastTouchedByName = loggedInStaff.fullName || `${loggedInStaff.firstName || ''} ${loggedInStaff.lastName || ''}`.trim() || 'Staff';
+
+    // Add entry to callLogs timeline if stage changed or notes provided
+    if (stageChanged || counselingNotes) {
+      const stageLogText = leadStage ? `${leadStage}${leadSubStage ? ` - ${leadSubStage}` : ''}` : 'Details Updated';
+      if (!Array.isArray(student.callLogs)) student.callLogs = [];
+      student.callLogs.unshift({
+        calledAt: new Date(),
+        calledBy: loggedInStaff._id || null,
+        calledByName: student.lastTouchedByName,
+        callOutcome: stageLogText,
+        notes: counselingNotes || (demoTiming ? `Demo scheduled: ${demoTechnology} on ${new Date(demoTiming).toLocaleString()}` : (admissionTechnology ? `Enrolled in ${admissionTechnology}` : 'Student details updated')),
+        nextFollowUpDate: student.nextFollowUpDate || null
+      });
+    }
+
+    await student.save();
+    await student.populate('assignedTo', 'firstName lastName fullName email designation department role profileImage phoneNumber');
+
+    // Log activity
+    logActivity({
+      type: 'student_updated',
+      category: 'counselor',
+      user: student.lastTouchedByName,
+      actorId: loggedInStaff._id,
+      actorName: student.lastTouchedByName,
+      actorRole: loggedInStaff.role || 'counselor',
+      actorDepartment: loggedInStaff.department || 'Counseling',
+      action: `Updated student details (${student.fullName}): ${leadStage || 'Updated'}`,
+      target: student.fullName,
+      targetId: student._id,
+      targetModel: 'Student',
+      metadata: {
+        studentEmail: student.email,
+        phone: student.phoneNumber,
+        alternatePhone: student.alternatePhoneNumber,
+        leadStage: student.leadStage,
+        leadSubStage: student.leadSubStage,
+        demoTechnology: student.demoTechnology,
+        admissionTechnology: student.admissionTechnology
+      }
+    }).catch(() => null);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student details updated successfully!',
+      data: student
+    });
+  } catch (error) {
+    console.error('Error in updateStudentDetails:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 16. Get TL Counselor Oversight & Untouched Leads Analytics
+exports.getTLTeamPerformance = async (req, res) => {
+  try {
+    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    const tlId = req.staff?._id;
+
+    // Get all active counselors / BDEs
+    const bdeQuery = {
+      $or: [
+        { role: 'bde' },
+        { systemRole: 'bde' },
+        { role: 'counselor' },
+        { designation: { $regex: /^bde\b|counselor|business development/i } }
+      ],
+      isActive: true
+    };
+
+    const counselors = await Staff.find(bdeQuery)
+      .select('firstName lastName fullName email phoneNumber designation department role profileImage')
+      .lean();
+
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const teamReports = await Promise.all(
+      counselors.map(async (c) => {
+        const counselorFilter = { assignedTo: c._id };
+
+        const [
+          totalAssigned,
+          touchedToday,
+          untouched3Days,
+          untouched7Days,
+          admissionsDone,
+          demosScheduled,
+          followUpsDue
+        ] = await Promise.all([
+          Student.countDocuments(counselorFilter),
+          Student.countDocuments({ ...counselorFilter, lastContactedAt: { $gte: oneDayAgo } }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lte: threeDaysAgo } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lte: sevenDaysAgo } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { leadStage: 'Admission done' },
+              { counselingStatus: 'enrolled' }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { leadSubStage: 'need demo session' },
+              { demoTechnology: { $exists: true, $ne: '' } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            nextFollowUpDate: { $lte: now, $ne: null }
+          })
+        ]);
+
+        return {
+          counselorId: c._id,
+          fullName: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Counselor',
+          email: c.email,
+          phone: c.phoneNumber,
+          designation: c.designation || 'Career Counselor',
+          profileImage: c.profileImage,
+          totalAssigned,
+          touchedToday,
+          untouched3Days,
+          untouched7Days,
+          admissionsDone,
+          demosScheduled,
+          followUpsDue,
+          conversionRate: totalAssigned > 0 ? Math.round((admissionsDone / totalAssigned) * 100) : 0
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: teamReports
+    });
+  } catch (error) {
+    console.error('Error fetching TL team performance:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
