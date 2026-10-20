@@ -27,13 +27,14 @@ exports.getBDEs = async (req, res) => {
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
     const tlId = req.staff?._id;
 
-    // Find all BDEs (only staff whose role/systemRole is bde or designation is BDE)
+    // Find all Counselors / BDEs / TLs (excluding purely administrative roles)
     const bdes = await Staff.find({
       $or: [
-        { role: 'bde' },
-        { systemRole: 'bde' },
-        { designation: { $regex: /^bde\b|business development executive/i } }
+        { role: { $in: ['bde', 'tl', 'employee'] } },
+        { systemRole: { $in: ['bde', 'tl', 'employee'] } },
+        { designation: { $regex: /bde|business development executive|counselor|team lead|\btl\b/i } }
       ],
+      role: { $nin: ['super_admin', 'admin'] },
       isActive: true
     }).select('firstName lastName fullName email phoneNumber department designation role systemRole profileImage createdAt');
 
@@ -42,11 +43,6 @@ exports.getBDEs = async (req, res) => {
     const matchFilter = {
       assignedTo: { $in: bdeIds }
     };
-
-    // If TL, only count students assigned by this TL to the BDEs
-    if (isTL) {
-      matchFilter.assignedBy = tlId;
-    }
 
     const assignmentStats = await Student.aggregate([
       {
@@ -1247,15 +1243,37 @@ exports.getMyAssignedStudents = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdmin(loggedInStaff);
+
     // Base match filter for this counselor's assignments
-    let baseCounselorFilter = { assignedTo: counselorObjectId };
-    if ((loggedInStaff.role === 'tl' || loggedInStaff.systemRole === 'tl') && (!req.query.counselorId || req.query.counselorId === 'all')) {
-        baseCounselorFilter = {
+    let baseCounselorFilter;
+    if (isTL) {
+      if (req.query.counselorId && req.query.counselorId !== 'all') {
+        const requestedCounselorId = req.query.counselorId;
+        if (requestedCounselorId === loggedInStaff._id.toString()) {
+          // TL viewing their own assignments
+          baseCounselorFilter = { assignedTo: loggedInStaff._id };
+        } else {
+          // TL viewing a counselor: show students assigned to this counselor that this TL assigned or that belong to this TL's pool
+          baseCounselorFilter = {
+            assignedTo: counselorObjectId,
             $or: [
-                { assignedTo: counselorObjectId },
-                { assignedBy: counselorObjectId }
+              { assignedBy: loggedInStaff._id },
+              { allocatedTL: loggedInStaff._id }
             ]
+          };
+        }
+      } else {
+        // TL viewing all: show all students assigned to this TL or assigned by this TL
+        baseCounselorFilter = {
+          $or: [
+            { assignedTo: loggedInStaff._id },
+            { assignedBy: loggedInStaff._id }
+          ]
         };
+      }
+    } else {
+      baseCounselorFilter = { assignedTo: counselorObjectId };
     }
     const andConditions = [baseCounselorFilter];
 
@@ -1328,9 +1346,61 @@ exports.getMyAssignedStudents = async (req, res) => {
     }
 
     if (leadSubStage && leadSubStage !== 'all') {
-      andConditions.push({
-        leadSubStage: { $regex: new RegExp(`^${escapeRegex(leadSubStage.trim())}$`, 'i') }
-      });
+      if (leadSubStage === 'shortlisted') {
+        try {
+          const shortlistedResults = await Result.find({
+            $or: [{ isShortlisted: true }, { isSelected: true }]
+          }).select('studentEmail studentId').lean();
+          const slEmails = shortlistedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const slIds = shortlistedResults.map(r => r.studentId).filter(Boolean);
+          andConditions.push({
+            $or: [
+              { isShortlisted: true },
+              { isSelected: true },
+              { email: { $in: slEmails } },
+              { _id: { $in: slIds } }
+            ]
+          });
+        } catch (slErr) {
+          andConditions.push({
+            $or: [{ isShortlisted: true }, { isSelected: true }]
+          });
+        }
+      } else if (leadSubStage === 'machine_selected') {
+        try {
+          const selectedResults = await Result.find({ isSelected: true }).select('studentEmail studentId').lean();
+          const selEmails = selectedResults.map(r => r.studentEmail?.toLowerCase()).filter(Boolean);
+          const selIds = selectedResults.map(r => r.studentId).filter(Boolean);
+          andConditions.push({
+            $or: [
+              { isSelected: true },
+              { email: { $in: selEmails } },
+              { _id: { $in: selIds } }
+            ]
+          });
+        } catch (selErr) {
+          andConditions.push({ isSelected: true });
+        }
+      } else if (leadSubStage === 'tests_completed') {
+        andConditions.push({
+          $or: [
+            { resultDeclared: true },
+            { testTokenStatus: 'completed' },
+            { testCompletedAt: { $ne: null } }
+          ]
+        });
+      } else if (leadSubStage === 'untouched') {
+        andConditions.push({
+          $or: [
+            { lastContactedAt: null },
+            { lastTouchedAt: null }
+          ]
+        });
+      } else {
+        andConditions.push({
+          leadSubStage: { $regex: new RegExp(`^${escapeRegex(leadSubStage.trim())}$`, 'i') }
+        });
+      }
     }
 
     if (counselingStatus && counselingStatus !== 'all') {
