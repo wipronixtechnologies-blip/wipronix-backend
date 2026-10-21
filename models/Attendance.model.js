@@ -29,11 +29,21 @@ const attendanceSchema = new mongoose.Schema({
   // Punch in details
   punchInTime: {
     type: Date,
-    required: true
+    required: function() {
+      const nonPunchStatuses = [
+        'absent', 'medical_leave', 'casual_leave', 'maternity_leave',
+        'lwp', 'holiday', 'compensatory_leave', 'bereavement_leave',
+        'unmarked'
+      ];
+      return !nonPunchStatuses.includes(this.status);
+    }
   },
   punchInLocation: {
     type: locationSchema,
-    required: true
+    default: () => ({
+      latitude: 30.6970439,
+      longitude: 76.68684
+    })
   },
 
   // Punch out details (optional until punched out)
@@ -55,7 +65,24 @@ const attendanceSchema = new mongoose.Schema({
   // Status of attendance
   status: {
     type: String,
-    enum: ['present', 'absent', 'half_day', 'late', 'short_leave', 'pending_half_day', 'pending_other'],
+    enum: [
+      'present',
+      'absent',
+      'half_day',
+      'late',
+      'short_leave',
+      'medical_leave',
+      'casual_leave',
+      'maternity_leave',
+      'lwp',
+      'holiday',
+      'official_tour',
+      'compensatory_leave',
+      'bereavement_leave',
+      'pending_half_day',
+      'pending_other',
+      'unmarked'
+    ],
     default: 'present'
   },
 

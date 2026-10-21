@@ -5,7 +5,9 @@ const {
   punchOut,
   getAttendanceByStaff,
   getCurrentStatus,
-  getAllStaffAttendance
+  getAllStaffAttendance,
+  markManualAttendance,
+  markBulkAttendance
 } = require('../../controllers/Attendance/Attendance.controller');
 const { authenticateStaff } = require('../../controllers/Auth/staffProfile');
 
@@ -17,6 +19,12 @@ router.post('/punch-in', punchIn);
 
 // Punch Out
 router.post('/punch-out', punchOut);
+
+// Mark Manual Attendance (Super Admin / Admin / HR)
+router.post('/mark-manual', markManualAttendance);
+
+// Mark Bulk Attendance (Super Admin / Admin / HR)
+router.post('/mark-bulk', markBulkAttendance);
 
 // Get current attendance status
 router.get('/status', getCurrentStatus);

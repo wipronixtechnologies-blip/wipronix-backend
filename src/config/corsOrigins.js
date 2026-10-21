@@ -32,7 +32,15 @@ const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigi
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   const normalized = origin.trim().replace(/\/+$/, "");
-  return allowedOrigins.includes(normalized);
+  if (allowedOrigins.includes(normalized)) return true;
+
+  // Development only: allow the Vite dev servers when opened via a private LAN IP
+  if (process.env.NODE_ENV === "development") {
+    const lanDevOrigin = /^http:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(5173|8080)$/;
+    if (lanDevOrigin.test(normalized)) return true;
+  }
+
+  return false;
 };
 
 module.exports = {

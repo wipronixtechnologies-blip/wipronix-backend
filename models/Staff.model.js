@@ -174,9 +174,9 @@ const staffSchema = new mongoose.Schema({
 
   // Leave Balance (per year tracking)
   leaveBalance: {
-    casual: { type: Number, default: 10 },
-    sick: { type: Number, default: 10 },
-    paid: { type: Number, default: 4 },
+    casual: { type: Number, default: 12 },
+    medical: { type: Number, default: 10 },
+    maternity: { type: Number, default: 15 },
     lastResetDate: { type: Date, default: null }
   }
 }, {

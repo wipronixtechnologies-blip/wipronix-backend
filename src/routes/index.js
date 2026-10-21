@@ -9,6 +9,9 @@ router.use("/api", (req, res, next) => {
   next();
 }, apiRoutes);
 
+// Forgiving alias in case client baseURL already contains /api
+router.use("/api/api", apiRoutes);
+
 // Fallback for unknown /api routes
 router.use("/api", (req, res) => {
   res.status(404).json({

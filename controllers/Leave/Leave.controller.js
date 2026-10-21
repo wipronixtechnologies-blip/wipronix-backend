@@ -36,13 +36,13 @@ exports.getMyLeaveBalance = async (req, res) => {
 
     // Check and update leave balance if new year
     const currentYear = new Date().getFullYear();
-    if (!staff.leaveBalance.lastResetDate || 
+    if (!staff.leaveBalance || !staff.leaveBalance.lastResetDate || 
         new Date(staff.leaveBalance.lastResetDate).getFullYear() < currentYear) {
       // Reset leave balance for new year
       staff.leaveBalance = {
-        casual: 10,
-        sick: 10,
-        paid: 4,
+        casual: 12,
+        medical: 10,
+        maternity: 15,
         lastResetDate: new Date()
       };
       await staff.save();
@@ -61,29 +61,45 @@ exports.getMyLeaveBalance = async (req, res) => {
     // Calculate remaining balance
     const takenByType = {
       casual: 0,
+      medical: 0,
+      maternity: 0,
       sick: 0,
       paid: 0
     };
 
     leaves.forEach(leave => {
-      takenByType[leave.leaveType] += leave.totalDays;
+      const type = leave.leaveType === 'sick' ? 'medical' : leave.leaveType;
+      if (takenByType[type] !== undefined) {
+        takenByType[type] += leave.totalDays;
+      }
     });
 
     const balance = {
       casual: {
-        total: 10,
+        total: 12,
         taken: takenByType.casual,
-        remaining: 10 - takenByType.casual
+        remaining: Math.max(0, 12 - takenByType.casual)
       },
+      medical: {
+        total: 10,
+        taken: takenByType.medical + takenByType.sick,
+        remaining: Math.max(0, 10 - (takenByType.medical + takenByType.sick))
+      },
+      maternity: {
+        total: 15,
+        taken: takenByType.maternity,
+        remaining: Math.max(0, 15 - takenByType.maternity)
+      },
+      // Backward compatibility aliases to prevent crashes in existing views
       sick: {
         total: 10,
-        taken: takenByType.sick,
-        remaining: 10 - takenByType.sick
+        taken: takenByType.medical + takenByType.sick,
+        remaining: Math.max(0, 10 - (takenByType.medical + takenByType.sick))
       },
       paid: {
-        total: 4,
-        taken: takenByType.paid,
-        remaining: 4 - takenByType.paid
+        total: 15,
+        taken: takenByType.maternity + takenByType.paid,
+        remaining: Math.max(0, 15 - (takenByType.maternity + takenByType.paid))
       }
     };
 
@@ -147,19 +163,57 @@ exports.applyLeave = async (req, res) => {
     // Calculate working days
     const totalDays = calculateWorkingDays(startDate, endDate);
 
+    // Enforce max 2 casual leaves per month rule
+    if (leaveType === 'casual') {
+      const reqStart = new Date(startDate);
+      const startOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth(), 1);
+      const endOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth() + 1, 0, 23, 59, 59);
+
+      const monthLeaves = await Leave.find({
+        staffId,
+        leaveType: 'casual',
+        status: { $in: ['approved', 'pending'] },
+        startDate: { $gte: startOfMonth, $lte: endOfMonth }
+      });
+
+      const monthCasualDaysTaken = monthLeaves.reduce((acc, l) => acc + (l.totalDays || 0), 0);
+      if (monthCasualDaysTaken + totalDays > 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Policy Limit: A maximum of 2 casual leaves are permitted in a month (recommended standard is 1 per month).'
+        });
+      }
+    }
+
+    // Leave limits
+    const maxQuotas = {
+      casual: 12,
+      medical: 10,
+      sick: 10,
+      maternity: 15,
+      paid: 4,
+      half_day: 12,
+      short_leave: 24
+    };
+
+    const quota = maxQuotas[leaveType] || 12;
+    const currentTaken = takenByType[leaveType] || 0;
+
     // Check if enough balance
-    if (takenByType[leaveType] + totalDays > (leaveType === 'paid' ? 4 : 10)) {
+    if (['casual', 'medical', 'maternity', 'sick', 'paid'].includes(leaveType) && (currentTaken + totalDays > quota)) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient ${leaveType} leave balance`
+        message: `Insufficient ${leaveType} leave balance. Available: ${Math.max(0, quota - currentTaken)}, requested: ${totalDays}`
       });
     }
 
     // Get balance snapshot
     const balanceSnapshot = {
-      casual: 10 - takenByType.casual,
-      sick: 10 - takenByType.sick,
-      paid: 4 - takenByType.paid
+      casual: Math.max(0, 12 - (takenByType.casual || 0)),
+      medical: Math.max(0, 10 - ((takenByType.medical || 0) + (takenByType.sick || 0))),
+      maternity: Math.max(0, 15 - (takenByType.maternity || 0)),
+      sick: Math.max(0, 10 - (takenByType.sick || 0)),
+      paid: Math.max(0, 4 - (takenByType.paid || 0))
     };
 
     const leave = new Leave({

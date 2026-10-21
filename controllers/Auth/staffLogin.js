@@ -51,9 +51,8 @@ const staffLogin = async (request, response) => {
       });
     }
 
-    // Update last login and set isActive to true
+    // Update last login
     staff.lastLogin = new Date();
-    staff.isActive = true;
     await staff.save();
 
     // Log Activity for Super Admin audit trail

@@ -17,7 +17,10 @@ const leaveSchema = new mongoose.Schema({
   },
   leaveType: {
     type: String,
-    enum: ['casual', 'sick', 'paid'],
+    enum: [
+      'casual', 'medical', 'maternity', 'half_day', 'short_leave',
+      'lwp', 'bereavement', 'official_tour', 'compensatory', 'sick', 'paid'
+    ],
     required: true
   },
   startDate: {
@@ -61,6 +64,8 @@ const leaveSchema = new mongoose.Schema({
   // Track leave balances at time of application
   balanceSnapshot: {
     casual: { type: Number, default: 0 },
+    medical: { type: Number, default: 0 },
+    maternity: { type: Number, default: 0 },
     sick: { type: Number, default: 0 },
     paid: { type: Number, default: 0 }
   }

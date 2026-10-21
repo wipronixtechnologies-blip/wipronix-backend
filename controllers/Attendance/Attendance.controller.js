@@ -66,10 +66,14 @@ const getISTTimeParts = (dateObj = new Date()) => {
 };
 
 // Constants for attendance time thresholds (in IST)
-const PUNCH_IN_LATE_THRESHOLD_HOUR = 9;
-const PUNCH_IN_LATE_THRESHOLD_MINUTE = 30; // 9:30 AM IST
-const PUNCH_OUT_EARLY_THRESHOLD_HOUR = 18;
-const PUNCH_OUT_EARLY_THRESHOLD_MINUTE = 30; // 6:30 PM IST
+const PUNCH_IN_SHORT_LEAVE_THRESHOLD_HOUR = 9;
+const PUNCH_IN_SHORT_LEAVE_THRESHOLD_MINUTE = 40; // 9:40 AM IST
+const PUNCH_IN_HALF_DAY_THRESHOLD_HOUR = 11;
+const PUNCH_IN_HALF_DAY_THRESHOLD_MINUTE = 30; // 11:30 AM IST
+const PUNCH_OUT_SHORT_LEAVE_START_HOUR = 16;
+const PUNCH_OUT_SHORT_LEAVE_START_MINUTE = 30; // 4:30 PM IST
+const PUNCH_OUT_SHIFT_END_HOUR = 18;
+const PUNCH_OUT_SHIFT_END_MINUTE = 30; // 6:30 PM IST
 const HALF_DAY_THRESHOLD_HOUR = 13;
 const HALF_DAY_THRESHOLD_MINUTE = 30; // 1:30 PM IST
 
@@ -82,14 +86,21 @@ const isAfterHalfDayThreshold = (dateObj = new Date()) => {
 };
 
 // Determine status based on punch-in time (in IST)
+// Rule:
+// - On or before 09:40 AM: 'present'
+// - Between 09:40 AM and 11:30 AM: 'short_leave'
+// - After 11:30 AM: 'half_day'
 const getStatusFromPunchInTime = (punchInTime) => {
   const punchInDate = new Date(punchInTime);
   const { hour: punchInHour, minute: punchInMinute } = getISTTimeParts(punchInDate);
+  const punchMinutes = punchInHour * 60 + punchInMinute;
 
-  // Check if punch-in is after 9:30 AM IST
-  if (punchInHour > PUNCH_IN_LATE_THRESHOLD_HOUR || 
-      (punchInHour === PUNCH_IN_LATE_THRESHOLD_HOUR && 
-       punchInMinute > PUNCH_IN_LATE_THRESHOLD_MINUTE)) {
+  const shortLeaveMinutes = 9 * 60 + 40; // 09:40 AM (580 min)
+  const halfDayMinutes = 11 * 60 + 30;   // 11:30 AM (690 min)
+
+  if (punchMinutes > halfDayMinutes) {
+    return 'half_day';
+  } else if (punchMinutes > shortLeaveMinutes) {
     return 'short_leave';
   }
 
@@ -97,9 +108,17 @@ const getStatusFromPunchInTime = (punchInTime) => {
 };
 
 // Determine or update status based on punch-out time (in IST)
+// Rule:
+// - If reasonType is 'half_day': 'half_day'
+// - If reasonType is 'other': 'pending_other'
+// - If currentStatus is already 'half_day': remains 'half_day'
+// - If punch-out is between 04:30 PM and 06:30 PM IST: 'short_leave'
+// - If punch-out is before 04:30 PM IST: 'half_day'
+// - If punch-out is on or after 06:30 PM IST: keep 'short_leave' if already marked, otherwise 'present'
 const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = null) => {
   const punchOutDate = new Date(punchOutTime);
   const { hour: punchOutHour, minute: punchOutMinute } = getISTTimeParts(punchOutDate);
+  const punchOutMinutes = punchOutHour * 60 + punchOutMinute;
 
   // If reason type is provided (half_day or other), handle accordingly
   if (reasonType === 'half_day') {
@@ -110,15 +129,26 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
     return 'pending_other';
   }
 
-  // Check if punch-out is before 6:30 PM IST
-  if (punchOutHour < PUNCH_OUT_EARLY_THRESHOLD_HOUR || 
-      (punchOutHour === PUNCH_OUT_EARLY_THRESHOLD_HOUR && 
-       punchOutMinute < PUNCH_OUT_EARLY_THRESHOLD_MINUTE)) {
+  // If already half day (e.g. came after 11:30 AM), maintain half_day
+  if (currentStatus === 'half_day') {
+    return 'half_day';
+  }
+
+  const shortLeaveStartMin = 16 * 60 + 30; // 04:30 PM (990 min)
+  const shiftEndMin = 18 * 60 + 30;        // 06:30 PM (1110 min)
+
+  // Check if punch-out is before 04:30 PM IST -> Half Day
+  if (punchOutMinutes < shortLeaveStartMin) {
+    return 'half_day';
+  }
+
+  // Check if punch-out is in between 04:30 PM and 06:30 PM IST -> Short Leave
+  if (punchOutMinutes < shiftEndMin) {
     return 'short_leave';
   }
 
   // If punch-out is on/after 6:30 PM IST and current status is already short_leave 
-  // (due to late punch-in), keep it as short_leave
+  // (due to late punch-in between 9:40 and 11:30), keep it as short_leave
   if (currentStatus === 'short_leave') {
     return 'short_leave';
   }
@@ -150,6 +180,14 @@ const punchIn = async (request, response) => {
     }
 
     const staffId = request.staff._id;
+
+    if (!request.staff.isActive) {
+      return response.status(403).json({
+        success: false,
+        message: 'Your account is deactivated. You cannot mark attendance.'
+      });
+    }
+
     const today = getTodayDateIST(); // YYYY-MM-DD format in IST
 
     // Check if already punched in today
@@ -168,6 +206,8 @@ const punchIn = async (request, response) => {
     // Determine status based on punch-in time (in IST)
     const currentTime = new Date();
     const status = getStatusFromPunchInTime(currentTime);
+    const isLateShortLeave = status === 'short_leave';
+    const notes = isLateShortLeave ? 'Late punch-in (after 09:40 AM) - Short Leave' : undefined;
 
     // Create new attendance record
     const attendance = new Attendance({
@@ -178,7 +218,8 @@ const punchIn = async (request, response) => {
         latitude,
         longitude
       },
-      status: status
+      status: status,
+      notes: notes
     });
 
     await attendance.save();
@@ -307,7 +348,26 @@ const punchOut = async (request, response) => {
     }
 
     // Update status based on punch-out time and reason
-    attendance.status = getStatusFromPunchOutTime(attendance.status, punchOutTime, reasonType);
+    const newStatus = getStatusFromPunchOutTime(attendance.status, punchOutTime, reasonType);
+    
+    // Add descriptive notes if early punch-out occurred
+    const { hour: poH, minute: poM } = getISTTimeParts(punchOutTime);
+    const poMin = poH * 60 + poM;
+    if (poMin >= (16 * 60 + 30) && poMin < (18 * 60 + 30)) {
+      if (newStatus === 'short_leave' && !attendance.notes?.includes('04:30 PM - 06:30 PM')) {
+        attendance.notes = attendance.notes 
+          ? `${attendance.notes} | Early punch-out (04:30 PM - 06:30 PM) - Short Leave` 
+          : 'Early punch-out (04:30 PM - 06:30 PM) - Short Leave';
+      }
+    } else if (poMin < (16 * 60 + 30)) {
+      if (newStatus === 'half_day' && !attendance.notes?.includes('before 04:30 PM')) {
+        attendance.notes = attendance.notes 
+          ? `${attendance.notes} | Early punch-out (before 04:30 PM) - Half Day` 
+          : 'Early punch-out (before 04:30 PM) - Half Day';
+      }
+    }
+
+    attendance.status = newStatus;
 
     // Calculate total hours
     attendance.calculateTotalHours();
@@ -394,6 +454,16 @@ const getAttendanceByStaff = async (request, response) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Auto-reconcile forgotten punch-outs on past dates to short_leave
+    const todayIST = getTodayDateIST();
+    for (const attendance of attendances) {
+      if (attendance.date < todayIST && attendance.punchInTime && !attendance.punchOutTime && attendance.status === 'present') {
+        attendance.status = 'short_leave';
+        attendance.notes = attendance.notes ? `${attendance.notes} | Forgot to punch out` : 'Forgot to punch out';
+        await attendance.save();
+      }
+    }
+
     // Calculate summary statistics
     const totalDays = attendances.length;
     const presentDays = attendances.filter(a => a.status === 'present').length;
@@ -475,6 +545,15 @@ const getCurrentStatus = async (request, response) => {
         status = 'on_duty';
         // Check if user can apply for half day
         canApplyHalfDay = isAfterHalfDayThreshold();
+        // Calculate live elapsed hours so far
+        if (attendance.punchInTime) {
+          const inTime = new Date(attendance.punchInTime);
+          const now = new Date();
+          const diffMs = now.getTime() - inTime.getTime();
+          if (diffMs > 0) {
+            totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+          }
+        }
       }
       punchInTime = attendance.punchInTime;
       formattedPunchInTime = attendance.formattedPunchInTime;
@@ -508,10 +587,11 @@ const getCurrentStatus = async (request, response) => {
 const getAllStaffAttendance = async (request, response) => {
   try {
     const { role } = request.staff;
-    if (!['super_admin', 'admin', 'hr'].includes(role)) {
+    const normRole = (role || '').toLowerCase().replace(/[\s-]/g, '_');
+    if (!['super_admin', 'superadmin', 'admin'].includes(normRole)) {
       return response.status(403).json({
         success: false,
-        message: 'Access denied. Administrator privileges required.'
+        message: 'Access denied. Super Administrator privileges required.'
       });
     }
 
@@ -551,6 +631,16 @@ const getAllStaffAttendance = async (request, response) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Auto-reconcile forgotten punch-outs on past dates to short_leave
+    const todayIST = getTodayDateIST();
+    for (const attendance of attendances) {
+      if (attendance.date < todayIST && attendance.punchInTime && !attendance.punchOutTime && attendance.status === 'present') {
+        attendance.status = 'short_leave';
+        attendance.notes = attendance.notes ? `${attendance.notes} | Forgot to punch out` : 'Forgot to punch out';
+        await attendance.save();
+      }
+    }
+
     response.status(200).json({
       success: true,
       data: {
@@ -588,10 +678,333 @@ const getAllStaffAttendance = async (request, response) => {
   }
 };
 
+// Helper for parsing manual date/time inputs
+const parseManualDateTime = (dateStr, timeInput) => {
+  if (!timeInput) return null;
+  if (timeInput instanceof Date && !isNaN(timeInput.getTime())) return timeInput;
+
+  if (typeof timeInput === 'string') {
+    // Check for full ISO string
+    if (timeInput.includes('T') || (timeInput.includes('-') && timeInput.includes(':'))) {
+      const d = new Date(timeInput);
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Match "HH:mm", "HH:mm:ss", "HH:mm AM/PM"
+    const match = timeInput.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const seconds = match[3] ? parseInt(match[3], 10) : 0;
+      const meridiem = match[4] ? match[4].toLowerCase() : null;
+
+      if (meridiem === 'pm' && hours < 12) hours += 12;
+      if (meridiem === 'am' && hours === 12) hours = 0;
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const isoStr = `${dateStr}T${pad(hours)}:${pad(minutes)}:${pad(seconds)}+05:30`;
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    const fallback = new Date(timeInput);
+    if (!isNaN(fallback.getTime())) return fallback;
+  }
+
+  return null;
+};
+
+// Mark Manual Attendance (Super Admin / Admin / HR)
+const markManualAttendance = async (request, response) => {
+  try {
+    const userRole = request.staff.role || request.staff.systemRole;
+    if (!['super_admin', 'admin', 'hr'].includes(request.staff.role) && !['super_admin', 'admin', 'hr'].includes(request.staff.systemRole)) {
+      return response.status(403).json({
+        success: false,
+        message: 'Access denied. Administrator privileges required.'
+      });
+    }
+
+    const { staffId, date, status = 'present', punchInTime, punchOutTime, notes } = request.body;
+
+    if (!staffId) {
+      return response.status(400).json({
+        success: false,
+        message: 'Staff ID is required'
+      });
+    }
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return response.status(400).json({
+        success: false,
+        message: 'A valid date in YYYY-MM-DD format is required'
+      });
+    }
+
+    const targetStaff = await Staff.findById(staffId);
+    if (!targetStaff) {
+      return response.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    if (!targetStaff.isActive) {
+      return response.status(400).json({
+        success: false,
+        message: `Cannot mark attendance for ${targetStaff.fullName}. This employee is deactivated/removed from the ERP.`
+      });
+    }
+
+    const defaultLocation = { latitude: 30.6970439, longitude: 76.68684 };
+    let parsedPunchIn = null;
+    let parsedPunchOut = null;
+    let totalHours = 0;
+
+    const nonPunchStatuses = [
+      'absent', 'medical_leave', 'casual_leave', 'maternity_leave',
+      'lwp', 'holiday', 'compensatory_leave', 'bereavement_leave',
+      'unmarked'
+    ];
+
+    if (status === 'unmarked') {
+      await Attendance.findOneAndDelete({ staffId, date });
+      return response.status(200).json({
+        success: true,
+        message: `Attendance cleared for ${targetStaff.fullName}`,
+        data: null
+      });
+    }
+
+    if (!nonPunchStatuses.includes(status)) {
+      parsedPunchIn = parseManualDateTime(date, punchInTime);
+      if (!parsedPunchIn) {
+        // Fallback to 09:30 AM IST of that date
+        parsedPunchIn = new Date(`${date}T09:30:00+05:30`);
+      }
+
+      if (punchOutTime) {
+        parsedPunchOut = parseManualDateTime(date, punchOutTime);
+        if (parsedPunchOut && parsedPunchIn) {
+          const diffMs = parsedPunchOut.getTime() - parsedPunchIn.getTime();
+          if (diffMs > 0) {
+            totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+          }
+        }
+      }
+    }
+
+    let finalStatus = status;
+    const adminName = request.staff.fullName || 'Admin';
+    let finalNotes = notes ? notes.trim() : `Attendance marked manually by ${adminName}`;
+
+    if (!nonPunchStatuses.includes(finalStatus) && parsedPunchIn && finalStatus === 'present') {
+      const { hour: piH, minute: piM } = getISTTimeParts(parsedPunchIn);
+      const punchMin = piH * 60 + piM;
+      if (punchMin > (11 * 60 + 30)) {
+        finalStatus = 'half_day';
+        finalNotes = finalNotes ? `${finalNotes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
+      } else if (punchMin > (9 * 60 + 40)) {
+        finalStatus = 'short_leave';
+        finalNotes = finalNotes ? `${finalNotes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
+      }
+    }
+
+    if (!nonPunchStatuses.includes(finalStatus) && parsedPunchOut) {
+      const { hour: poH, minute: poM } = getISTTimeParts(parsedPunchOut);
+      const punchOutMin = poH * 60 + poM;
+      if (punchOutMin < (16 * 60 + 30)) {
+        finalStatus = 'half_day';
+        finalNotes = finalNotes ? `${finalNotes} | Early punch-out (before 04:30 PM) - Half Day` : 'Early punch-out (before 04:30 PM) - Half Day';
+      } else if (punchOutMin < (18 * 60 + 30)) {
+        if (finalStatus !== 'half_day') {
+          finalStatus = 'short_leave';
+          finalNotes = finalNotes ? `${finalNotes} | Early punch-out (04:30 PM - 06:30 PM) - Short Leave` : 'Early punch-out (04:30 PM - 06:30 PM) - Short Leave';
+        }
+      }
+    }
+
+    const updateData = {
+      staffId,
+      date,
+      status: finalStatus,
+      punchInTime: parsedPunchIn,
+      punchInLocation: defaultLocation,
+      punchOutTime: parsedPunchOut,
+      punchOutLocation: parsedPunchOut ? defaultLocation : null,
+      totalHours,
+      notes: finalNotes,
+      isActive: true
+    };
+
+    const attendance = await Attendance.findOneAndUpdate(
+      { staffId, date },
+      updateData,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).populate('staffId', 'fullName email department designation role');
+
+    return response.status(200).json({
+      success: true,
+      message: `Attendance marked successfully for ${targetStaff.fullName}`,
+      data: attendance
+    });
+
+  } catch (error) {
+    console.error('Mark manual attendance error:', error);
+    return response.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error while marking attendance'
+    });
+  }
+};
+
+// Mark Bulk Attendance (Super Admin / Admin / HR / TL)
+const markBulkAttendance = async (request, response) => {
+  try {
+    const userRole = request.staff.role || request.staff.systemRole;
+    if (!['super_admin', 'admin', 'hr', 'tl'].includes(request.staff.role) && !['super_admin', 'admin', 'hr', 'tl'].includes(request.staff.systemRole)) {
+      return response.status(403).json({
+        success: false,
+        message: 'Access denied. Administrator privileges required.'
+      });
+    }
+
+    const { date, records } = request.body;
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return response.status(400).json({
+        success: false,
+        message: 'A valid date in YYYY-MM-DD format is required'
+      });
+    }
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return response.status(400).json({
+        success: false,
+        message: 'Records array is required'
+      });
+    }
+
+    // Fetch active staff ids to skip any deactivated/removed employees
+    const requestedStaffIds = records.map((r) => r.staffId).filter(Boolean);
+    const activeStaffDocs = await Staff.find({ _id: { $in: requestedStaffIds }, isActive: true }).select('_id');
+    const activeStaffIdSet = new Set(activeStaffDocs.map((d) => d._id.toString()));
+
+    const defaultLocation = { latitude: 30.6970439, longitude: 76.68684 };
+    const nonPunchStatuses = [
+      'absent', 'medical_leave', 'casual_leave', 'maternity_leave',
+      'lwp', 'holiday', 'compensatory_leave', 'bereavement_leave',
+      'unmarked'
+    ];
+    const adminName = request.staff.fullName || 'Super Admin';
+
+    const results = [];
+    for (const rec of records) {
+      if (!rec.staffId) continue;
+      // Skip inactive or removed employees
+      if (!activeStaffIdSet.has(rec.staffId.toString())) {
+        continue;
+      }
+
+      if (rec.status === 'unmarked') {
+        await Attendance.findOneAndDelete({ staffId: rec.staffId, date });
+        results.push({ staffId: rec.staffId, status: 'unmarked', cleared: true });
+        continue;
+      }
+
+      let parsedPunchIn = null;
+      let parsedPunchOut = null;
+      let totalHours = 0;
+
+      if (!nonPunchStatuses.includes(rec.status)) {
+        parsedPunchIn = parseManualDateTime(date, rec.punchInTime);
+        if (!parsedPunchIn && rec.status === 'present') {
+          parsedPunchIn = new Date(`${date}T09:30:00+05:30`);
+        }
+
+        if (rec.punchOutTime) {
+          parsedPunchOut = parseManualDateTime(date, rec.punchOutTime);
+          if (parsedPunchOut && parsedPunchIn) {
+            const diffMs = parsedPunchOut.getTime() - parsedPunchIn.getTime();
+            if (diffMs > 0) {
+              totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+            }
+          }
+        }
+      }
+
+      let recStatus = rec.status || 'present';
+      let recNotes = rec.notes ? rec.notes.trim() : `Marked by ${adminName}`;
+
+      if (!nonPunchStatuses.includes(recStatus) && parsedPunchIn && recStatus === 'present') {
+        const { hour: piH, minute: piM } = getISTTimeParts(parsedPunchIn);
+        const punchMin = piH * 60 + piM;
+        if (punchMin > (11 * 60 + 30)) {
+          recStatus = 'half_day';
+          recNotes = recNotes ? `${recNotes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
+        } else if (punchMin > (9 * 60 + 40)) {
+          recStatus = 'short_leave';
+          recNotes = recNotes ? `${recNotes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
+        }
+      }
+
+      if (!nonPunchStatuses.includes(recStatus) && parsedPunchOut) {
+        const { hour: poH, minute: poM } = getISTTimeParts(parsedPunchOut);
+        const punchOutMin = poH * 60 + poM;
+        if (punchOutMin < (16 * 60 + 30)) {
+          recStatus = 'half_day';
+          recNotes = recNotes ? `${recNotes} | Early punch-out (before 04:30 PM) - Half Day` : 'Early punch-out (before 04:30 PM) - Half Day';
+        } else if (punchOutMin < (18 * 60 + 30)) {
+          if (recStatus !== 'half_day') {
+            recStatus = 'short_leave';
+            recNotes = recNotes ? `${recNotes} | Early punch-out (04:30 PM - 06:30 PM) - Short Leave` : 'Early punch-out (04:30 PM - 06:30 PM) - Short Leave';
+          }
+        }
+      }
+
+      const updateData = {
+        staffId: rec.staffId,
+        date,
+        status: recStatus,
+        punchInTime: parsedPunchIn,
+        punchInLocation: defaultLocation,
+        punchOutTime: parsedPunchOut,
+        punchOutLocation: parsedPunchOut ? defaultLocation : null,
+        totalHours,
+        notes: recNotes,
+        isActive: true
+      };
+
+      const updated = await Attendance.findOneAndUpdate(
+        { staffId: rec.staffId, date },
+        updateData,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      results.push(updated);
+    }
+
+    return response.status(200).json({
+      success: true,
+      message: `Attendance marked successfully for ${results.length} employee(s)`,
+      count: results.length
+    });
+  } catch (error) {
+    console.error('Mark bulk attendance error:', error);
+    return response.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error while marking bulk attendance'
+    });
+  }
+};
+
 module.exports = {
   punchIn,
   punchOut,
   getAttendanceByStaff,
   getCurrentStatus,
-  getAllStaffAttendance
+  getAllStaffAttendance,
+  markManualAttendance,
+  markBulkAttendance
 };
+
+

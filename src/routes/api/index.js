@@ -57,6 +57,10 @@ const adminRoutes = require('./Admin.route');
 const jobRoutes = require('./Job.route');
 const counselorRoutes = require('./Counselor.route');
 
+const webinarRoutes = require('./Webinar.route');
+const dailyWorkReportRoutes = require('./DailyWorkReport.route');
+const financialYearRoutes = require('./FinancialYear.route');
+
 Router.use("/settings", settingsRoutes);
 Router.use("/highest-education", highestEducationRoutes);
 Router.use("/course-options", courseOptionRoutes);
@@ -69,5 +73,8 @@ Router.use("/admission", admissionRoutes);
 Router.use("/admin", adminRoutes);
 Router.use("/jobs", jobRoutes);
 Router.use("/counselor", counselorRoutes);
+Router.use("/webinars", webinarRoutes);
+Router.use("/daily-work-reports", dailyWorkReportRoutes);
+Router.use("/financial-years", financialYearRoutes);
 
 module.exports = Router;
