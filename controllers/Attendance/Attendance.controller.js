@@ -109,16 +109,27 @@ const getStatusFromPunchInTime = (punchInTime) => {
 
 // Determine or update status based on punch-out time (in IST)
 // Rule:
+// - If punch-out is on or after 06:30 PM IST: complete shift ('present')
 // - If reasonType is 'half_day': 'half_day'
 // - If reasonType is 'other': 'pending_other'
 // - If currentStatus is already 'half_day': remains 'half_day'
 // - If punch-out is between 04:30 PM and 06:30 PM IST: 'short_leave'
 // - If punch-out is before 04:30 PM IST: 'half_day'
-// - If punch-out is on or after 06:30 PM IST: keep 'short_leave' if already marked, otherwise 'present'
 const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = null) => {
   const punchOutDate = new Date(punchOutTime);
   const { hour: punchOutHour, minute: punchOutMinute } = getISTTimeParts(punchOutDate);
   const punchOutMinutes = punchOutHour * 60 + punchOutMinute;
+
+  const shortLeaveStartMin = 16 * 60 + 30; // 04:30 PM (990 min)
+  const shiftEndMin = 18 * 60 + 30;        // 06:30 PM (1110 min)
+
+  // On or after 06:30 PM IST: Complete shift -> present (unless marked half_day)
+  if (punchOutMinutes >= shiftEndMin) {
+    if (reasonType === 'half_day' || currentStatus === 'half_day') {
+      return 'half_day';
+    }
+    return 'present';
+  }
 
   // If reason type is provided (half_day or other), handle accordingly
   if (reasonType === 'half_day') {
@@ -134,9 +145,6 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
     return 'half_day';
   }
 
-  const shortLeaveStartMin = 16 * 60 + 30; // 04:30 PM (990 min)
-  const shiftEndMin = 18 * 60 + 30;        // 06:30 PM (1110 min)
-
   // Check if punch-out is before 04:30 PM IST -> Half Day
   if (punchOutMinutes < shortLeaveStartMin) {
     return 'half_day';
@@ -144,12 +152,6 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
 
   // Check if punch-out is in between 04:30 PM and 06:30 PM IST -> Short Leave
   if (punchOutMinutes < shiftEndMin) {
-    return 'short_leave';
-  }
-
-  // If punch-out is on/after 6:30 PM IST and current status is already short_leave 
-  // (due to late punch-in between 9:40 and 11:30), keep it as short_leave
-  if (currentStatus === 'short_leave') {
     return 'short_leave';
   }
 
@@ -353,7 +355,14 @@ const punchOut = async (request, response) => {
     // Add descriptive notes if early punch-out occurred
     const { hour: poH, minute: poM } = getISTTimeParts(punchOutTime);
     const poMin = poH * 60 + poM;
-    if (poMin >= (16 * 60 + 30) && poMin < (18 * 60 + 30)) {
+    const shiftEndMin = 18 * 60 + 30;
+
+    if (poMin >= shiftEndMin) {
+      // Completed shift on or after 6:30 PM - no early punch out note
+      if (attendance.notes && attendance.notes.includes('Early punch-out')) {
+        attendance.notes = attendance.notes.replace(/\|\s*Early punch-out[^|]*/g, '').replace(/Early punch-out[^|]*/g, '').trim();
+      }
+    } else if (poMin >= (16 * 60 + 30) && poMin < shiftEndMin) {
       if (newStatus === 'short_leave' && !attendance.notes?.includes('04:30 PM - 06:30 PM')) {
         attendance.notes = attendance.notes 
           ? `${attendance.notes} | Early punch-out (04:30 PM - 06:30 PM) - Short Leave` 
@@ -388,11 +397,16 @@ const punchOut = async (request, response) => {
     // Populate staff information
     await attendance.populate('staffId', 'fullName email department designation');
 
+    let responseMessage = 'Punched out successfully';
+    if (poMin >= shiftEndMin) {
+      responseMessage = 'Punched out successfully! Shift completed.';
+    } else if (reasonType === 'other') {
+      responseMessage = 'Punch out submitted for admin approval';
+    }
+
     response.status(200).json({
       success: true,
-      message: reasonType === 'other' 
-        ? 'Punch out submitted for admin approval' 
-        : 'Punched out successfully',
+      message: responseMessage,
       attendance: {
         id: attendance._id,
         date: attendance.date,
