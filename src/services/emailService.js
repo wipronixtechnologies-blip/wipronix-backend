@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { GMAIL_APP_PASSWORD, GMAIL_USER, SUPPORT_EMAIL, WEBSITE_URL, FRONTEND_URL } = require('../config/env');
+const { GMAIL_APP_PASSWORD, GMAIL_USER, SUPPORT_EMAIL, WEBSITE_URL, FRONTEND_URL, ADMIN_LINK } = require('../config/env');
 
 // Create transporter for Gmail SMTP
 const createTransporter = () => {
@@ -402,7 +402,7 @@ const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuff
               Your Login Credentials
             </h4>
             <div style="font-size: 15px; color: #374151; line-height: 1.8;">
-              <strong>Portal URL:</strong> <a href="${WEBSITE_URL}">${WEBSITE_URL}</a><br>
+              <strong>Portal URL:</strong> <a href="${ADMIN_LINK}">${ADMIN_LINK}</a><br>
               <strong>Username/Email:</strong> ${staffData.email}<br>
               <strong>Temporary Password:</strong> ${password}
             </div>

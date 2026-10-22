@@ -82,6 +82,9 @@ const staffLogin = async (request, response) => {
         userId: staff._id,
         email: staff.email,
         role: staff.role,
+        systemRole: staff.systemRole || staff.role,
+        designation: staff.designation || '',
+        department: staff.department || '',
         userType: 'staff',
         firstName: staff.firstName,
         lastName: staff.lastName,
@@ -91,15 +94,20 @@ const staffLogin = async (request, response) => {
       { expiresIn: '1h' }
     );
 
-    // Prepare user data for response (not stored in cookie anymore)
+    // Prepare user data for response (stored in client localStorage)
     const userData = {
       userId: staff._id,
       email: staff.email,
       role: staff.role,
+      systemRole: staff.systemRole || staff.role,
+      designation: staff.designation || '',
+      department: staff.department || '',
       userType: 'staff',
       firstName: staff.firstName,
       lastName: staff.lastName,
-      fullName: staff.fullName
+      fullName: staff.fullName,
+      permissions: staff.permissions || [],
+      profileImage: staff.profileImage || ''
     };
 
     // Set HTTP-only cookie for token (contains all user data)
@@ -125,9 +133,9 @@ const staffLogin = async (request, response) => {
         fullName: staff.fullName,
         email: staff.email,
         role: staff.role,
-        systemRole: staff.systemRole,
-        department: staff.department,
-        designation: staff.designation,
+        systemRole: staff.systemRole || staff.role,
+        department: staff.department || '',
+        designation: staff.designation || '',
         profileImage: staff.profileImage,
         permissions: staff.permissions
       }

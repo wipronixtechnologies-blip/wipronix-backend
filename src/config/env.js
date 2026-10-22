@@ -24,6 +24,7 @@ module.exports = {
     GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD,
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || 'support@wipronix.com',
     WEBSITE_URL: process.env.WEBSITE_URL || 'http://localhost:5173/onBoard',
-    FRONTEND_URL: process.env.FRONTEND_URL || 'https://wipronix-frontend.vercel.app'
+    FRONTEND_URL: process.env.FRONTEND_URL || 'https://wipronix-frontend.vercel.app',
+    ADMIN_LINK: process.env.ADMIN_LINK || 'https://admin.wipronix.com'
   };
   

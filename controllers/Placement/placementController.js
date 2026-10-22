@@ -43,7 +43,12 @@ exports.getMyColleges = async (req, res) => {
 // Get BDE Staff (for Training Head to select)
 exports.getBDEs = async (req, res) => {
     try {
-        const bdes = await Staff.find({ role: { $in: ['bde', 'training_head', 'marketing_manager'] }, isActive: true }).select('fullName email role');
+        const bdes = await Staff.find({
+            department: { $regex: /marketing/i },
+            role: { $nin: ['super_admin', 'admin'] },
+            systemRole: { $nin: ['super_admin', 'admin'] },
+            isActive: true
+        }).select('fullName email role department designation');
         res.status(200).json({ success: true, data: bdes });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });   

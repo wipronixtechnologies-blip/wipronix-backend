@@ -5,6 +5,9 @@ const College = require('../../models/College.model');
 const EventTest = require('../../models/EventTest.model');
 const RegistrationSlip = require('../../models/RegistrationSlip.model');
 const Result = require('../../models/Result.model');
+const Task = require('../../models/Task.model');
+const DailyWorkReport = require('../../models/DailyWorkReport.model');
+const Notification = require('../../models/Notification.model');
 const crypto = require('crypto');
 const emailService = require('../../src/services/emailService');
 const { logActivity } = require('../Activity/activityController');
@@ -27,14 +30,11 @@ exports.getBDEs = async (req, res) => {
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
     const tlId = req.staff?._id;
 
-    // Find all Counselors / BDEs / TLs (excluding purely administrative roles)
+    // Find all Counselors / BDEs / TLs strictly in the MARKETING department only (excluding purely administrative roles)
     const bdes = await Staff.find({
-      $or: [
-        { role: { $in: ['bde', 'tl', 'employee'] } },
-        { systemRole: { $in: ['bde', 'tl', 'employee'] } },
-        { designation: { $regex: /bde|business development executive|counselor|team lead|\btl\b/i } }
-      ],
+      department: { $regex: /marketing/i },
       role: { $nin: ['super_admin', 'admin'] },
+      systemRole: { $nin: ['super_admin', 'admin'] },
       isActive: true
     }).select('firstName lastName fullName email phoneNumber department designation role systemRole profileImage createdAt');
 
@@ -624,10 +624,14 @@ exports.assignStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: 'BDE selection is required' });
     }
 
-    // Verify BDE exists
+    // Verify BDE exists and belongs to the Marketing department
     const bde = await Staff.findById(bdeId);
     if (!bde) {
       return res.status(404).json({ success: false, message: 'Selected BDE employee not found' });
+    }
+    const bdeDept = (bde.department || '').toLowerCase();
+    if (!bdeDept.includes('marketing')) {
+      return res.status(400).json({ success: false, message: 'Students can only be assigned to staff members in the Marketing department.' });
     }
 
     // Find students for this college / event drive (FIFO: oldest registered first)
@@ -1015,6 +1019,10 @@ exports.reassignStudents = async (req, res) => {
     if (!newBde) {
       return res.status(404).json({ success: false, message: 'Target BDE not found' });
     }
+    const newBdeDept = (newBde.department || '').toLowerCase();
+    if (!newBdeDept.includes('marketing')) {
+      return res.status(400).json({ success: false, message: 'Students can only be reassigned to staff members in the Marketing department.' });
+    }
 
         // Authorization check for TL: TL can only re-assign students globally if they own them, OR are super admin
     let query = { _id: { $in: studentIds } };
@@ -1247,33 +1255,24 @@ exports.getMyAssignedStudents = async (req, res) => {
 
     // Base match filter for this counselor's assignments
     let baseCounselorFilter;
-    if (isTL) {
-      if (req.query.counselorId && req.query.counselorId !== 'all') {
-        const requestedCounselorId = req.query.counselorId;
-        if (requestedCounselorId === loggedInStaff._id.toString()) {
-          // TL viewing their own assignments
-          baseCounselorFilter = { assignedTo: loggedInStaff._id };
-        } else {
-          // TL viewing a counselor: show students assigned to this counselor that this TL assigned or that belong to this TL's pool
-          baseCounselorFilter = {
-            assignedTo: counselorObjectId,
-            $or: [
-              { assignedBy: loggedInStaff._id },
-              { allocatedTL: loggedInStaff._id }
-            ]
-          };
-        }
-      } else {
-        // TL viewing all: show all students assigned to this TL or assigned by this TL
+    if (req.query.counselorId && req.query.counselorId !== 'all') {
+      // Viewing as a specific counselor (for TL, Admin, and Super Admin)
+      baseCounselorFilter = { assignedTo: counselorObjectId };
+    } else if (req.query.counselorId === 'all') {
+      // Viewing all team leads
+      if (isTL) {
         baseCounselorFilter = {
           $or: [
             { assignedTo: loggedInStaff._id },
             { assignedBy: loggedInStaff._id }
           ]
         };
+      } else {
+        baseCounselorFilter = { assignedTo: { $ne: null } };
       }
     } else {
-      baseCounselorFilter = { assignedTo: counselorObjectId };
+      // Default: logged in staff viewing their own assigned students
+      baseCounselorFilter = { assignedTo: loggedInStaff._id };
     }
     const andConditions = [baseCounselorFilter];
 
@@ -2454,20 +2453,17 @@ exports.updateStudentDetails = async (req, res) => {
   }
 };
 
-// 16. Get TL Counselor Oversight & Untouched Leads Analytics
+// 16. Get TL Counselor Oversight & Untouched Leads Analytics (Marketing Team BDEs only)
 exports.getTLTeamPerformance = async (req, res) => {
   try {
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
     const tlId = req.staff?._id;
 
-    // Get all active counselors / BDEs
+    // Strictly filter staff belonging to the MARKETING department only (excluding super_admin / admin)
     const bdeQuery = {
-      $or: [
-        { role: 'bde' },
-        { systemRole: 'bde' },
-        { role: 'counselor' },
-        { designation: { $regex: /^bde\b|counselor|business development/i } }
-      ],
+      department: { $regex: /marketing/i },
+      role: { $nin: ['super_admin', 'admin'] },
+      systemRole: { $nin: ['super_admin', 'admin'] },
       isActive: true
     };
 
@@ -2476,10 +2472,33 @@ exports.getTLTeamPerformance = async (req, res) => {
       .lean();
 
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const endOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
+    const endOf7Days = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999);
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
     const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
     const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let totalAssignedPool = 0;
+    let totalContactedToday = 0;
+    let totalUntouchedToday = 0;
+    let totalUntouched1Day = 0;
+    let totalUntouched2Days = 0;
+    let totalUntouched3Days = 0;
+    let totalUntouched5Days = 0;
+    let totalUntouched7Days = 0;
+    let totalFollowUpsOverdue = 0;
+    let totalFollowUpsToday = 0;
+    let totalFollowUpsTomorrow = 0;
+    let totalFollowUpsThisWeek = 0;
+    let totalAdmissions = 0;
+    let totalCallsToday = 0;
+    let totalTasksCompleted = 0;
 
     const teamReports = await Promise.all(
       counselors.map(async (c) => {
@@ -2488,19 +2507,62 @@ exports.getTLTeamPerformance = async (req, res) => {
         const [
           totalAssigned,
           touchedToday,
+          untouchedToday,
+          untouched1Day,
+          untouched2Days,
           untouched3Days,
+          untouched5Days,
           untouched7Days,
           admissionsDone,
           demosScheduled,
-          followUpsDue
+          followUpsOverdue,
+          followUpsToday,
+          followUpsTomorrow,
+          followUpsThisWeek,
+          interestedCount,
+          tasksTotal,
+          tasksCompleted,
+          tasksPending,
+          recentTasks,
+          dailyReportToday,
+          recentCallLogs,
+          upcomingFollowUps
         ] = await Promise.all([
           Student.countDocuments(counselorFilter),
-          Student.countDocuments({ ...counselorFilter, lastContactedAt: { $gte: oneDayAgo } }),
+          Student.countDocuments({ ...counselorFilter, lastContactedAt: { $gte: startOfToday } }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lt: startOfToday } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lte: oneDayAgo } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lte: twoDaysAgo } }
+            ]
+          }),
           Student.countDocuments({
             ...counselorFilter,
             $or: [
               { lastContactedAt: null },
               { lastContactedAt: { $lte: threeDaysAgo } }
+            ]
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { lastContactedAt: null },
+              { lastContactedAt: { $lte: fiveDaysAgo } }
             ]
           }),
           Student.countDocuments({
@@ -2514,7 +2576,7 @@ exports.getTLTeamPerformance = async (req, res) => {
             ...counselorFilter,
             $or: [
               { leadStage: 'Admission done' },
-              { counselingStatus: 'enrolled' }
+              { counselingStatus: { $in: ['enrolled', 'registered'] } }
             ]
           }),
           Student.countDocuments({
@@ -2526,35 +2588,245 @@ exports.getTLTeamPerformance = async (req, res) => {
           }),
           Student.countDocuments({
             ...counselorFilter,
-            nextFollowUpDate: { $lte: now, $ne: null }
+            nextFollowUpDate: { $lt: startOfToday, $ne: null }
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            nextFollowUpDate: { $gte: startOfToday, $lte: endOfToday }
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            nextFollowUpDate: { $gt: endOfToday, $lte: endOfTomorrow }
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            nextFollowUpDate: { $lte: endOf7Days, $ne: null }
+          }),
+          Student.countDocuments({
+            ...counselorFilter,
+            $or: [
+              { counselingStatus: 'interested' },
+              { leadStage: 'Interested' }
+            ]
+          }),
+          Task.countDocuments({ assignedTo: c._id }).catch(() => 0),
+          Task.countDocuments({ assignedTo: c._id, status: 'completed' }).catch(() => 0),
+          Task.countDocuments({ assignedTo: c._id, status: { $in: ['pending', 'in_progress'] } }).catch(() => 0),
+          Task.find({ assignedTo: c._id }).sort({ createdAt: -1 }).limit(5).lean().catch(() => []),
+          DailyWorkReport.findOne({ staff: c._id, date: todayStr }).lean().catch(() => null),
+          // Fetch student call logs by this counselor
+          Student.aggregate([
+            { $match: { 'callLogs.calledBy': c._id } },
+            { $unwind: '$callLogs' },
+            { $match: { 'callLogs.calledBy': c._id } },
+            { $sort: { 'callLogs.calledAt': -1 } },
+            { $limit: 5 },
+            {
+              $project: {
+                studentName: '$fullName',
+                studentEmail: '$email',
+                calledAt: '$callLogs.calledAt',
+                callOutcome: '$callLogs.callOutcome',
+                notes: '$callLogs.notes'
+              }
+            }
+          ]).catch(() => []),
+          // Top 5 upcoming follow-ups
+          Student.find({
+            ...counselorFilter,
+            nextFollowUpDate: { $ne: null }
           })
+            .sort({ nextFollowUpDate: 1 })
+            .limit(5)
+            .select('fullName email phoneNumber counselingStatus leadStage nextFollowUpDate counselingNotes')
+            .lean()
+            .catch(() => [])
         ]);
 
-        return {
-          counselorId: c._id,
+        const callsTodayCount = await Student.aggregate([
+          { $match: { 'callLogs.calledBy': c._id, 'callLogs.calledAt': { $gte: startOfToday } } },
+          { $unwind: '$callLogs' },
+          { $match: { 'callLogs.calledBy': c._id, 'callLogs.calledAt': { $gte: startOfToday } } },
+          { $count: 'count' }
+        ]).then(res => res[0]?.count || 0).catch(() => 0);
+
+        totalAssignedPool += totalAssigned;
+        totalContactedToday += touchedToday;
+        totalUntouchedToday += untouchedToday;
+        totalUntouched1Day += untouched1Day;
+        totalUntouched2Days += untouched2Days;
+        totalUntouched3Days += untouched3Days;
+        totalUntouched5Days += untouched5Days;
+        totalUntouched7Days += untouched7Days;
+        totalFollowUpsOverdue += followUpsOverdue;
+        totalFollowUpsToday += followUpsToday;
+        totalFollowUpsTomorrow += followUpsTomorrow;
+        totalFollowUpsThisWeek += followUpsThisWeek;
+        totalAdmissions += admissionsDone;
+        totalCallsToday += callsTodayCount;
+        totalTasksCompleted += tasksCompleted;
+
+        const counselorData = {
+          _id: c._id,
           fullName: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Counselor',
           email: c.email,
-          phone: c.phoneNumber,
-          designation: c.designation || 'Career Counselor',
-          profileImage: c.profileImage,
+          phoneNumber: c.phoneNumber,
+          designation: c.designation || 'BDE / Counselor',
+          department: c.department || 'Marketing',
+          role: c.role || 'bde',
+          profileImage: c.profileImage
+        };
+
+        const metricsData = {
           totalAssigned,
           touchedToday,
+          untouchedToday,
+          untouched1Day,
+          untouched2Days,
           untouched3Days,
+          untouched5Days,
           untouched7Days,
           admissionsDone,
           demosScheduled,
-          followUpsDue,
-          conversionRate: totalAssigned > 0 ? Math.round((admissionsDone / totalAssigned) * 100) : 0
+          followUpsDue: followUpsToday + followUpsOverdue,
+          followUpsOverdue,
+          followUpsToday,
+          followUpsTomorrow,
+          followUpsThisWeek,
+          interestedCount,
+          callsTodayCount,
+          tasksTotal,
+          tasksCompleted,
+          tasksPending,
+          conversionRate: totalAssigned > 0 ? Math.round((admissionsDone / totalAssigned) * 100) : 0,
+          recentTasks,
+          dailyReportToday,
+          recentCallLogs,
+          upcomingFollowUps
+        };
+
+        return {
+          counselor: counselorData,
+          metrics: metricsData,
+          // Flat attributes for backwards-compatibility
+          counselorId: c._id,
+          ...counselorData,
+          ...metricsData
         };
       })
     );
 
+    const summary = {
+      totalAssignedPool,
+      totalContactedToday,
+      totalUntouchedToday,
+      totalUntouched1Day,
+      totalUntouched2Days,
+      totalUntouched: totalUntouched3Days, // backwards-compatibility
+      totalUntouched3Days,
+      totalUntouched5Days,
+      totalUntouched7Days,
+      totalFollowUpsDue: totalFollowUpsToday + totalFollowUpsOverdue,
+      totalFollowUpsOverdue,
+      totalFollowUpsToday,
+      totalFollowUpsTomorrow,
+      totalFollowUpsThisWeek,
+      totalAdmissions,
+      totalCallsToday,
+      totalTasksCompleted,
+      totalActiveCounselors: counselors.length
+    };
+
     res.status(200).json({
       success: true,
-      data: teamReports
+      data: {
+        summary,
+        counselors: teamReports
+      }
     });
   } catch (error) {
     console.error('Error fetching TL team performance:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 17. Send BDE Catch-Up / Follow-Up Reminder Notification
+exports.sendBDEReminderNotification = async (req, res) => {
+  try {
+    const { bdeId, customMessage, reminderType } = req.body;
+    const sender = req.staff;
+    if (!sender) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!bdeId) {
+      return res.status(400).json({ success: false, message: 'BDE ID is required' });
+    }
+
+    const bde = await Staff.findById(bdeId);
+    if (!bde) {
+      return res.status(404).json({ success: false, message: 'BDE staff member not found' });
+    }
+
+    // Count pending follow-ups and untouched leads for this BDE
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const [followUpsDue, untouchedToday, untouched3Days] = await Promise.all([
+      Student.countDocuments({ assignedTo: bde._id, nextFollowUpDate: { $lte: endOfToday, $ne: null } }),
+      Student.countDocuments({
+        assignedTo: bde._id,
+        $or: [{ lastContactedAt: null }, { lastContactedAt: { $lt: startOfToday } }]
+      }),
+      Student.countDocuments({
+        assignedTo: bde._id,
+        $or: [{ lastContactedAt: null }, { lastContactedAt: { $lte: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000) } }]
+      })
+    ]);
+
+    const senderName = sender.fullName || 'Team Lead';
+    const notificationTitle = `Lead Follow-Up & Catch-Up Reminder from TL ${senderName}`;
+    const notificationMessage = customMessage || 
+      `Hi ${bde.fullName.split(' ')[0]}, you have ${followUpsDue} scheduled follow-up(s) and ${untouchedToday} pending lead(s) today (${untouched3Days} untouched 3+ days). Please connect with your assigned leads today!`;
+
+    const notification = new Notification({
+      recipient: bde._id,
+      sender: sender._id,
+      senderName: senderName,
+      type: 'task',
+      title: notificationTitle,
+      message: notificationMessage,
+      link: '/counselor/my-students',
+      priority: 'urgent',
+      metadata: {
+        bdeId: bde._id,
+        followUpsDue,
+        untouchedToday,
+        untouched3Days,
+        sentBy: sender._id,
+        reminderType: reminderType || 'follow_up'
+      }
+    });
+
+    await notification.save();
+
+    try {
+      const { emitNotification } = require('../../src/services/socket');
+      if (typeof emitNotification === 'function') {
+        emitNotification(bde._id, notification);
+      }
+    } catch (sockErr) {
+      // socket notification is optional if socket service is unavailable
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Catch-up reminder notification sent to ${bde.fullName} successfully!`,
+      data: notification
+    });
+  } catch (error) {
+    console.error('Error sending BDE reminder:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

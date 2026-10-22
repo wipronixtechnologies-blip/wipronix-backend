@@ -12,7 +12,7 @@ router.use(authenticateStaff);
 
 // Only Super Admin has access to Staff Activity & Audit Trail
 const restrictToSuperAdmin = (req, res, next) => {
-  const isSuperAdmin = ['super_admin', 'admin'].includes(req.staff?.role) || req.staff?.systemRole === 'super_admin';
+  const isSuperAdmin = ['super_admin'].includes(req.staff?.role) || req.staff?.systemRole === 'super_admin';
   if (isSuperAdmin) {
     next();
   } else {
