@@ -1303,7 +1303,20 @@ exports.getMyAssignedStudents = async (req, res) => {
     }
 
     if (leadStage && leadStage !== 'all') {
-      if (leadStage === 'Admission done') {
+      if (leadStage === 'Untouched leads' || leadStage === 'Untouched') {
+        andConditions.push({
+          $or: [
+            { leadStage: { $in: ['Untouched leads', 'Untouched'] } },
+            {
+              $and: [
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }] },
+                { $or: [{ counselingStatus: 'assigned' }, { counselingStatus: '' }, { counselingStatus: null }, { counselingStatus: { $exists: false } }] },
+                { $or: [{ lastContactedAt: null }, { lastContactedAt: { $exists: false } }] }
+              ]
+            }
+          ]
+        });
+      } else if (leadStage === 'Admission done') {
         andConditions.push({
           $or: [
             { leadStage: 'Admission done' },
@@ -1335,8 +1348,13 @@ exports.getMyAssignedStudents = async (req, res) => {
         andConditions.push({
           $or: [
             { leadStage: 'Follow up' },
-            { counselingStatus: { $in: ['follow_up', 'assigned', 'interested'] } },
-            { leadStage: { $exists: false }, counselingStatus: { $exists: false } }
+            { counselingStatus: 'follow_up' },
+            {
+              $and: [
+                { nextFollowUpDate: { $ne: null } },
+                { counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected', 'ringing'] } }
+              ]
+            }
           ]
         });
       } else {
@@ -1684,12 +1702,13 @@ exports.getMyAssignedStudents = async (req, res) => {
       console.warn('Error counting machine selected students:', cntErr.message);
     }
 
-    // Aggregate 5 Main Lead Stages across all leads for this counselor
-    const allAssignedStudents = await Student.find(baseCounselorFilter).select('leadStage leadSubStage counselingStatus').lean();
+    // Aggregate Main Lead Stages across all leads for this counselor (Untouched leads distinct from Follow up leads)
+    const allAssignedStudents = await Student.find(baseCounselorFilter).select('leadStage leadSubStage counselingStatus lastContactedAt nextFollowUpDate').lean();
     const stageCounts = {
       all: totalAssignedCount,
-      'Not responding': 0,
+      'Untouched leads': 0,
       'Follow up': 0,
+      'Not responding': 0,
       'Call back later': 0,
       'Not interested': 0,
       'Admission done': 0
@@ -1704,12 +1723,17 @@ exports.getMyAssignedStudents = async (req, res) => {
         else if (st === 'not_interested' || st === 'rejected') stage = 'Not interested';
         else if (st === 'ringing') stage = 'Not responding';
         else if (st === 'contacted') stage = 'Call back later';
-        else stage = 'Follow up';
+        else if (st === 'follow_up' || s.nextFollowUpDate) stage = 'Follow up';
+        else stage = 'Untouched leads';
       }
       if (stageCounts[stage] !== undefined) {
         stageCounts[stage]++;
       } else {
-        stageCounts['Follow up']++;
+        if (s.lastContactedAt || s.nextFollowUpDate || s.counselingStatus === 'follow_up') {
+          stageCounts['Follow up']++;
+        } else {
+          stageCounts['Untouched leads']++;
+        }
       }
       if (s.leadSubStage) {
         subStageCounts[s.leadSubStage] = (subStageCounts[s.leadSubStage] || 0) + 1;
