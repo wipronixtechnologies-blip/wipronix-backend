@@ -2,30 +2,160 @@ const Webinar = require('../../models/Webinar.model');
 const WebinarRegistration = require('../../models/WebinarRegistration.model');
 
 // ============================================================================
+// TIMING HELPER METHODS
+// ============================================================================
+
+/**
+ * Accurately calculate webinar start date, end date, and expiration status.
+ * Takes into account startDate, startTime (e.g. '05:47 PM'), and duration (e.g. '90 Mins').
+ */
+const getWebinarTimingInfo = (webinar) => {
+  if (!webinar || !webinar.startDate) return null;
+
+  try {
+    const rawDate = new Date(webinar.startDate);
+    if (isNaN(rawDate.getTime())) return null;
+
+    let year, month, day;
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      }).formatToParts(rawDate);
+      year = parseInt(parts.find(p => p.type === 'year')?.value, 10);
+      month = parseInt(parts.find(p => p.type === 'month')?.value, 10) - 1;
+      day = parseInt(parts.find(p => p.type === 'day')?.value, 10);
+    } catch {
+      year = rawDate.getFullYear();
+      month = rawDate.getMonth();
+      day = rawDate.getDate();
+    }
+
+    let hours = 18;
+    let minutes = 0;
+
+    if (webinar.startTime) {
+      const timeStr = String(webinar.startTime).trim();
+      const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      if (match12) {
+        hours = parseInt(match12[1], 10);
+        minutes = parseInt(match12[2], 10);
+        const meridian = match12[3] ? match12[3].toUpperCase() : null;
+        if (meridian === 'PM' && hours < 12) hours += 12;
+        if (meridian === 'AM' && hours === 12) hours = 0;
+      } else {
+        const match24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+        if (match24) {
+          hours = parseInt(match24[1], 10);
+          minutes = parseInt(match24[2], 10);
+        }
+      }
+    }
+
+    let durationMinutes = 60;
+    if (webinar.duration) {
+      const durMatch = String(webinar.duration).match(/(\d+(\.\d+)?)/);
+      if (durMatch) {
+        const val = parseFloat(durMatch[1]);
+        if (/hour/i.test(webinar.duration)) {
+          durationMinutes = Math.round(val * 60);
+        } else {
+          durationMinutes = Math.round(val);
+        }
+      }
+    }
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const isoString = `${year}-${pad(month + 1)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00+05:30`;
+    let startDateTime = new Date(isoString);
+    if (isNaN(startDateTime.getTime())) {
+      startDateTime = new Date(year, month, day, hours, minutes, 0);
+    }
+
+    // 15-minute grace period after scheduled duration
+    const endDateTime = new Date(startDateTime.getTime() + (durationMinutes + 15) * 60 * 1000);
+    const now = new Date();
+
+    return {
+      startDateTime,
+      endDateTime,
+      isExpired: now > endDateTime,
+      isLiveNow: now >= startDateTime && now <= endDateTime
+    };
+  } catch (e) {
+    console.error('Error calculating webinar end time:', e);
+    return null;
+  }
+};
+
+// ============================================================================
 // PUBLIC CONTROLLER METHODS
 // ============================================================================
 
 /**
- * Get current active webinar for website popup and page
- * Priority: Currently isLive=true, then isActive=true with closest upcoming/latest date
+ * Get current active webinar for website popup and page.
+ * Strictly excludes any webinar whose timings have passed (stale).
+ * Priority: Currently isLive/LiveNow=true, then closest upcoming non-expired webinar.
  */
 exports.getActiveWebinar = async (req, res) => {
   try {
-    const webinar = await Webinar.findOne({ isActive: true })
-      .sort({ isLive: -1, startDate: -1, createdAt: -1 })
+    // Query active candidates
+    const candidates = await Webinar.find({ isActive: true })
+      .sort({ isLive: -1, startDate: 1, createdAt: -1 })
       .lean();
 
-    if (!webinar) {
+    const validWebinars = [];
+    const expiredIds = [];
+
+    for (const w of candidates) {
+      const timing = getWebinarTimingInfo(w);
+      if (timing && timing.isExpired) {
+        expiredIds.push(w._id);
+      } else {
+        validWebinars.push({
+          ...w,
+          timing
+        });
+      }
+    }
+
+    // Auto-deactivate stale webinars in background
+    if (expiredIds.length > 0) {
+      Webinar.updateMany(
+        { _id: { $in: expiredIds } },
+        { $set: { isActive: false, isLive: false } }
+      ).catch(err => console.error('Error auto-deactivating expired webinars:', err));
+    }
+
+    if (validWebinars.length === 0) {
       return res.status(200).json({
         success: true,
         webinar: null,
-        message: 'No active webinar currently scheduled'
+        message: 'No active or upcoming webinar currently scheduled'
       });
     }
 
+    // Sort valid non-expired webinars:
+    // 1. Currently live session first
+    // 2. Earliest upcoming scheduled session next
+    validWebinars.sort((a, b) => {
+      const aLive = a.isLive || a.timing?.isLiveNow;
+      const bLive = b.isLive || b.timing?.isLiveNow;
+      if (aLive && !bLive) return -1;
+      if (!aLive && bLive) return 1;
+      const aStart = a.timing?.startDateTime?.getTime() || 0;
+      const bStart = b.timing?.startDateTime?.getTime() || 0;
+      return aStart - bStart;
+    });
+
+    const chosen = validWebinars[0];
+    const { timing, ...cleanWebinar } = chosen;
+
     return res.status(200).json({
       success: true,
-      webinar
+      webinar: cleanWebinar
     });
   } catch (error) {
     console.error('Error fetching active webinar:', error);
@@ -39,6 +169,7 @@ exports.getActiveWebinar = async (req, res) => {
 
 /**
  * Get single webinar by ID (Public)
+ * Returns isExpired: true and null webinar if timings have passed.
  */
 exports.getWebinarById = async (req, res) => {
   try {
@@ -49,6 +180,22 @@ exports.getWebinarById = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Webinar not found'
+      });
+    }
+
+    const timing = getWebinarTimingInfo(webinar);
+    if (timing && timing.isExpired) {
+      // Auto-deactivate stale webinar in background
+      if (webinar.isActive || webinar.isLive) {
+        Webinar.updateOne({ _id: webinar._id }, { $set: { isActive: false, isLive: false } })
+          .catch(() => {});
+      }
+
+      return res.status(200).json({
+        success: true,
+        isExpired: true,
+        webinar: null,
+        message: 'This webinar session has already concluded. Please check back for upcoming webinars!'
       });
     }
 
@@ -105,6 +252,15 @@ exports.registerForWebinar = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Webinar not found or no longer available'
+      });
+    }
+
+    // Check if webinar has already passed (stale)
+    const timing = getWebinarTimingInfo(webinar);
+    if (timing && timing.isExpired) {
+      return res.status(400).json({
+        success: false,
+        message: 'This webinar session has already concluded. Registrations are now closed.'
       });
     }
 
@@ -195,10 +351,15 @@ exports.getAllWebinars = async (req, res) => {
       countMap[String(c._id)] = c.count;
     });
 
-    const enriched = webinars.map(w => ({
-      ...w,
-      registrationCount: countMap[String(w._id)] || 0
-    }));
+    const enriched = webinars.map(w => {
+      const timing = getWebinarTimingInfo(w);
+      return {
+        ...w,
+        registrationCount: countMap[String(w._id)] || 0,
+        isExpired: timing ? timing.isExpired : false,
+        isLiveNow: timing ? timing.isLiveNow : false
+      };
+    });
 
     return res.status(200).json({
       success: true,

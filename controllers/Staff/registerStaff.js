@@ -28,7 +28,7 @@ exports.registerStaff = async (req, res, next) => {
     // Split fullName into firstName and lastName for the new model schema
     const nameParts = (fullName || '').trim().split(' ');
     const firstName = nameParts[0] || 'Staff';
-    const lastName = nameParts.slice(1).join(' ') || 'Member';
+    const lastName = nameParts.slice(1).join(' ') || '';
 
     const staff = new Staff({
       firstName,

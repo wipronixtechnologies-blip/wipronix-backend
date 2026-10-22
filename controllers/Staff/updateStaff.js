@@ -85,8 +85,10 @@ exports.updateStaff = async (req, res) => {
 
     const updateData = {
       firstName,
-      lastName,
-      fullName: (firstName || lastName) ? `${firstName || targetStaff.firstName} ${lastName || targetStaff.lastName}`.trim() : undefined,
+      lastName: lastName !== undefined ? lastName : targetStaff.lastName,
+      fullName: (firstName !== undefined || lastName !== undefined) 
+        ? `${firstName !== undefined ? firstName : (targetStaff.firstName || '')} ${lastName !== undefined ? lastName : (targetStaff.lastName || '')}`.trim() 
+        : undefined,
       phoneNumber,
       dateOfBirth,
       address,

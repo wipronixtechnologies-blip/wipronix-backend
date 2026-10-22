@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const { bucket } = require('../config/firebase');
+const { uploadBuffer, deleteFile } = require('./cloudinaryService');
 
 // Allowed MIME types
 const ALLOWED_TYPES = [
@@ -11,8 +11,8 @@ const ALLOWED_TYPES = [
   'text/plain'
 ];
 
-// Maximum file size (10MB)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Maximum file size (15MB)
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 class StorageService {
   /**
@@ -55,7 +55,7 @@ class StorageService {
   }
 
   /**
-   * Upload file to Firebase Storage
+   * Upload file to Cloudinary Storage
    * @param {Object} file - File object from multer
    * @param {string} folder - Folder path in storage
    * @returns {Object} Upload result
@@ -71,35 +71,20 @@ class StorageService {
         };
       }
 
-      // Generate unique filename
-      const fileName = this.generateFileName(file.originalname);
-      const filePath = `${folder}/${fileName}`;
-      
-      // Create file reference in Firebase Storage
-      const fileUpload = bucket.file(filePath);
-
-      // Upload file to Firebase Storage
-      await fileUpload.save(file.buffer, {
-        metadata: {
-          contentType: file.mimetype,
-          metadata: {
-            firebaseStorageDownloadTokens: uuidv4()
-          }
-        }
-      });
-
-      // Get signed URL for the file (valid for 1 year)
-      const [signedUrl] = await fileUpload.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year
+      // Upload to Cloudinary with auto resource type (supports pdf, docx, images)
+      const result = await uploadBuffer(file.buffer, {
+        folder: `wipronix/${folder}`,
+        resource_type: 'auto'
       });
 
       return {
         success: true,
         data: {
-          fileName,
-          filePath: filePath,
-          fileUrl: signedUrl,
+          fileName: result.public_id,
+          filePath: result.public_id,
+          fileUrl: result.secure_url,
+          url: result.secure_url,
+          public_id: result.public_id,
           size: file.size,
           contentType: file.mimetype,
           originalName: file.originalname,
@@ -108,27 +93,24 @@ class StorageService {
       };
 
     } catch (error) {
-      console.error('File upload error:', error);
+      console.error('Cloudinary document upload error:', error);
       return {
         success: false,
-        error: error.message || 'Failed to upload file'
+        error: error.message || 'Failed to upload document to Cloudinary'
       };
     }
   }
 
   /**
-   * Delete file from Firebase Storage
+   * Delete file from Cloudinary
    */
-  async deleteFile(filePath) {
+  async deleteFile(publicId) {
     try {
-      const fileToDelete = bucket.file(filePath);
-      const [exists] = await fileToDelete.exists();
-      if (!exists) return { success: true };
-      
-      await fileToDelete.delete();
+      if (!publicId) return { success: true };
+      await deleteFile(publicId);
       return { success: true };
     } catch (error) {
-      console.error('File deletion error:', error);
+      console.error('Cloudinary file deletion error:', error);
       return { success: false, error: error.message };
     }
   }

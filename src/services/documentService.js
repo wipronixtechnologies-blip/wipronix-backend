@@ -1,12 +1,18 @@
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const { bucket } = require('../config/firebase');
+const { uploadBuffer, deleteFile } = require('./cloudinaryService');
 
 // Allowed document MIME types
-const ALLOWED_DOC_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+const ALLOWED_DOC_TYPES = [
+  'application/pdf', 
+  'application/msword', 
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png'
+];
 
-// Maximum file size (10MB)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Maximum file size (15MB)
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 // Storage folders
 const STORAGE_FOLDERS = {
@@ -23,7 +29,7 @@ class DocumentService {
     if (!ALLOWED_DOC_TYPES.includes(file.mimetype)) {
       return { 
         isValid: false, 
-        error: `Invalid file type. Allowed types: PDF, DOC, DOCX` 
+        error: `Invalid file type. Allowed types: PDF, DOC, DOCX, JPEG, PNG` 
       };
     }
 
@@ -51,31 +57,19 @@ class DocumentService {
         return { success: false, error: validation.error };
       }
 
-      const fileName = this.generateFileName(file.originalname);
-      const filePath = `${folder}/${fileName}`;
-      
-      const fileUpload = bucket.file(filePath);
-
-      await fileUpload.save(file.buffer, {
-        metadata: {
-          contentType: file.mimetype,
-          metadata: {
-            firebaseStorageDownloadTokens: uuidv4()
-          }
-        }
-      });
-
-      const [signedUrl] = await fileUpload.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year
+      const result = await uploadBuffer(file.buffer, {
+        folder: `wipronix/${folder}`,
+        resource_type: 'auto'
       });
 
       return {
         success: true,
         data: {
-          fileName,
-          filePath: filePath,
-          fileUrl: signedUrl,
+          fileName: result.public_id,
+          filePath: result.public_id,
+          fileUrl: result.secure_url,
+          url: result.secure_url,
+          public_id: result.public_id,
           contentType: file.mimetype,
           originalName: file.originalname,
           uploadedAt: new Date().toISOString()
@@ -83,8 +77,19 @@ class DocumentService {
       };
 
     } catch (error) {
-      console.error('Document upload error:', error);
-      return { success: false, error: error.message || 'Failed to upload document' };
+      console.error('Cloudinary document upload error:', error);
+      return { success: false, error: error.message || 'Failed to upload document to Cloudinary' };
+    }
+  }
+
+  async deleteDocument(publicId) {
+    try {
+      if (!publicId) return { success: true };
+      await deleteFile(publicId);
+      return { success: true };
+    } catch (error) {
+      console.error('Cloudinary document deletion error:', error);
+      return { success: false, error: error.message };
     }
   }
 }

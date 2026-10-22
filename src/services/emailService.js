@@ -468,7 +468,7 @@ const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuff
       html: html,
       attachments: [
         {
-          filename: `Offer_Letter_${staffData.firstName}_${staffData.lastName}.pdf`,
+          filename: `Offer_Letter_${staffData.firstName}${staffData.lastName ? '_' + staffData.lastName : ''}.pdf`,
           content: pdfBuffer,
           contentType: 'application/pdf'
         }

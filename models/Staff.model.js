@@ -37,7 +37,8 @@ const staffSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: true,
+    required: false,
+    default: '',
     trim: true
   },
   fullName: {
@@ -183,10 +184,16 @@ const staffSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Update fullName before saving or updating
+// Update fullName before validating or saving
+staffSchema.pre('validate', function() {
+  if (this.isModified('firstName') || this.isModified('lastName') || !this.fullName) {
+    this.fullName = `${this.firstName || ''} ${this.lastName || ''}`.trim();
+  }
+});
+
 staffSchema.pre('save', function() {
-  if (this.isModified('firstName') || this.isModified('lastName')) {
-    this.fullName = `${this.firstName} ${this.lastName}`.trim();
+  if (this.isModified('firstName') || this.isModified('lastName') || !this.fullName) {
+    this.fullName = `${this.firstName || ''} ${this.lastName || ''}`.trim();
   }
 
   // Enforce single super_admin policy

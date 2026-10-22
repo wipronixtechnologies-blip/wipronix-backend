@@ -128,7 +128,8 @@ exports.createStaff = async (req, res) => {
 
     const staff = new Staff({
       firstName,
-      lastName,
+      lastName: lastName || '',
+      fullName: req.body.fullName || `${firstName || ''} ${lastName || ''}`.trim(),
       email,
       password,
       phoneNumber,

@@ -1,12 +1,12 @@
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const { bucket } = require('../config/firebase');
+const { uploadBuffer, deleteFile } = require('./cloudinaryService');
 
 // Allowed image MIME types
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
-// Maximum file size (5MB)
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Maximum file size (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // Storage folders
 const STORAGE_FOLDERS = {
@@ -55,9 +55,9 @@ class ImageService {
   }
 
   /**
-   * Upload image to Firebase Storage
+   * Upload image to Cloudinary Storage
    * @param {Object} file - File object from multer
-   * @param {string} folder - Folder path in storage (profile-pictures or images)
+   * @param {string} folder - Folder path in Cloudinary (profile-pictures or images)
    * @returns {Object} Upload result
    */
   async uploadImage(file, folder = STORAGE_FOLDERS.IMAGES) {
@@ -71,36 +71,20 @@ class ImageService {
         };
       }
 
-      // Generate unique filename
-      const fileName = this.generateFileName(file.originalname);
-      const filePath = `${folder}/${fileName}`;
-      
-      // Create file reference in Firebase Storage
-      const fileUpload = bucket.file(filePath);
-
-      // Upload file to Firebase Storage
-      await fileUpload.save(file.buffer, {
-        metadata: {
-          contentType: file.mimetype,
-          metadata: {
-            firebaseStorageDownloadTokens: uuidv4()
-          }
-        }
-      });
-
-      // Get signed URL for the file (valid for 1 year)
-      const [signedUrl] = await fileUpload.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year
+      // Upload to Cloudinary
+      const result = await uploadBuffer(file.buffer, {
+        folder: `wipronix/${folder}`,
+        resource_type: 'image'
       });
 
       return {
         success: true,
         data: {
-          fileName,
-          filePath: filePath,
-          fileUrl: signedUrl,
-          bucket: bucket.name,
+          fileName: result.public_id,
+          filePath: result.public_id,
+          fileUrl: result.secure_url,
+          url: result.secure_url,
+          public_id: result.public_id,
           size: file.size,
           contentType: file.mimetype,
           originalName: file.originalname,
@@ -109,10 +93,10 @@ class ImageService {
       };
 
     } catch (error) {
-      console.error('Image upload error:', error);
+      console.error('Cloudinary image upload error:', error);
       return {
         success: false,
-        error: error.message || 'Failed to upload image'
+        error: error.message || 'Failed to upload image to Cloudinary'
       };
     }
   }

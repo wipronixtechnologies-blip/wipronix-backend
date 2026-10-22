@@ -53,10 +53,10 @@ const staffRegister = async (request, response, next) => {
     } = request.body;
 
     // Validate required fields
-    if (!fullName || !lastName || !email || !password) {
+    if (!fullName || !email || !password) {
       return response.status(400).json({
         success: false,
-        message: 'First name, last name, email, and password are required'
+        message: 'Name, email, and password are required'
       });
     }
 

@@ -134,11 +134,7 @@ const staffRegisterSchema = Joi.object({
     'string.min': 'First name must be at least 2 characters long',
     'string.max': 'First name cannot exceed 50 characters'
   }),
-  lastName: Joi.string().min(2).max(50).required().messages({
-    'string.empty': 'Last name is required',
-    'string.min': 'Last name must be at least 2 characters long',
-    'string.max': 'Last name cannot exceed 50 characters'
-  }),
+  lastName: Joi.string().max(50).allow('', null).optional(),
   email: Joi.string().email().required().messages({
     'string.empty': 'Email is required',
     'string.email': 'Please provide a valid email address'
