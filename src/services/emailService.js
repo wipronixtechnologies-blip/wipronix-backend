@@ -935,93 +935,114 @@ const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customM
 
     const subject = `Exclusive Invitation: Join Wipronix Smart Cut Assessment Portal`;
     const html = `
-      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 680px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #E52328 0%, #B91C1C 100%); padding: 36px 24px; text-align: center;">
-          <img src="https://www.wipronix.com/logo.png" alt="Wipronix Logo" style="max-width: 170px; height: auto; margin-bottom: 16px; filter: brightness(0) invert(1);">
-          <div style="display: inline-block; background-color: rgba(255,255,255,0.2); padding: 4px 14px; border-radius: 9999px; margin-bottom: 10px;">
-            <span style="color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">
-              ⚡ Smart Cut Portal
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+        <!-- Top Red Accent Bar -->
+        <div style="height: 5px; background-color: #E52328; width: 100%;"></div>
+
+        <!-- Header with Logo on Clean Background -->
+        <div style="padding: 28px 24px 20px 24px; text-align: center; background-color: #ffffff; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://www.wipronix.com/logo.png" alt="Wipronix" style="max-width: 160px; height: auto; display: block; margin: 0 auto 14px auto;" />
+          <div style="display: inline-block; background-color: #fef2f2; border: 1px solid #fee2e2; padding: 4px 14px; border-radius: 20px;">
+            <span style="color: #E52328; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
+              SmartCut Assessment Portal
             </span>
           </div>
-          <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">
+          <h1 style="color: #0f172a; margin: 14px 0 4px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">
             You Are Invited to Wipronix Smart Cut
           </h1>
-          <p style="color: #fee2e2; margin-top: 8px; font-size: 14px; font-weight: 400;">
-            Fast-Track Technical Reassessment & Discovery
+          <p style="color: #64748b; margin: 0; font-size: 13.5px; font-weight: 400;">
+            Practical Assessment & Technical Defense
           </p>
         </div>
 
         <!-- Body -->
-        <div style="padding: 36px 32px; color: #1e293b;">
-          <p style="font-size: 17px; line-height: 1.6; margin-top: 0; color: #0f172a;">
+        <div style="padding: 28px 24px; color: #1e293b;">
+          <p style="font-size: 16px; margin-top: 0; color: #0f172a;">
             Dear <strong>${recipientName}</strong>,
           </p>
 
-          <p style="font-size: 15px; color: #334155; line-height: 1.7;">
-            ${customMessage || `We are pleased to invite you to join the official <strong>Wipronix Smart Cut</strong> platform. Based on your application and profile, our leadership team has shortlisted you for an exclusive second-chance technical reassessment opportunity to demonstrate your engineering skills.`}
+          <p style="font-size: 14.5px; color: #334155; line-height: 1.6; margin-bottom: 20px;">
+            We are pleased to inform you that you have received an official invitation to the <strong>Wipronix Smart Cut</strong> assessment platform. Based on your profile and credentials, you have been selected for this practical defense evaluation.
           </p>
 
-          <!-- Highlights Card -->
-          <div style="background: #fff5f5; border: 1px solid #fecaca; border-radius: 10px; padding: 22px; margin: 26px 0;">
-            <h4 style="margin: 0 0 14px 0; color: #b91c1c; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-              🚀 Why Participate in Smart Cut?
-            </h4>
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 14px; color: #374151;">
+          ${customMessage ? `
+          <!-- Note from Evaluator -->
+          <div style="background-color: #fef2f2; border-left: 4px solid #E52328; padding: 14px 18px; border-radius: 6px; margin: 18px 0 24px 0;">
+            <div style="color: #991b1b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+              📝 Note from Evaluator / Super Admin:
+            </div>
+            <div style="color: #7f1d1d; font-size: 14px; font-weight: 600; line-height: 1.5;">
+              ${customMessage}
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Login Credentials Box -->
+          <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 20px 0;">
+            <div style="color: #0f172a; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+              🔐 Your Login Credentials
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #334155;">
               <tr>
-                <td style="padding-bottom: 10px; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
-                <td style="padding-bottom: 10px; line-height: 1.5;"><strong>Live Hands-On Coding:</strong> Solve real-world challenges in interactive, sandboxed coding environments.</td>
+                <td style="padding: 7px 0; color: #64748b; width: 140px; font-weight: 600;">Portal Link:</td>
+                <td style="padding: 7px 0;"><a href="${targetUrl}" style="color: #E52328; font-weight: 700; text-decoration: underline;">${targetUrl}</a></td>
               </tr>
               <tr>
-                <td style="padding-bottom: 10px; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
-                <td style="padding-bottom: 10px; line-height: 1.5;"><strong>Skill Passport:</strong> Earn verifiable technical credentials that showcase your strengths directly to hiring managers.</td>
+                <td style="padding: 7px 0; color: #64748b; font-weight: 600;">Registered Email:</td>
+                <td style="padding: 7px 0; font-weight: 700; color: #0f172a;">${email}</td>
               </tr>
               <tr>
-                <td style="padding-bottom: 0; vertical-align: top; width: 24px; color: #e52328; font-weight: bold;">✔</td>
-                <td style="padding-bottom: 0; line-height: 1.5;"><strong>Fast-Track Consideration:</strong> High performers receive immediate priority consideration for internships and full-time placement roles.</td>
+                <td style="padding: 7px 0; color: #64748b; font-weight: 600;">Password:</td>
+                <td style="padding: 7px 0;">
+                  <span style="background-color: #fee2e2; color: #991b1b; font-weight: 800; padding: 4px 10px; border-radius: 4px; display: inline-block;">
+                    Your Registered 10-Digit Mobile Number
+                  </span>
+                </td>
               </tr>
             </table>
           </div>
 
-          <!-- CTA Section -->
-          <div style="text-align: center; margin: 36px 0 24px 0;">
+          <!-- Action Button -->
+          <div style="text-align: center; margin: 28px 0;">
             <a href="${targetUrl}" 
-               style="background: linear-gradient(135deg, #E52328 0%, #B91C1C 100%); color: #ffffff; padding: 16px 44px; text-decoration: none; font-size: 16px; font-weight: 700; border-radius: 8px; display: inline-block; box-shadow: 0 4px 14px rgba(229, 35, 40, 0.35); letter-spacing: 0.3px;">
-              Join Smart Cut Portal &rarr;
+               style="background-color: #E52328; color: #ffffff; padding: 14px 38px; text-decoration: none; font-size: 15px; font-weight: 700; border-radius: 8px; display: inline-block; box-shadow: 0 4px 12px rgba(229, 35, 40, 0.3);">
+              Log In to Smart Cut Portal &rarr;
             </a>
-            <p style="margin: 14px 0 0 0; font-size: 12.5px; color: #64748b;">
-              Or navigate directly to: <a href="${targetUrl}" style="color: #e52328; font-weight: 600; text-decoration: underline;">${targetUrl}</a>
-            </p>
           </div>
 
-          <!-- Instructions Card -->
-          <div style="background-color: #f8fafc; border-left: 4px solid #e52328; padding: 16px 20px; border-radius: 4px; margin: 26px 0;">
-            <p style="margin: 0; font-size: 13.5px; color: #475569; line-height: 1.6;">
-              <strong>Quick Tip:</strong> Use your registered email (<strong>${email}</strong>) to sign in or get access to your assessment tasks upon visiting the portal.
-            </p>
+          <!-- Quick Steps -->
+          <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 16px 18px; margin: 20px 0;">
+            <div style="color: #92400e; font-size: 13px; font-weight: 700; margin-bottom: 6px;">
+              📌 Quick Instructions:
+            </div>
+            <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f; line-height: 1.6;">
+              <li>Click the button above or visit <a href="${targetUrl}" style="color: #92400e; font-weight: 600;">${targetUrl}</a></li>
+              <li>Enter your email (<strong>${email}</strong>) to verify your invitation status.</li>
+              <li>Enter your registered mobile number in the password field to sign in.</li>
+              <li>Please use a desktop/laptop for the best assessment and coding experience.</li>
+            </ol>
           </div>
 
-          <!-- Closing -->
-          <p style="font-size: 14.5px; color: #334155; margin-top: 30px; line-height: 1.6;">
-            We look forward to seeing your technical competence and welcoming you into the Wipronix ecosystem.
+          <p style="font-size: 14px; color: #475569; margin-top: 26px; line-height: 1.6;">
+            Best of luck with your assessment!
           </p>
 
-          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid #e2e8f0;">
-            <p style="font-size: 14px; color: #0f172a; margin: 0; font-weight: 700;">
-              Executive Talent Acquisition Team
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 13.5px; color: #0f172a; margin: 0; font-weight: 700;">
+              Talent Acquisition & Assessment Team
             </p>
-            <p style="font-size: 13px; color: #64748b; margin: 4px 0 0 0;">
-              Wipronix Technologies Pvt. Ltd. • <a href="mailto:info@wipronix.com" style="color: #e52328; text-decoration: none;">info@wipronix.com</a>
+            <p style="font-size: 12.5px; color: #64748b; margin: 3px 0 0 0;">
+              Wipronix Technologies Pvt. Ltd. &bull; <a href="mailto:info@wipronix.com" style="color: #E52328; text-decoration: none;">info@wipronix.com</a>
             </p>
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="background-color: #f8fafc; padding: 18px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
+        <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
           <p style="margin: 0;">
-            This email was sent to ${email} regarding an official Wipronix assessment invitation.
+            This email was sent to ${email} regarding an official Wipronix Smart Cut invitation.
           </p>
-          <p style="margin: 6px 0 0 0;">
+          <p style="margin: 4px 0 0 0;">
             © ${new Date().getFullYear()} Wipronix Technologies Pvt. Ltd. All rights reserved.
           </p>
         </div>
