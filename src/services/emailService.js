@@ -1065,6 +1065,122 @@ const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customM
   }
 };
 
+/**
+ * Send official email to student when an assessment has been assigned on the SmartCut Portal,
+ * with proper mentioning of assessment details and the due date / deadline.
+ */
+const sendSmartCutAssessmentAssignedEmail = async ({
+  email,
+  fullName,
+  assessmentTitle,
+  domain,
+  deadlineDate,
+  deadlineDays = 7,
+  portalUrl = 'https://smartcut.wipronix.com'
+}) => {
+  try {
+    const targetUrl = portalUrl || 'https://smartcut.wipronix.com';
+    const domainLabel = domain === 'technical' ? 'Technical Track' : 'Non-Technical Track';
+    const subject = `Assessment Assigned: ${assessmentTitle} | SmartCut Portal (Due: ${deadlineDate})`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+        <!-- Header -->
+        <div style="background-color: #ED1C24; padding: 24px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
+            Wipronix <span style="font-weight: 300;">SmartCut</span>
+          </h1>
+          <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">
+            Official Assessment Assignment Notification
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 32px 24px; color: #1e293b; line-height: 1.6;">
+          <p style="font-size: 16px; margin-top: 0;">
+            Dear <strong>${fullName || 'Candidate'}</strong>,
+          </p>
+          <p style="font-size: 14px; color: #475569;">
+            Your official evaluation assessment on the <strong>SmartCut Portal</strong> has been assigned by the administrator. Please review the details below and ensure completion prior to the stated deadline.
+          </p>
+
+          <!-- Assessment Card -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #ED1C24; border-radius: 8px; padding: 18px 20px; margin: 24px 0;">
+            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+              Assigned Assessment Challenge
+            </div>
+            <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">
+              ${assessmentTitle}
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+              <tr>
+                <td style="padding: 6px 0; color: #64748b; width: 140px;">Evaluation Track:</td>
+                <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${domainLabel}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;">Due Date / Deadline:</td>
+                <td style="padding: 6px 0; font-weight: 800; color: #dc2626; font-size: 14px;">
+                  🚨 ${deadlineDate} (${deadlineDays} days allocated)
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;">Proctoring:</td>
+                <td style="padding: 6px 0; font-weight: 600; color: #334155;">
+                  Webcam & Live Screen Casting Enabled
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Instructions & Login Credentials -->
+          <div style="background-color: #f1f5f9; padding: 16px 20px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #334155;">
+            <strong>Portal Login Details:</strong><br>
+            • <strong>Email:</strong> ${email}<br>
+            • <strong>Access Pass:</strong> Your registered 10-digit mobile number
+          </div>
+
+          <!-- CTA Button -->
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${targetUrl}/student/assessments" 
+               style="background-color: #ED1C24; color: #ffffff; padding: 14px 32px; font-size: 15px; font-weight: 700; text-decoration: none; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(237, 28, 36, 0.25);">
+              Access Assessment Portal Now &rarr;
+            </a>
+          </div>
+
+          <p style="font-size: 12.5px; color: #94a3b8; text-align: center; margin-bottom: 0;">
+            Please take this assessment in a quiet environment on a desktop/laptop with a working camera and screen sharing support.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
+          <p style="margin: 0;">
+            This email was sent to ${email} regarding your SmartCut Portal assessment assignment.
+          </p>
+          <p style="margin: 4px 0 0 0;">
+            © ${new Date().getFullYear()} Wipronix Technologies Pvt. Ltd. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: GMAIL_USER || 'wipronixtechnologies@gmail.com',
+      to: email,
+      subject,
+      html
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Smart Cut assessment assigned email sent successfully to ${email}`);
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to send Smart Cut assessment assigned email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendTestCompletionEmail,
   sendPasswordResetEmail,
@@ -1074,5 +1190,6 @@ module.exports = {
   sendRegistrationSlipEmail,
   sendMachineRoundLinkEmail,
   sendAssignedAssessmentLinkEmail,
-  sendSmartCutInvitationEmail
+  sendSmartCutInvitationEmail,
+  sendSmartCutAssessmentAssignedEmail
 };

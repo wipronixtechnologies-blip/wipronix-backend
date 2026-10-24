@@ -24,9 +24,13 @@ router.get('/check-invite', async (req, res) => {
     const student = await Student.findOne({
       email,
       smartCutInvited: true
-    }).select('fullName email phoneNumber college course technology smartCutInvited smartCutInvitedAt smartCutChannel counselingStatus isSelected isShortlisted');
+    }).select('fullName email phoneNumber college course technology testTrack smartCutInvited smartCutInvitedAt smartCutChannel counselingStatus isSelected isShortlisted');
 
     if (student) {
+      const tech = student.technology || 'Core Engineering';
+      const isNonTech = student.testTrack === 'non-technical' || (/hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(tech));
+      const track = isNonTech ? 'non-technical' : 'technical';
+
       return res.status(200).json({
         success: true,
         isInvited: true,
@@ -38,7 +42,9 @@ router.get('/check-invite', async (req, res) => {
           phoneNumber: student.phoneNumber || '',
           college: student.college || 'Wipronix Partner College',
           course: student.course || 'B.Tech / Degree',
-          technology: student.technology || 'Core Engineering',
+          technology: tech,
+          testTrack: track,
+          domain: track === 'non-technical' ? 'non_technical' : 'technical',
           invitedAt: student.smartCutInvitedAt,
           channel: student.smartCutChannel || 'email',
           status: student.isSelected ? 'selected' : (student.isShortlisted ? 'shortlisted' : 'interested')
@@ -53,6 +59,10 @@ router.get('/check-invite', async (req, res) => {
     }).select('studentName studentEmail studentPhone collegeName course technology smartCutInvited smartCutInvitedAt smartCutChannel isSelected isShortlisted');
 
     if (result) {
+      const tech = result.technology || 'Software Engineering';
+      const isNonTech = /hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(tech);
+      const track = isNonTech ? 'non-technical' : 'technical';
+
       return res.status(200).json({
         success: true,
         isInvited: true,
@@ -64,7 +74,9 @@ router.get('/check-invite', async (req, res) => {
           phoneNumber: result.studentPhone || '',
           college: result.collegeName || 'Campus Placement Drive',
           course: result.course || 'Engineering',
-          technology: result.technology || 'Software Engineering',
+          technology: tech,
+          testTrack: track,
+          domain: track === 'non-technical' ? 'non_technical' : 'technical',
           invitedAt: result.smartCutInvitedAt,
           channel: result.smartCutChannel || 'email',
           status: result.isSelected ? 'selected' : 'shortlisted'

@@ -299,6 +299,8 @@ const syncCandidateToSmartCut = async (candidateData) => {
         college: candidateData.college || 'Partner College',
         course: candidateData.course || 'Degree',
         technology: candidateData.technology || 'Software Engineering',
+        testTrack: candidateData.testTrack || 'technical',
+        domain: candidateData.domain || (candidateData.testTrack === 'non-technical' ? 'non_technical' : 'technical'),
         channel: candidateData.channel || 'email'
     });
 
@@ -396,6 +398,8 @@ exports.sendSmartCutInvite = async (req, res) => {
         const college = student?.college || result?.collegeName || 'Partner College';
         const course = student?.course || result?.course || 'Degree';
         const technology = student?.technology || result?.technology || 'Software Engineering';
+        const isNonTech = student?.testTrack === 'non-technical' || (/hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(technology));
+        const testTrack = isNonTech ? 'non-technical' : 'technical';
         const candPhone = phoneNumber || student?.phoneNumber || result?.studentPhone || '';
         const candName = fullName || student?.fullName || result?.studentName || 'Candidate';
 
@@ -407,6 +411,8 @@ exports.sendSmartCutInvite = async (req, res) => {
             college,
             course,
             technology,
+            testTrack,
+            domain: isNonTech ? 'non_technical' : 'technical',
             channel
         });
 
@@ -473,6 +479,9 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     $inc: { smartCutInviteCount: 1 }
                 }).catch(() => null);
 
+                const candTech = candidate.technology || 'Software Engineering';
+                const isNonTech = candidate.testTrack === 'non-technical' || (/hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(candTech));
+
                 // Immediately register / sync candidate to SmartCut system
                 await syncCandidateToSmartCut({
                     email: candidate.email,
@@ -480,7 +489,9 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     phoneNumber: candidate.phoneNumber || '',
                     college: candidate.college || 'Partner College',
                     course: candidate.course || 'Degree',
-                    technology: candidate.technology || 'Software Engineering',
+                    technology: candTech,
+                    testTrack: isNonTech ? 'non-technical' : 'technical',
+                    domain: isNonTech ? 'non_technical' : 'technical',
                     channel
                 });
 
