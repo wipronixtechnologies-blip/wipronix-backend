@@ -969,7 +969,7 @@ const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customM
           <!-- Note from Evaluator -->
           <div style="background-color: #fef2f2; border-left: 4px solid #E52328; padding: 14px 18px; border-radius: 6px; margin: 18px 0 24px 0;">
             <div style="color: #991b1b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-              📝 Note from Evaluator / Super Admin:
+              Note from Evaluator / Super Admin:
             </div>
             <div style="color: #7f1d1d; font-size: 14px; font-weight: 600; line-height: 1.5;">
               ${customMessage}
@@ -980,7 +980,7 @@ const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customM
           <!-- Login Credentials Box -->
           <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 20px 0;">
             <div style="color: #0f172a; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
-              🔐 Your Login Credentials
+              Your Login Credentials
             </div>
             <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13.5px; color: #334155;">
               <tr>
