@@ -6,6 +6,7 @@ const Campaign = require('../../models/Campaign.model');
 const Proposal = require('../../models/Proposal.model');
 const FeePayment = require('../../models/FeePayment.model');
 const PlacementDrive = require('../../models/PlacementDrive.model');
+const Result = require('../../models/Result.model');
 let Activity;
 try {
     Activity = require('../../models/Activity.model');
@@ -320,9 +321,9 @@ exports.sendSmartCutInvite = async (req, res) => {
             }
         }
 
-        // Update student / result record with invite status if candidateId exists
-        const updateQuery = candidateId ? { _id: candidateId } : { email: email.toLowerCase() };
-        await Student.findOneAndUpdate(updateQuery, {
+        // Update student / result record with invite status
+        const studentQuery = candidateId ? { _id: candidateId } : { email: email.toLowerCase() };
+        await Student.findOneAndUpdate(studentQuery, {
             $set: {
                 smartCutInvited: true,
                 smartCutInvitedAt: new Date(),
@@ -330,6 +331,42 @@ exports.sendSmartCutInvite = async (req, res) => {
             },
             $inc: { smartCutInviteCount: 1 }
         }).catch(() => null);
+
+        // Also update Result record if this is a campus drive candidate
+        const resultQuery = candidateId ? { _id: candidateId } : { studentEmail: email.toLowerCase() };
+        await Result.findOneAndUpdate(resultQuery, {
+            $set: {
+                smartCutInvited: true,
+                smartCutInvitedAt: new Date(),
+                smartCutChannel: channel
+            },
+            $inc: { smartCutInviteCount: 1 }
+        }).catch(() => null);
+
+        // Attempt async sync with SmartCut backend if running
+        try {
+            const http = require('http');
+            const syncPayload = JSON.stringify({
+                email,
+                fullName: fullName || 'Candidate',
+                phoneNumber: phoneNumber || '',
+                channel
+            });
+            const reqSmart = http.request({
+                hostname: '127.0.0.1',
+                port: 8000,
+                path: '/api/v1/auth/sync-invited-candidate',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(syncPayload)
+                },
+                timeout: 1000
+            });
+            reqSmart.on('error', () => {});
+            reqSmart.write(syncPayload);
+            reqSmart.end();
+        } catch (e) {}
 
         res.status(200).json({
             success: true,
@@ -382,6 +419,41 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     },
                     $inc: { smartCutInviteCount: 1 }
                 }).catch(() => null);
+
+                const resQuery = candidate.id ? { _id: candidate.id } : { studentEmail: candidate.email.toLowerCase() };
+                await Result.findOneAndUpdate(resQuery, {
+                    $set: {
+                        smartCutInvited: true,
+                        smartCutInvitedAt: new Date(),
+                        smartCutChannel: channel
+                    },
+                    $inc: { smartCutInviteCount: 1 }
+                }).catch(() => null);
+
+                // Attempt async sync with SmartCut backend
+                try {
+                    const http = require('http');
+                    const syncPayload = JSON.stringify({
+                        email: candidate.email,
+                        fullName: candidate.fullName || 'Candidate',
+                        phoneNumber: candidate.phoneNumber || '',
+                        channel
+                    });
+                    const reqSmart = http.request({
+                        hostname: '127.0.0.1',
+                        port: 8000,
+                        path: '/api/v1/auth/sync-invited-candidate',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(syncPayload)
+                        },
+                        timeout: 1000
+                    });
+                    reqSmart.on('error', () => {});
+                    reqSmart.write(syncPayload);
+                    reqSmart.end();
+                } catch (e) {}
 
             } catch (err) {
                 console.error(`Failed to invite ${candidate.email}:`, err);

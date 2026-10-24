@@ -60,6 +60,7 @@ const counselorRoutes = require('./Counselor.route');
 const webinarRoutes = require('./Webinar.route');
 const dailyWorkReportRoutes = require('./DailyWorkReport.route');
 const financialYearRoutes = require('./FinancialYear.route');
+const smartCutRoutes = require('./SmartCut.route');
 
 Router.use("/settings", settingsRoutes);
 Router.use("/highest-education", highestEducationRoutes);
@@ -76,5 +77,6 @@ Router.use("/counselor", counselorRoutes);
 Router.use("/webinars", webinarRoutes);
 Router.use("/daily-work-reports", dailyWorkReportRoutes);
 Router.use("/financial-years", financialYearRoutes);
+Router.use("/smart-cut", smartCutRoutes);
 
 module.exports = Router;

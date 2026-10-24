@@ -166,6 +166,24 @@ const resultSchema = new mongoose.Schema(
     machineRoundTokenExpires: {
       type: Date,
       default: null
+    },
+    // Smart Cut Invitation Tracking
+    smartCutInvited: {
+      type: Boolean,
+      default: false
+    },
+    smartCutInvitedAt: {
+      type: Date,
+      default: null
+    },
+    smartCutChannel: {
+      type: String,
+      enum: ['email', 'whatsapp', 'both', 'none'],
+      default: 'none'
+    },
+    smartCutInviteCount: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }

@@ -87,7 +87,7 @@ const isAfterHalfDayThreshold = (dateObj = new Date()) => {
 
 // Determine status based on punch-in time (in IST)
 // Rule:
-// - On or before 09:40 AM: 'present'
+// - Before 09:40 AM: 'present'
 // - Between 09:40 AM and 11:30 AM: 'short_leave'
 // - After 11:30 AM: 'half_day'
 const getStatusFromPunchInTime = (punchInTime) => {
@@ -100,7 +100,7 @@ const getStatusFromPunchInTime = (punchInTime) => {
 
   if (punchMinutes > halfDayMinutes) {
     return 'half_day';
-  } else if (punchMinutes > shortLeaveMinutes) {
+  } else if (punchMinutes >= shortLeaveMinutes) {
     return 'short_leave';
   }
 
@@ -109,12 +109,12 @@ const getStatusFromPunchInTime = (punchInTime) => {
 
 // Determine or update status based on punch-out time (in IST)
 // Rule:
-// - If punch-out is on or after 06:30 PM IST: complete shift ('present')
+// - If punch-out is on or after 06:30 PM IST: complete shift -> maintain 'half_day' or 'short_leave' if already marked, otherwise 'present'
 // - If reasonType is 'half_day': 'half_day'
 // - If reasonType is 'other': 'pending_other'
 // - If currentStatus is already 'half_day': remains 'half_day'
-// - If punch-out is between 04:30 PM and 06:30 PM IST: 'short_leave'
 // - If punch-out is before 04:30 PM IST: 'half_day'
+// - If punch-out is between 04:30 PM and 06:30 PM IST: 'short_leave'
 const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = null) => {
   const punchOutDate = new Date(punchOutTime);
   const { hour: punchOutHour, minute: punchOutMinute } = getISTTimeParts(punchOutDate);
@@ -123,10 +123,13 @@ const getStatusFromPunchOutTime = (currentStatus, punchOutTime, reasonType = nul
   const shortLeaveStartMin = 16 * 60 + 30; // 04:30 PM (990 min)
   const shiftEndMin = 18 * 60 + 30;        // 06:30 PM (1110 min)
 
-  // On or after 06:30 PM IST: Complete shift -> present (unless marked half_day)
+  // On or after 06:30 PM IST: Complete shift
   if (punchOutMinutes >= shiftEndMin) {
     if (reasonType === 'half_day' || currentStatus === 'half_day') {
       return 'half_day';
+    }
+    if (currentStatus === 'short_leave') {
+      return 'short_leave';
     }
     return 'present';
   }
@@ -208,8 +211,9 @@ const punchIn = async (request, response) => {
     // Determine status based on punch-in time (in IST)
     const currentTime = new Date();
     const status = getStatusFromPunchInTime(currentTime);
-    const isLateShortLeave = status === 'short_leave';
-    const notes = isLateShortLeave ? 'Late punch-in (after 09:40 AM) - Short Leave' : undefined;
+    const notes = status === 'short_leave'
+      ? 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave'
+      : (status === 'half_day' ? 'Late punch-in (after 11:30 AM) - Half Day' : undefined);
 
     // Create new attendance record
     const attendance = new Attendance({
@@ -468,12 +472,29 @@ const getAttendanceByStaff = async (request, response) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    // Auto-reconcile forgotten punch-outs on past dates to short_leave
+    // Auto-reconcile past dates: forgotten punch-outs and late punch-ins
     const todayIST = getTodayDateIST();
     for (const attendance of attendances) {
+      let isUpdated = false;
       if (attendance.date < todayIST && attendance.punchInTime && !attendance.punchOutTime && attendance.status === 'present') {
         attendance.status = 'short_leave';
         attendance.notes = attendance.notes ? `${attendance.notes} | Forgot to punch out` : 'Forgot to punch out';
+        isUpdated = true;
+      }
+      if (attendance.punchInTime && attendance.status === 'present') {
+        const { hour: piH, minute: piM } = getISTTimeParts(attendance.punchInTime);
+        const punchMin = piH * 60 + piM;
+        if (punchMin > (11 * 60 + 30)) {
+          attendance.status = 'half_day';
+          attendance.notes = attendance.notes ? `${attendance.notes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
+          isUpdated = true;
+        } else if (punchMin >= (9 * 60 + 40)) {
+          attendance.status = 'short_leave';
+          attendance.notes = attendance.notes ? `${attendance.notes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
+          isUpdated = true;
+        }
+      }
+      if (isUpdated) {
         await attendance.save();
       }
     }
@@ -645,12 +666,29 @@ const getAllStaffAttendance = async (request, response) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    // Auto-reconcile forgotten punch-outs on past dates to short_leave
+    // Auto-reconcile past dates: forgotten punch-outs and late punch-ins
     const todayIST = getTodayDateIST();
     for (const attendance of attendances) {
+      let isUpdated = false;
       if (attendance.date < todayIST && attendance.punchInTime && !attendance.punchOutTime && attendance.status === 'present') {
         attendance.status = 'short_leave';
         attendance.notes = attendance.notes ? `${attendance.notes} | Forgot to punch out` : 'Forgot to punch out';
+        isUpdated = true;
+      }
+      if (attendance.punchInTime && attendance.status === 'present') {
+        const { hour: piH, minute: piM } = getISTTimeParts(attendance.punchInTime);
+        const punchMin = piH * 60 + piM;
+        if (punchMin > (11 * 60 + 30)) {
+          attendance.status = 'half_day';
+          attendance.notes = attendance.notes ? `${attendance.notes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
+          isUpdated = true;
+        } else if (punchMin >= (9 * 60 + 40)) {
+          attendance.status = 'short_leave';
+          attendance.notes = attendance.notes ? `${attendance.notes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
+          isUpdated = true;
+        }
+      }
+      if (isUpdated) {
         await attendance.save();
       }
     }
@@ -818,7 +856,7 @@ const markManualAttendance = async (request, response) => {
       if (punchMin > (11 * 60 + 30)) {
         finalStatus = 'half_day';
         finalNotes = finalNotes ? `${finalNotes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
-      } else if (punchMin > (9 * 60 + 40)) {
+      } else if (punchMin >= (9 * 60 + 40)) {
         finalStatus = 'short_leave';
         finalNotes = finalNotes ? `${finalNotes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
       }
@@ -956,7 +994,7 @@ const markBulkAttendance = async (request, response) => {
         if (punchMin > (11 * 60 + 30)) {
           recStatus = 'half_day';
           recNotes = recNotes ? `${recNotes} | Late punch-in (after 11:30 AM) - Half Day` : 'Late punch-in (after 11:30 AM) - Half Day';
-        } else if (punchMin > (9 * 60 + 40)) {
+        } else if (punchMin >= (9 * 60 + 40)) {
           recStatus = 'short_leave';
           recNotes = recNotes ? `${recNotes} | Late punch-in (09:40 AM - 11:30 AM) - Short Leave` : 'Late punch-in (09:40 AM - 11:30 AM) - Short Leave';
         }
