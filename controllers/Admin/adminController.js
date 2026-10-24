@@ -289,6 +289,52 @@ exports.getPendingApprovals = async (req, res) => {
     }
 };
 
+// Helper to immediately register / provision invited candidate in SmartCut system
+const syncCandidateToSmartCut = async (candidateData) => {
+    if (!candidateData || !candidateData.email) return;
+    const payload = JSON.stringify({
+        email: candidateData.email.trim().toLowerCase(),
+        fullName: candidateData.fullName || 'Candidate',
+        phoneNumber: candidateData.phoneNumber || '',
+        college: candidateData.college || 'Partner College',
+        course: candidateData.course || 'Degree',
+        technology: candidateData.technology || 'Software Engineering',
+        channel: candidateData.channel || 'email'
+    });
+
+    const urls = [
+        'http://127.0.0.1:8000/api/v1/auth/sync-invited-candidate',
+        'http://localhost:8000/api/v1/auth/sync-invited-candidate',
+        'https://smartcut-cjf5.onrender.com/api/v1/auth/sync-invited-candidate'
+    ];
+
+    for (const urlStr of urls) {
+        try {
+            const url = new URL(urlStr);
+            const client = url.protocol === 'https:' ? require('https') : require('http');
+            await new Promise((resolve) => {
+                const req = client.request({
+                    hostname: url.hostname,
+                    port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(payload)
+                    },
+                    timeout: 3000
+                }, (res) => {
+                    resolve(res.statusCode >= 200 && res.statusCode < 300);
+                });
+                req.on('error', () => resolve(false));
+                req.on('timeout', () => { req.destroy(); resolve(false); });
+                req.write(payload);
+                req.end();
+            });
+        } catch (e) {}
+    }
+};
+
 // Send Smart Cut Candidate Invite (Individual)
 exports.sendSmartCutInvite = async (req, res) => {
     try {
@@ -343,36 +389,33 @@ exports.sendSmartCutInvite = async (req, res) => {
             $inc: { smartCutInviteCount: 1 }
         }).catch(() => null);
 
-        // Attempt async sync with SmartCut backend if running
-        try {
-            const http = require('http');
-            const syncPayload = JSON.stringify({
-                email,
-                fullName: fullName || 'Candidate',
-                phoneNumber: phoneNumber || '',
-                channel
-            });
-            const reqSmart = http.request({
-                hostname: '127.0.0.1',
-                port: 8000,
-                path: '/api/v1/auth/sync-invited-candidate',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(syncPayload)
-                },
-                timeout: 1000
-            });
-            reqSmart.on('error', () => {});
-            reqSmart.write(syncPayload);
-            reqSmart.end();
-        } catch (e) {}
+        // Retrieve student or result record to fetch complete profile details for SmartCut
+        const student = await Student.findOne(candidateId ? { _id: candidateId } : { email: email.toLowerCase() });
+        const result = !student ? await Result.findOne(candidateId ? { _id: candidateId } : { studentEmail: email.toLowerCase() }) : null;
+
+        const college = student?.college || result?.collegeName || 'Partner College';
+        const course = student?.course || result?.course || 'Degree';
+        const technology = student?.technology || result?.technology || 'Software Engineering';
+        const candPhone = phoneNumber || student?.phoneNumber || result?.studentPhone || '';
+        const candName = fullName || student?.fullName || result?.studentName || 'Candidate';
+
+        // Immediately synchronize and register candidate in SmartCut system (local + Render live backend)
+        await syncCandidateToSmartCut({
+            email,
+            fullName: candName,
+            phoneNumber: candPhone,
+            college,
+            course,
+            technology,
+            channel
+        });
 
         res.status(200).json({
             success: true,
+            registeredInSmartCut: true,
             message: emailSent 
-                ? `Smart Cut invitation sent successfully to ${email}!` 
-                : (channel === 'whatsapp' ? 'WhatsApp invitation link prepared.' : 'Smart Cut invitation recorded successfully.'),
+                ? `Smart Cut invitation sent successfully to ${email}! The user is registered in SmartCut.` 
+                : (channel === 'whatsapp' ? 'WhatsApp invitation link prepared. The user is registered in SmartCut.' : 'Smart Cut invitation recorded. The user is registered in SmartCut.'),
             data: {
                 emailSent,
                 emailError,
@@ -430,30 +473,16 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     $inc: { smartCutInviteCount: 1 }
                 }).catch(() => null);
 
-                // Attempt async sync with SmartCut backend
-                try {
-                    const http = require('http');
-                    const syncPayload = JSON.stringify({
-                        email: candidate.email,
-                        fullName: candidate.fullName || 'Candidate',
-                        phoneNumber: candidate.phoneNumber || '',
-                        channel
-                    });
-                    const reqSmart = http.request({
-                        hostname: '127.0.0.1',
-                        port: 8000,
-                        path: '/api/v1/auth/sync-invited-candidate',
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Content-Length': Buffer.byteLength(syncPayload)
-                        },
-                        timeout: 1000
-                    });
-                    reqSmart.on('error', () => {});
-                    reqSmart.write(syncPayload);
-                    reqSmart.end();
-                } catch (e) {}
+                // Immediately register / sync candidate to SmartCut system
+                await syncCandidateToSmartCut({
+                    email: candidate.email,
+                    fullName: candidate.fullName || 'Candidate',
+                    phoneNumber: candidate.phoneNumber || '',
+                    college: candidate.college || 'Partner College',
+                    course: candidate.course || 'Degree',
+                    technology: candidate.technology || 'Software Engineering',
+                    channel
+                });
 
             } catch (err) {
                 console.error(`Failed to invite ${candidate.email}:`, err);

@@ -76,7 +76,7 @@ router.get('/check-invite', async (req, res) => {
     return res.status(200).json({
       success: true,
       isInvited: false,
-      message: 'Candidate has not been invited to Smart Cut portal.'
+      message: 'Invite not sent. Candidate has not been invited to the Smart Cut portal.'
     });
   } catch (error) {
     console.error('Error in /smart-cut/check-invite:', error);
