@@ -86,10 +86,20 @@ const studentSchema = new mongoose.Schema(
       default: 'organic'
     },
 
-    // Result Declaration
+    // Result Declaration & Selection Status
     resultDeclared: {
       type: Boolean,
       default: false
+    },
+    isSelected: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    isShortlisted: {
+      type: Boolean,
+      default: false,
+      index: true
     },
 
     // Profile Picture

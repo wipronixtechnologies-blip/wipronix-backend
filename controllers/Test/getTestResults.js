@@ -324,6 +324,24 @@ const toggleShortlist = async (req, res, next) => {
       });
     }
 
+    // Synchronize shortlist status to Student collection
+    if (updatedResult.studentEmail) {
+      const emailLower = updatedResult.studentEmail.trim().toLowerCase();
+      try {
+        await Student.updateMany(
+          { email: emailLower },
+          {
+            $set: {
+              isShortlisted: Boolean(isShortlisted),
+              ...(!updatedResult.isSelected ? { counselingStatus: isShortlisted ? 'shortlisted' : 'assigned' } : {})
+            }
+          }
+        );
+      } catch (studentSyncErr) {
+        console.warn("Could not sync shortlist status to Student collection:", studentSyncErr);
+      }
+    }
+
     res.json({
       success: true,
       message: `Candidate ${isShortlisted ? 'shortlisted' : 'removed from shortlist'} successfully`,
@@ -433,6 +451,24 @@ const toggleSelection = async (req, res, next) => {
         success: false,
         message: "Test result record not found"
       });
+    }
+
+    // Synchronize selection status to Student collection
+    if (updatedResult.studentEmail) {
+      const emailLower = updatedResult.studentEmail.trim().toLowerCase();
+      try {
+        await Student.updateMany(
+          { email: emailLower },
+          {
+            $set: {
+              isSelected: Boolean(isSelected),
+              counselingStatus: isSelected ? 'selected' : (updatedResult.isShortlisted ? 'shortlisted' : 'assigned')
+            }
+          }
+        );
+      } catch (studentSyncErr) {
+        console.warn("Could not sync selection status to Student collection:", studentSyncErr);
+      }
     }
 
     res.json({
