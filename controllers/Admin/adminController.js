@@ -292,8 +292,9 @@ exports.getPendingApprovals = async (req, res) => {
 // Helper to immediately register / provision invited candidate in SmartCut system
 const syncCandidateToSmartCut = async (candidateData) => {
     if (!candidateData || !candidateData.email) return;
+    const cleanEmail = candidateData.email.trim().toLowerCase();
     const payload = JSON.stringify({
-        email: candidateData.email.trim().toLowerCase(),
+        email: cleanEmail,
         fullName: candidateData.fullName || 'Candidate',
         phoneNumber: candidateData.phoneNumber || '',
         college: candidateData.college || 'Partner College',
@@ -306,6 +307,7 @@ const syncCandidateToSmartCut = async (candidateData) => {
 
     const urls = [
         'http://127.0.0.1:8000/api/v1/auth/sync-invited-candidate',
+        'http://localhost:8000/api/v1/auth/sync-invited-candidate',
         'https://smartcut-api.wipronix.com/api/v1/auth/sync-invited-candidate',
         'http://localhost:8000/api/v1/auth/sync-invited-candidate',
         'https://smartcut-cjf5.onrender.com/api/v1/auth/sync-invited-candidate'
@@ -315,7 +317,7 @@ const syncCandidateToSmartCut = async (candidateData) => {
         try {
             const url = new URL(urlStr);
             const client = url.protocol === 'https:' ? require('https') : require('http');
-            await new Promise((resolve) => {
+            const success = await new Promise((resolve) => {
                 const req = client.request({
                     hostname: url.hostname,
                     port: url.port || (url.protocol === 'https:' ? 443 : 80),
@@ -325,7 +327,7 @@ const syncCandidateToSmartCut = async (candidateData) => {
                         'Content-Type': 'application/json',
                         'Content-Length': Buffer.byteLength(payload)
                     },
-                    timeout: 3000
+                    timeout: 4000
                 }, (res) => {
                     resolve(res.statusCode >= 200 && res.statusCode < 300);
                 });
@@ -334,28 +336,35 @@ const syncCandidateToSmartCut = async (candidateData) => {
                 req.write(payload);
                 req.end();
             });
-        } catch (e) {}
+            if (success) {
+                console.log(`[SmartCut Sync] Successfully synced ${cleanEmail} via ${urlStr}`);
+                break;
+            }
+        } catch (e) {
+            console.error(`[SmartCut Sync] Error syncing to ${urlStr}:`, e.message);
+        }
     }
 };
 
 // Send Smart Cut Candidate Invite (Individual)
 exports.sendSmartCutInvite = async (req, res) => {
     try {
-        const { candidateId, email, fullName, phoneNumber, channel = 'email', customMessage, portalUrl } = req.body;
+        const { candidateId, email, fullName, phoneNumber, college: reqCollege, course: reqCourse, technology: reqTech, testTrack: reqTrack, channel = 'email', customMessage, portalUrl } = req.body;
         
         if (!email && !phoneNumber) {
             return res.status(400).json({ success: false, message: 'Email or phone number is required.' });
         }
 
+        const cleanEmail = (email || '').trim().toLowerCase();
         let emailSent = false;
         let emailError = null;
 
         // If channel is 'email' or 'both', dispatch email
-        if ((channel === 'email' || channel === 'both') && email) {
+        if ((channel === 'email' || channel === 'both') && cleanEmail) {
             try {
                 const { sendSmartCutInvitationEmail } = require('../../src/services/emailService');
                 const emailResult = await sendSmartCutInvitationEmail({
-                    email,
+                    email: cleanEmail,
                     fullName: fullName || 'Candidate',
                     portalUrl: portalUrl || 'https://smartcut.wipronix.com',
                     customMessage
@@ -371,7 +380,7 @@ exports.sendSmartCutInvite = async (req, res) => {
         }
 
         // Update student / result record with invite status
-        const studentQuery = candidateId ? { _id: candidateId } : { email: email.toLowerCase() };
+        const studentQuery = candidateId ? { $or: [{ _id: candidateId }, { email: cleanEmail }] } : { email: cleanEmail };
         await Student.findOneAndUpdate(studentQuery, {
             $set: {
                 smartCutInvited: true,
@@ -382,7 +391,7 @@ exports.sendSmartCutInvite = async (req, res) => {
         }).catch(() => null);
 
         // Also update Result record if this is a campus drive candidate
-        const resultQuery = candidateId ? { _id: candidateId } : { studentEmail: email.toLowerCase() };
+        const resultQuery = candidateId ? { $or: [{ _id: candidateId }, { studentEmail: cleanEmail }] } : { studentEmail: cleanEmail };
         await Result.findOneAndUpdate(resultQuery, {
             $set: {
                 smartCutInvited: true,
@@ -393,27 +402,30 @@ exports.sendSmartCutInvite = async (req, res) => {
         }).catch(() => null);
 
         // Retrieve student or result record to fetch complete profile details for SmartCut
-        const student = await Student.findOne(candidateId ? { _id: candidateId } : { email: email.toLowerCase() });
-        const result = !student ? await Result.findOne(candidateId ? { _id: candidateId } : { studentEmail: email.toLowerCase() }) : null;
+        const student = await Student.findOne(studentQuery).lean().catch(() => null);
+        const result = !student ? await Result.findOne(resultQuery).lean().catch(() => null) : null;
 
-        const college = student?.college || result?.collegeName || 'Partner College';
-        const course = student?.course || result?.course || 'Degree';
-        const technology = student?.technology || result?.technology || 'Software Engineering';
-        const isNonTech = student?.testTrack === 'non-technical' || (/hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(technology));
-        const testTrack = isNonTech ? 'non-technical' : 'technical';
-        const candPhone = phoneNumber || student?.phoneNumber || result?.studentPhone || '';
         const candName = fullName || student?.fullName || result?.studentName || 'Candidate';
+        const candPhone = phoneNumber || student?.phoneNumber || result?.studentPhone || '';
+        const candCollege = reqCollege || student?.college || result?.collegeName || 'Partner College';
+        const candCourse = reqCourse || student?.course || result?.course || 'Degree';
+        const candTech = reqTech || student?.technology || result?.technology || 'Software Engineering';
 
-        // Immediately synchronize and register candidate in SmartCut system (local + Render live backend)
+        const nonTechKeywords = /hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i;
+        const isNonTech = reqTrack === 'non-technical' || student?.testTrack === 'non-technical' || nonTechKeywords.test(candTech);
+        const testTrack = isNonTech ? 'non-technical' : 'technical';
+        const domain = isNonTech ? 'non_technical' : 'technical';
+
+        // Immediately synchronize and register candidate in SmartCut system
         await syncCandidateToSmartCut({
-            email,
+            email: cleanEmail,
             fullName: candName,
             phoneNumber: candPhone,
-            college,
-            course,
-            technology,
+            college: candCollege,
+            course: candCourse,
+            technology: candTech,
             testTrack,
-            domain: isNonTech ? 'non_technical' : 'technical',
+            domain,
             channel
         });
 
@@ -421,7 +433,7 @@ exports.sendSmartCutInvite = async (req, res) => {
             success: true,
             registeredInSmartCut: true,
             message: emailSent 
-                ? `Smart Cut invitation sent successfully to ${email}! The user is registered in SmartCut.` 
+                ? `Smart Cut invitation sent successfully to ${cleanEmail}! The user is registered in SmartCut.` 
                 : (channel === 'whatsapp' ? 'WhatsApp invitation link prepared. The user is registered in SmartCut.' : 'Smart Cut invitation recorded. The user is registered in SmartCut.'),
             data: {
                 emailSent,
@@ -450,9 +462,12 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
 
         for (const candidate of candidates) {
             try {
-                if ((channel === 'email' || channel === 'both') && candidate.email) {
+                const cleanEmail = (candidate.email || '').trim().toLowerCase();
+                if (!cleanEmail) continue;
+
+                if ((channel === 'email' || channel === 'both')) {
                     await sendSmartCutInvitationEmail({
-                        email: candidate.email,
+                        email: cleanEmail,
                         fullName: candidate.fullName || 'Candidate',
                         portalUrl: portalUrl || 'https://smartcut.wipronix.com',
                         customMessage
@@ -460,7 +475,7 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     successCount++;
                 }
 
-                const query = candidate.id ? { _id: candidate.id } : { email: candidate.email.toLowerCase() };
+                const query = candidate.id ? { $or: [{ _id: candidate.id }, { email: cleanEmail }] } : { email: cleanEmail };
                 await Student.findOneAndUpdate(query, {
                     $set: {
                         smartCutInvited: true,
@@ -470,7 +485,7 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     $inc: { smartCutInviteCount: 1 }
                 }).catch(() => null);
 
-                const resQuery = candidate.id ? { _id: candidate.id } : { studentEmail: candidate.email.toLowerCase() };
+                const resQuery = candidate.id ? { $or: [{ _id: candidate.id }, { studentEmail: cleanEmail }] } : { studentEmail: cleanEmail };
                 await Result.findOneAndUpdate(resQuery, {
                     $set: {
                         smartCutInvited: true,
@@ -480,19 +495,31 @@ exports.bulkSendSmartCutInvites = async (req, res) => {
                     $inc: { smartCutInviteCount: 1 }
                 }).catch(() => null);
 
-                const candTech = candidate.technology || 'Software Engineering';
-                const isNonTech = candidate.testTrack === 'non-technical' || (/hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i.test(candTech));
+                // Fetch real registered details from Wipronix central DB so nothing is missing
+                const student = await Student.findOne(query).lean().catch(() => null);
+                const result = !student ? await Result.findOne(resQuery).lean().catch(() => null) : null;
+
+                const candName = candidate.fullName || student?.fullName || result?.studentName || 'Candidate';
+                const candPhone = candidate.phoneNumber || student?.phoneNumber || result?.studentPhone || '';
+                const candCollege = candidate.college || student?.college || result?.collegeName || 'Partner College';
+                const candCourse = candidate.course || student?.course || result?.course || 'Degree';
+                const candTech = candidate.technology || student?.technology || result?.technology || 'Software Engineering';
+
+                const nonTechKeywords = /hr|human resource|talent|recruiter|operations|sales|marketing|business|bba|mba|finance|admin|content/i;
+                const isNonTech = candidate.testTrack === 'non-technical' || student?.testTrack === 'non-technical' || nonTechKeywords.test(candTech);
+                const testTrack = isNonTech ? 'non-technical' : 'technical';
+                const domain = isNonTech ? 'non_technical' : 'technical';
 
                 // Immediately register / sync candidate to SmartCut system
                 await syncCandidateToSmartCut({
-                    email: candidate.email,
-                    fullName: candidate.fullName || 'Candidate',
-                    phoneNumber: candidate.phoneNumber || '',
-                    college: candidate.college || 'Partner College',
-                    course: candidate.course || 'Degree',
+                    email: cleanEmail,
+                    fullName: candName,
+                    phoneNumber: candPhone,
+                    college: candCollege,
+                    course: candCourse,
                     technology: candTech,
-                    testTrack: isNonTech ? 'non-technical' : 'technical',
-                    domain: isNonTech ? 'non_technical' : 'technical',
+                    testTrack,
+                    domain,
                     channel
                 });
 
