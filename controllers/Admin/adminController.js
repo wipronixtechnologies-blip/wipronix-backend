@@ -306,6 +306,7 @@ const syncCandidateToSmartCut = async (candidateData) => {
 
     const urls = [
         'http://127.0.0.1:8000/api/v1/auth/sync-invited-candidate',
+        'https://smartcut-api.wipronix.com/api/v1/auth/sync-invited-candidate',
         'http://localhost:8000/api/v1/auth/sync-invited-candidate',
         'https://smartcut-cjf5.onrender.com/api/v1/auth/sync-invited-candidate'
     ];
