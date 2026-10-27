@@ -10,8 +10,8 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: GMAIL_USER || 'wipronixtechnologies@gmail.com',
-      pass: process.env.GMAIL_APP_PASSWORD || 'kekyidqbcsirojzc'
+      user: process.env.GMAIL_USER || GMAIL_USER || 'wipronix01@gmail.com',
+      pass: process.env.GMAIL_APP_PASSWORD || GMAIL_APP_PASSWORD
     }
   });
 };
@@ -1050,7 +1050,7 @@ const sendSmartCutInvitationEmail = async ({ email, fullName, portalUrl, customM
     `;
 
     const mailOptions = {
-      from: GMAIL_USER || 'wipronixtechnologies@gmail.com',
+      from: `"Wipronix SmartCut" <${process.env.GMAIL_USER || GMAIL_USER || 'wipronix01@gmail.com'}>`,
       to: email,
       subject,
       html
@@ -1166,7 +1166,7 @@ const sendSmartCutAssessmentAssignedEmail = async ({
     `;
 
     const mailOptions = {
-      from: GMAIL_USER || 'wipronixtechnologies@gmail.com',
+      from: `"Wipronix SmartCut" <${process.env.GMAIL_USER || GMAIL_USER || 'wipronix01@gmail.com'}>`,
       to: email,
       subject,
       html
