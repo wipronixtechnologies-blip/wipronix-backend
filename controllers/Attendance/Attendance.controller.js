@@ -1,6 +1,7 @@
 const Attendance = require('../../models/Attendance.model');
 const Staff = require('../../models/Staff.model');
 const Activity = require('../../models/Activity.model');
+const DailyWorkReport = require('../../models/DailyWorkReport.model');
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -330,6 +331,32 @@ const punchOut = async (request, response) => {
       });
     }
 
+    // Super Admin can mark attendance without any interruption
+    const isSuperAdmin = ['super_admin', 'superadmin', 'admin'].includes(request.staff?.role) ||
+                         ['super_admin', 'superadmin', 'admin'].includes(request.staff?.systemRole);
+
+    // For non-superadmin staff, daily report submission is mandatory before punching out
+    let todayReport = null;
+    if (!isSuperAdmin) {
+      todayReport = await DailyWorkReport.findOne({
+        staff: staffId,
+        date: today
+      });
+
+      if (!todayReport || !todayReport.tasksSummary || !todayReport.tasksSummary.trim()) {
+        return response.status(400).json({
+          success: false,
+          message: 'Submission of daily report is mandatory before punching out. Punch out is not possible until you submit your daily report.'
+        });
+      }
+    } else {
+      // Super admin can still have report synced if one was submitted
+      todayReport = await DailyWorkReport.findOne({
+        staff: staffId,
+        date: today
+      });
+    }
+
     // Update punch out details
     const punchOutTime = new Date();
     attendance.punchOutTime = punchOutTime;
@@ -386,6 +413,16 @@ const punchOut = async (request, response) => {
     attendance.calculateTotalHours();
 
     await attendance.save();
+
+    // Sync daily report hoursWorked with automatically calculated totalHours
+    if (todayReport && attendance.totalHours > 0) {
+      try {
+        todayReport.hoursWorked = attendance.totalHours;
+        await todayReport.save();
+      } catch (err) {
+        console.warn('Failed to sync daily report hours on punch out:', err.message);
+      }
+    }
 
     // Log Activity
     await Activity.create({

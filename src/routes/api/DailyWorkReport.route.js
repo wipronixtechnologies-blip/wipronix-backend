@@ -18,6 +18,9 @@ router.get('/today', dailyWorkReportController.getTodayDailyWorkReport);
 // Super Admin / Admin: Get all daily work reports
 router.get('/all', dailyWorkReportController.getAllDailyWorkReports);
 
+// Super Admin / Admin: Bulk review reports
+router.patch('/bulk-review', dailyWorkReportController.bulkReviewDailyWorkReports);
+
 // Super Admin / Admin: Review report (approve / reject)
 router.patch('/:id/review', dailyWorkReportController.reviewDailyWorkReport);
 

@@ -1,5 +1,6 @@
 const DailyWorkReport = require('../../models/DailyWorkReport.model');
 const Staff = require('../../models/Staff.model');
+const Attendance = require('../../models/Attendance.model');
 
 // Helper to get current Date string in YYYY-MM-DD format in IST
 const getTodayDateIST = () => {
@@ -32,6 +33,26 @@ exports.submitDailyWorkReport = async (req, res) => {
       });
     }
 
+    // Total hours is calculated automatically from Attendance punch-in/out and cannot be edited
+    let resolvedHours = 0;
+    try {
+      const attendance = await Attendance.findOne({ staffId, date });
+      if (attendance) {
+        if (attendance.totalHours > 0) {
+          resolvedHours = attendance.totalHours;
+        } else if (attendance.punchInTime) {
+          const inTime = new Date(attendance.punchInTime).getTime();
+          const outTime = attendance.punchOutTime ? new Date(attendance.punchOutTime).getTime() : Date.now();
+          const diffMs = outTime - inTime;
+          if (diffMs > 0) {
+            resolvedHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+          }
+        }
+      }
+    } catch (attErr) {
+      console.warn('Attendance lookup for daily report error:', attErr.message);
+    }
+
     const reportData = {
       staff: staffId,
       date,
@@ -39,7 +60,7 @@ exports.submitDailyWorkReport = async (req, res) => {
       tasksSummary: tasksSummary.trim(),
       challengesBlockers: (challengesBlockers || '').trim(),
       planForTomorrow: (planForTomorrow || '').trim(),
-      hoursWorked: Number(hoursWorked) || 8,
+      hoursWorked: resolvedHours > 0 ? resolvedHours : (Number(hoursWorked) || 0),
       workLinks: (workLinks || '').trim(),
       status: 'pending' // Re-submitting sets status back to pending approval
     };
@@ -99,7 +120,11 @@ exports.getMyDailyWorkReports = async (req, res) => {
 // 3. Get today's report for the logged in staff
 exports.getTodayDailyWorkReport = async (req, res) => {
   try {
-    const staffId = req.staff._id;
+    const userRole = req.staff.role || req.staff.systemRole;
+    let staffId = req.staff._id;
+    if (req.query.staffId && ['super_admin', 'superadmin', 'admin', 'tl'].includes(userRole)) {
+      staffId = req.query.staffId;
+    }
     const date = req.query.date || getTodayDateIST();
 
     const report = await DailyWorkReport.findOne({ staff: staffId, date })
@@ -121,31 +146,70 @@ exports.getTodayDailyWorkReport = async (req, res) => {
 // 4. Get all daily work reports (Super Admin / Admin / TL view)
 exports.getAllDailyWorkReports = async (req, res) => {
   try {
-    const userRole = req.staff.role || req.staff.systemRole;
-    if (!['super_admin', 'admin', 'tl'].includes(userRole)) {
+    const userRole = (req.staff.role || req.staff.systemRole || '').toLowerCase();
+    if (!['super_admin', 'superadmin', 'admin', 'tl'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Administrative privileges required.'
       });
     }
 
-    const { date, status, department, staffId, page = 1, limit = 20 } = req.query;
+    const { date, status, department, staffId, search, page = 1, limit = 50 } = req.query;
     const query = {};
 
-    if (date) query.date = date;
-    if (status) query.status = status;
-    if (staffId) query.staff = staffId;
+    if (date && date !== 'all') {
+      query.date = date;
+    }
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    if (staffId && staffId !== 'all') {
+      query.staff = staffId;
+    }
 
-    if (department) {
-      const matchingStaff = await Staff.find({ department }).select('_id');
-      query.staff = { $in: matchingStaff.map(s => s._id) };
+    if (department && department !== 'all') {
+      const matchingStaff = await Staff.find({
+        department: { $regex: new RegExp(`^${department.trim()}$`, 'i') }
+      }).select('_id');
+      const staffIds = matchingStaff.map(s => s._id);
+      if (query.staff) {
+        if (!staffIds.map(String).includes(String(query.staff))) {
+          return res.status(200).json({
+            success: true,
+            data: [],
+            pagination: { page: 1, limit: parseInt(limit, 10), total: 0, pages: 0 }
+          });
+        }
+      } else {
+        query.staff = { $in: staffIds };
+      }
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      const matchingStaff = await Staff.find({
+        $or: [
+          { fullName: searchRegex },
+          { email: searchRegex },
+          { designation: searchRegex },
+          { department: searchRegex }
+        ]
+      }).select('_id');
+      const searchStaffIds = matchingStaff.map(s => s._id);
+
+      query.$or = [
+        { tasksSummary: searchRegex },
+        { challengesBlockers: searchRegex },
+        { planForTomorrow: searchRegex },
+        { staff: { $in: searchStaffIds } }
+      ];
     }
 
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     const reports = await DailyWorkReport.find(query)
       .populate('staff', 'fullName email department designation role')
       .populate('reviewedBy', 'fullName email')
-      .sort({ createdAt: -1 })
+      .sort({ date: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
 
@@ -173,8 +237,8 @@ exports.getAllDailyWorkReports = async (req, res) => {
 // 5. Review daily work report (Approve / Reject by Super Admin / Admin)
 exports.reviewDailyWorkReport = async (req, res) => {
   try {
-    const userRole = req.staff.role || req.staff.systemRole;
-    if (!['super_admin', 'admin'].includes(userRole)) {
+    const userRole = (req.staff.role || req.staff.systemRole || '').toLowerCase();
+    if (!['super_admin', 'superadmin', 'admin'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only Super Admin or Admin can approve daily reports.'
@@ -223,3 +287,56 @@ exports.reviewDailyWorkReport = async (req, res) => {
     });
   }
 };
+
+// 6. Bulk Review Daily Work Reports
+exports.bulkReviewDailyWorkReports = async (req, res) => {
+  try {
+    const userRole = (req.staff.role || req.staff.systemRole || '').toLowerCase();
+    if (!['super_admin', 'superadmin', 'admin'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only Super Admin or Admin can approve daily reports.'
+      });
+    }
+
+    const { ids, status, reviewRemarks } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of report IDs to review.'
+      });
+    }
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid status (approved or rejected) is required'
+      });
+    }
+
+    const result = await DailyWorkReport.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          status,
+          reviewedBy: req.staff._id,
+          reviewedAt: new Date(),
+          reviewRemarks: (reviewRemarks || '').trim()
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully updated ${result.modifiedCount} daily reports to ${status}`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Bulk review daily reports error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to bulk review daily reports'
+    });
+  }
+};
+
