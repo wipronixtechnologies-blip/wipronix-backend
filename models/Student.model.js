@@ -231,12 +231,48 @@ const studentSchema = new mongoose.Schema(
     smartCutInvited: { type: Boolean, default: false },
     smartCutInvitedAt: { type: Date, default: null },
     smartCutChannel: { type: String, enum: ['email', 'whatsapp', 'both', 'none'], default: 'none' },
-    smartCutInviteCount: { type: Number, default: 0 }
+    smartCutInviteCount: { type: Number, default: 0 },
+
+    // Dummy / Duplicate Lead Tracking & Audit Trail
+    isDummy: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    dummyInfo: {
+      isDummy: { type: Boolean, default: false },
+      markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
+      markedByName: { type: String, default: '' },
+      markedByRole: { type: String, default: '' },
+      markedAt: { type: Date, default: null },
+      reasonCategory: {
+        type: String,
+        enum: [
+          'Duplicate Lead (Same Student)',
+          'Wrong / Invalid Contact Number',
+          'Fake / Test Entry',
+          'College Faculty / Ineligible Profile',
+          'Other'
+        ],
+        default: 'Duplicate Lead (Same Student)'
+      },
+      reasonNotes: { type: String, default: '' },
+      duplicateOf: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Student',
+        default: null
+      },
+      unmarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
+      unmarkedByName: { type: String, default: '' },
+      unmarkedAt: { type: Date, default: null }
+    }
   },
   { timestamps: true }
 );
 
 studentSchema.index({ phoneNumber: 1 });
+studentSchema.index({ isDummy: 1 });
+studentSchema.index({ assignedTo: 1, isDummy: 1 });
 studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 // Allow same email for different technologies, but not same email+technology twice
 studentSchema.index({ email: 1, technology: 1 }, { unique: true });

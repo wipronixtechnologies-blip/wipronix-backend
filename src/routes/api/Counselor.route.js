@@ -119,4 +119,10 @@ router.post('/log-call', counselorController.logCallAndFollowUp);
 // Get Call History Timeline
 router.get('/call-history/:studentId', counselorController.getCallHistory);
 
+// Mark Student as Dummy / Duplicate Lead
+router.post('/mark-dummy/:id', counselorController.markStudentAsDummy);
+
+// Unmark Student as Dummy (Restore)
+router.post('/unmark-dummy/:id', counselorController.unmarkStudentAsDummy);
+
 module.exports = router;

@@ -1555,22 +1555,29 @@ exports.getMyAssignedStudents = async (req, res) => {
     // Self-heal / synchronize leadStage, leadSubStage, and counselingStatus for all leads of this counselor
     // so that any student whose stage was previously overwritten or only logged in callLogs is accurately classified.
     const allCounselorLeads = await Student.find(baseCounselorFilter)
-      .select('_id leadStage leadSubStage counselingStatus lastContactedAt nextFollowUpDate callLogs')
+      .select('_id isDummy dummyInfo leadStage leadSubStage counselingStatus lastContactedAt nextFollowUpDate callLogs')
       .lean();
 
     const bulkSyncOps = [];
     const stageCounts = {
-      all: allCounselorLeads.length,
+      all: 0,
       'Untouched leads': 0,
       'Follow up': 0,
       'Not responding': 0,
       'Call back later': 0,
       'Not interested': 0,
-      'Admission done': 0
+      'Admission done': 0,
+      dummy: 0
     };
     const subStageCounts = {};
 
     allCounselorLeads.forEach(s => {
+      if (s.isDummy) {
+        stageCounts.dummy = (stageCounts.dummy || 0) + 1;
+        return;
+      }
+      stageCounts.all++;
+
       const resolved = resolveEffectiveLeadStage(s);
       const effectiveStage = resolved.leadStage;
       const effectiveSubStage = resolved.leadSubStage;
@@ -1630,101 +1637,107 @@ exports.getMyAssignedStudents = async (req, res) => {
       await Student.bulkWrite(bulkSyncOps).catch(err => console.warn('Bulk stage sync warning:', err.message));
     }
 
-    if (leadStage && leadStage !== 'all') {
-      if (leadStage === 'Untouched leads' || leadStage === 'Untouched') {
-        andConditions.push({
-          $and: [
-            {
-              $or: [
-                { leadStage: { $in: ['Untouched leads', 'Untouched', '', null] } },
-                { leadStage: { $exists: false } }
-              ]
-            },
-            {
-              counselingStatus: {
-                $nin: ['follow_up', 'interested', 'contacted', 'ringing', 'not_interested', 'rejected', 'enrolled', 'registered']
-              }
-            },
-            {
-              $or: [
-                { nextFollowUpDate: null },
-                { nextFollowUpDate: { $exists: false } }
-              ]
-            }
-          ]
-        });
-      } else if (leadStage === 'Admission done') {
-        andConditions.push({
-          $or: [
-            { leadStage: 'Admission done' },
-            {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
-                { counselingStatus: { $in: ['enrolled', 'registered'] } }
-              ]
-            }
-          ]
-        });
-      } else if (leadStage === 'Not interested') {
-        andConditions.push({
-          $or: [
-            { leadStage: 'Not interested' },
-            {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
-                { counselingStatus: { $in: ['not_interested', 'rejected'] } }
-              ]
-            }
-          ]
-        });
-      } else if (leadStage === 'Not responding') {
-        andConditions.push({
-          $or: [
-            { leadStage: 'Not responding' },
-            {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
-                { counselingStatus: 'ringing' }
-              ]
-            }
-          ]
-        });
-      } else if (leadStage === 'Call back later') {
-        andConditions.push({
-          $or: [
-            { leadStage: 'Call back later' },
-            {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
-                { counselingStatus: 'contacted' }
-              ]
-            }
-          ]
-        });
-      } else if (leadStage === 'Follow up') {
-        andConditions.push({
-          $or: [
-            { leadStage: 'Follow up' },
-            {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
-                {
-                  $or: [
-                    { counselingStatus: { $in: ['follow_up', 'interested'] } },
-                    {
-                      $and: [
-                        { nextFollowUpDate: { $ne: null } },
-                        { counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected', 'ringing', 'contacted'] } }
-                      ]
-                    }
-                  ]
+    if (leadStage === 'dummy') {
+      andConditions.push({ isDummy: true });
+    } else {
+      andConditions.push({ isDummy: { $ne: true } });
+
+      if (leadStage && leadStage !== 'all') {
+        if (leadStage === 'Untouched leads' || leadStage === 'Untouched') {
+          andConditions.push({
+            $and: [
+              {
+                $or: [
+                  { leadStage: { $in: ['Untouched leads', 'Untouched', '', null] } },
+                  { leadStage: { $exists: false } }
+                ]
+              },
+              {
+                counselingStatus: {
+                  $nin: ['follow_up', 'interested', 'contacted', 'ringing', 'not_interested', 'rejected', 'enrolled', 'registered']
                 }
-              ]
-            }
-          ]
-        });
-      } else {
-        andConditions.push({ leadStage });
+              },
+              {
+                $or: [
+                  { nextFollowUpDate: null },
+                  { nextFollowUpDate: { $exists: false } }
+                ]
+              }
+            ]
+          });
+        } else if (leadStage === 'Admission done') {
+          andConditions.push({
+            $or: [
+              { leadStage: 'Admission done' },
+              {
+                $and: [
+                  { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                  { counselingStatus: { $in: ['enrolled', 'registered'] } }
+                ]
+              }
+            ]
+          });
+        } else if (leadStage === 'Not interested') {
+          andConditions.push({
+            $or: [
+              { leadStage: 'Not interested' },
+              {
+                $and: [
+                  { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                  { counselingStatus: { $in: ['not_interested', 'rejected'] } }
+                ]
+              }
+            ]
+          });
+        } else if (leadStage === 'Not responding') {
+          andConditions.push({
+            $or: [
+              { leadStage: 'Not responding' },
+              {
+                $and: [
+                  { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                  { counselingStatus: 'ringing' }
+                ]
+              }
+            ]
+          });
+        } else if (leadStage === 'Call back later') {
+          andConditions.push({
+            $or: [
+              { leadStage: 'Call back later' },
+              {
+                $and: [
+                  { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                  { counselingStatus: 'contacted' }
+                ]
+              }
+            ]
+          });
+        } else if (leadStage === 'Follow up') {
+          andConditions.push({
+            $or: [
+              { leadStage: 'Follow up' },
+              {
+                $and: [
+                  { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                  {
+                    $or: [
+                      { counselingStatus: { $in: ['follow_up', 'interested'] } },
+                      {
+                        $and: [
+                          { nextFollowUpDate: { $ne: null } },
+                          { counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected', 'ringing', 'contacted'] } }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          });
+        } else {
+          andConditions.push({ leadStage });
+        }
       }
     }
 
@@ -1964,7 +1977,7 @@ exports.getMyAssignedStudents = async (req, res) => {
         .limit(limitNum)
         .lean(),
       Student.countDocuments(query),
-      Student.countDocuments(baseCounselorFilter),
+      Student.countDocuments({ ...baseCounselorFilter, isDummy: { $ne: true } }),
       Student.aggregate([
         { $match: baseCounselorFilter },
         {
@@ -3286,6 +3299,117 @@ exports.sendBDEReminderNotification = async (req, res) => {
     });
   } catch (error) {
     console.error('Error sending BDE reminder:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 18. Mark Student as Dummy / Duplicate Lead
+exports.markStudentAsDummy = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const { reasonCategory, reasonNotes, duplicateOf } = req.body;
+    const staff = req.staff;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const staffName = staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff';
+    const staffRole = staff.role || staff.systemRole || 'Counselor';
+
+    student.isDummy = true;
+    student.dummyInfo = {
+      isDummy: true,
+      markedBy: staff._id,
+      markedByName: staffName,
+      markedByRole: staffRole,
+      markedAt: new Date(),
+      reasonCategory: reasonCategory || 'Duplicate Lead (Same Student)',
+      reasonNotes: (reasonNotes || '').trim(),
+      duplicateOf: duplicateOf ? new mongoose.Types.ObjectId(duplicateOf) : null,
+      unmarkedBy: null,
+      unmarkedByName: '',
+      unmarkedAt: null
+    };
+
+    await student.save();
+
+    // Log Activity
+    try {
+      await logActivity({
+        staffId: staff._id,
+        action: 'MARK_STUDENT_DUMMY',
+        details: `Marked student ${student.fullName} (${student.phoneNumber || student.email}) as dummy. Reason: ${reasonCategory || 'Duplicate Lead'}. ${reasonNotes || ''}`,
+        targetId: student._id,
+        targetType: 'Student'
+      });
+    } catch (actErr) {
+      console.warn('Could not log activity for mark dummy:', actErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student marked as dummy successfully',
+      data: student
+    });
+  } catch (error) {
+    console.error('Error marking student as dummy:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 19. Unmark Student as Dummy (Restore)
+exports.unmarkStudentAsDummy = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const staff = req.staff;
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID is required' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const staffName = staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff';
+
+    student.isDummy = false;
+    if (student.dummyInfo) {
+      student.dummyInfo.isDummy = false;
+      student.dummyInfo.unmarkedBy = staff._id;
+      student.dummyInfo.unmarkedByName = staffName;
+      student.dummyInfo.unmarkedAt = new Date();
+    }
+
+    await student.save();
+
+    // Log Activity
+    try {
+      await logActivity({
+        staffId: staff._id,
+        action: 'UNMARK_STUDENT_DUMMY',
+        details: `Restored student ${student.fullName} (${student.phoneNumber || student.email}) from dummy.`,
+        targetId: student._id,
+        targetType: 'Student'
+      });
+    } catch (actErr) {
+      console.warn('Could not log activity for unmark dummy:', actErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student restored from dummy successfully',
+      data: student
+    });
+  } catch (error) {
+    console.error('Error restoring student from dummy:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
