@@ -24,6 +24,191 @@ const isTLRole = (staff) => {
   return staff.role === 'tl' || staff.systemRole === 'tl';
 };
 
+const LEAD_PARENT_STAGES_LIST = [
+  'Untouched leads',
+  'Follow up',
+  'Not responding',
+  'Call back later',
+  'Not interested',
+  'Admission done'
+];
+
+const LEAD_SUB_STAGES_MAP = {
+  'Untouched leads': [
+    'never contacted',
+    'assigned today',
+    'untouched 1-2 days',
+    'untouched 3+ days (stale)'
+  ],
+  'Follow up': [
+    'need time to think',
+    'want to consult parents',
+    'want to visit',
+    'need demo session',
+    'waiting for exam result'
+  ],
+  'Not responding': [
+    'not picked',
+    'switch off',
+    'ringing no response',
+    'not reachable',
+    'busy',
+    'wrong number',
+    'call declined'
+  ],
+  'Call back later': [
+    'call back',
+    'was busy somewhere outside'
+  ],
+  'Not interested': [
+    'enrolled somewhere else',
+    'looking for stipend based training',
+    'parents denied',
+    'relocation problem',
+    'fees issues',
+    'need only certificate'
+  ],
+  'Admission done': [
+    'Full Stack Web Development (MERN)',
+    'Python AI / ML & Data Science',
+    'Data Analytics & Power BI',
+    'Java Enterprise Software Engineering',
+    'Cloud DevOps & AWS Infrastructure',
+    'Mobile Application Development (Flutter/React Native)',
+    'Other Technology Track'
+  ]
+};
+
+const mapParentStageToStatus = (parentStage) => {
+  if (parentStage === 'Admission done') return 'enrolled';
+  if (parentStage === 'Not interested') return 'not_interested';
+  if (parentStage === 'Not responding') return 'ringing';
+  if (parentStage === 'Call back later') return 'contacted';
+  if (parentStage === 'Follow up') return 'follow_up';
+  if (parentStage === 'Untouched leads') return 'assigned';
+  return null;
+};
+
+const mapStatusToParentStage = (status, nextFollowUpDate) => {
+  if (status === 'enrolled' || status === 'registered') return 'Admission done';
+  if (status === 'not_interested' || status === 'rejected') return 'Not interested';
+  if (status === 'ringing') return 'Not responding';
+  if (status === 'contacted') return 'Call back later';
+  if (status === 'follow_up' || status === 'interested' || nextFollowUpDate) return 'Follow up';
+  return 'Untouched leads';
+};
+
+const parseStageFromCallOutcome = (callOutcome) => {
+  if (!callOutcome || typeof callOutcome !== 'string') return null;
+  const text = callOutcome.trim();
+  if (text === 'Details Updated' || text === 'Student details updated') return null;
+
+  for (const pStage of LEAD_PARENT_STAGES_LIST) {
+    if (text.toLowerCase().startsWith(pStage.toLowerCase())) {
+      const remainder = text.slice(pStage.length).replace(/^\s*-\s*/, '').replace(/\s*\(Note Updated\)$/i, '').trim();
+      return {
+        leadStage: pStage,
+        leadSubStage: remainder || (LEAD_SUB_STAGES_MAP[pStage] ? LEAD_SUB_STAGES_MAP[pStage][0] : '')
+      };
+    }
+  }
+
+  const lower = text.toLowerCase();
+  if (lower.includes('ready to enroll') || lower.includes('enrolled') || lower.includes('admission done')) {
+    return { leadStage: 'Admission done', leadSubStage: '' };
+  }
+  if (lower.includes('not interested')) {
+    return { leadStage: 'Not interested', leadSubStage: 'enrolled somewhere else' };
+  }
+  if (lower.includes('ringing') || lower.includes('no response') || lower.includes('switched off') || lower.includes('not reachable') || lower.includes('invalid number') || lower.includes('wrong contact')) {
+    let sub = 'not picked';
+    if (lower.includes('switched off')) sub = 'switch off';
+    else if (lower.includes('ringing')) sub = 'ringing no response';
+    else if (lower.includes('not reachable')) sub = 'not reachable';
+    else if (lower.includes('invalid') || lower.includes('wrong')) sub = 'wrong number';
+    return { leadStage: 'Not responding', leadSubStage: sub };
+  }
+  if (lower.includes('call back later') || lower.includes('busy')) {
+    return { leadStage: 'Call back later', leadSubStage: lower.includes('busy') ? 'was busy somewhere outside' : 'call back' };
+  }
+  if (lower.includes('follow-up') || lower.includes('follow up') || lower.includes('interested') || lower.includes('discussing with parents')) {
+    let sub = 'need time to think';
+    if (lower.includes('parents')) sub = 'want to consult parents';
+    return { leadStage: 'Follow up', leadSubStage: sub };
+  }
+  return null;
+};
+
+const resolveEffectiveLeadStage = (student) => {
+  if (!student) return { leadStage: 'Untouched leads', leadSubStage: 'never contacted', counselingStatus: 'assigned' };
+
+  // 1. Check most recent callLog that specifies a stage (callLogs are sorted newest-first via unshift, but verify timestamps)
+  if (Array.isArray(student.callLogs) && student.callLogs.length > 0) {
+    const sortedLogs = [...student.callLogs].sort((a, b) => {
+      const tA = new Date(a.calledAt || a.createdAt || 0).getTime();
+      const tB = new Date(b.calledAt || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    const hasTouchedHistory =
+      sortedLogs.some((l) => {
+        const p = parseStageFromCallOutcome(l.callOutcome);
+        return p && p.leadStage && p.leadStage !== 'Untouched leads';
+      }) ||
+      (student.leadStage && student.leadStage !== 'Untouched leads' && student.leadStage !== 'Untouched') ||
+      (student.counselingStatus && !['assigned', 'unassigned', ''].includes(student.counselingStatus)) ||
+      Boolean(student.nextFollowUpDate);
+
+    for (const log of sortedLogs) {
+      const parsed = parseStageFromCallOutcome(log.callOutcome);
+      if (parsed && parsed.leadStage) {
+        // Never let an accidental "Untouched leads" details-update log override a lead that has touched history
+        if (
+          parsed.leadStage === 'Untouched leads' &&
+          (hasTouchedHistory || (log.notes || '').trim() === 'Student details updated')
+        ) {
+          continue;
+        }
+        const resolvedSub = parsed.leadSubStage || (student.leadStage === parsed.leadStage ? student.leadSubStage : '') || (LEAD_SUB_STAGES_MAP[parsed.leadStage]?.[0] || '');
+        const resolvedStatus = mapParentStageToStatus(parsed.leadStage) || student.counselingStatus || 'assigned';
+        return {
+          leadStage: parsed.leadStage,
+          leadSubStage: resolvedSub,
+          counselingStatus: resolvedStatus
+        };
+      }
+    }
+  }
+
+  // 2. Check top-level leadStage if valid
+  if (student.leadStage && LEAD_PARENT_STAGES_LIST.includes(student.leadStage)) {
+    // Guard against stale "Untouched leads" when counselingStatus or follow-up clearly shows touched state
+    if (student.leadStage === 'Untouched leads' && student.counselingStatus && student.counselingStatus !== 'assigned' && student.counselingStatus !== 'unassigned') {
+      const mappedStage = mapStatusToParentStage(student.counselingStatus, student.nextFollowUpDate);
+      if (mappedStage !== 'Untouched leads') {
+        return {
+          leadStage: mappedStage,
+          leadSubStage: (LEAD_SUB_STAGES_MAP[mappedStage]?.includes(student.leadSubStage) ? student.leadSubStage : LEAD_SUB_STAGES_MAP[mappedStage]?.[0]) || '',
+          counselingStatus: student.counselingStatus
+        };
+      }
+    }
+    return {
+      leadStage: student.leadStage,
+      leadSubStage: student.leadSubStage || (LEAD_SUB_STAGES_MAP[student.leadStage]?.[0] || ''),
+      counselingStatus: mapParentStageToStatus(student.leadStage) || student.counselingStatus || 'assigned'
+    };
+  }
+
+  // 3. Fallback to counselingStatus / nextFollowUpDate
+  const fallbackStage = mapStatusToParentStage(student.counselingStatus || 'assigned', student.nextFollowUpDate);
+  return {
+    leadStage: fallbackStage,
+    leadSubStage: student.leadSubStage || (LEAD_SUB_STAGES_MAP[fallbackStage]?.[0] || ''),
+    counselingStatus: student.counselingStatus || mapParentStageToStatus(fallbackStage) || 'assigned'
+  };
+};
+
 // 1. Get BDE Staff List with Assignment Metrics
 exports.getBDEs = async (req, res) => {
   try {
@@ -717,16 +902,30 @@ exports.assignStudents = async (req, res) => {
     const studentIds = studentsToAssign.map(s => s._id);
 
     // Update students: assign to BDE, set assignedBy to the current user (TL or Admin)
+    // Only set counselingStatus to 'assigned' for leads that don't already have an active counseling status
     await Student.updateMany(
       { _id: { $in: studentIds } },
-      {
-        $set: {
-          assignedTo: bde._id,
-          assignedBy: req.staff?._id || null,
-          assignedAt: new Date(),
-          counselingStatus: 'assigned'
+      [
+        {
+          $set: {
+            assignedTo: bde._id,
+            assignedBy: req.staff?._id || null,
+            assignedAt: new Date(),
+            counselingStatus: {
+              $cond: [
+                {
+                  $in: [
+                    { $ifNull: ['$counselingStatus', 'unassigned'] },
+                    ['unassigned', 'assigned', '']
+                  ]
+                },
+                'assigned',
+                '$counselingStatus'
+              ]
+            }
+          }
         }
-      }
+      ]
     );
 
     const remainingUnassigned = totalUnassigned - numberToAssign;
@@ -1060,14 +1259,67 @@ exports.reassignStudents = async (req, res) => {
 exports.updateCounselingStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { counselingStatus, counselingNotes } = req.body;
+    const { counselingStatus, counselingNotes, leadStage, leadSubStage } = req.body;
+    const loggedInStaff = req.staff || {};
 
-    const updates = {};
-    if (counselingStatus) updates.counselingStatus = counselingStatus;
-    if (counselingNotes !== undefined) updates.counselingNotes = counselingNotes;
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
 
-    const student = await Student.findByIdAndUpdate(id, { $set: updates }, { new: true })
-      .populate('assignedTo', 'fullName email designation');
+    if (counselingStatus) {
+      student.counselingStatus = counselingStatus;
+      const mappedStage = leadStage || mapStatusToParentStage(counselingStatus, student.nextFollowUpDate);
+      if (mappedStage) {
+        student.leadStage = mappedStage;
+        const validSubs = LEAD_SUB_STAGES_MAP[mappedStage] || [];
+        if (leadSubStage && validSubs.includes(leadSubStage)) {
+          student.leadSubStage = leadSubStage;
+        } else if (!student.leadSubStage || !validSubs.includes(student.leadSubStage)) {
+          student.leadSubStage = validSubs[0] || '';
+        }
+      }
+    } else if (leadStage) {
+      student.leadStage = leadStage;
+      const mappedSt = mapParentStageToStatus(leadStage);
+      if (mappedSt) student.counselingStatus = mappedSt;
+      const validSubs = LEAD_SUB_STAGES_MAP[leadStage] || [];
+      if (leadSubStage && validSubs.includes(leadSubStage)) {
+        student.leadSubStage = leadSubStage;
+      } else if (!student.leadSubStage || !validSubs.includes(student.leadSubStage)) {
+        student.leadSubStage = validSubs[0] || '';
+      }
+    }
+
+    if (counselingNotes !== undefined) {
+      student.counselingNotes = counselingNotes;
+    }
+
+    student.lastTouchedAt = new Date();
+    if (student.leadStage && student.leadStage !== 'Untouched leads') {
+      student.lastContactedAt = student.lastContactedAt || new Date();
+    }
+    student.lastTouchedBy = loggedInStaff._id || null;
+    student.lastTouchedByName = loggedInStaff.fullName || `${loggedInStaff.firstName || ''} ${loggedInStaff.lastName || ''}`.trim() || 'Staff';
+
+    if (counselingStatus || leadStage || counselingNotes) {
+      const outcomeLabel = student.leadStage
+        ? `${student.leadStage}${student.leadSubStage ? ` - ${student.leadSubStage}` : ''}`
+        : (counselingStatus || 'Status Updated');
+      if (!Array.isArray(student.callLogs)) student.callLogs = [];
+      student.callLogs.unshift({
+        calledAt: new Date(),
+        calledBy: loggedInStaff._id || null,
+        calledByName: student.lastTouchedByName,
+        callOutcome: outcomeLabel,
+        notes: counselingNotes || `Counseling status updated to ${student.leadStage || counselingStatus}`,
+        nextFollowUpDate: student.nextFollowUpDate || null
+      });
+    }
+
+    await student.save();
+    await student.populate('assignedTo', 'fullName email designation');
+
     // Log activity for Super Admin
     logActivity({
       type: 'status_updated',
@@ -1078,20 +1330,18 @@ exports.updateCounselingStatus = async (req, res) => {
       actorEmail: req.staff?.email,
       actorRole: req.staff?.role,
       actorDepartment: req.staff?.department,
-      action: `Updated counseling status to "${counselingStatus || 'updated'}"`,
+      action: `Updated counseling status to "${student.leadStage || counselingStatus || 'updated'}"`,
       target: student?.fullName || 'Student',
       targetId: id,
       targetModel: 'Student',
       metadata: {
-        newStatus: counselingStatus,
+        newStatus: student.counselingStatus,
+        leadStage: student.leadStage,
+        leadSubStage: student.leadSubStage,
         notes: counselingNotes,
         studentEmail: student?.email
       }
     }).catch(err => console.error('Error logging status activity:', err));
-
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Student not found' });
-    }
 
     res.status(200).json({
       success: true,
@@ -1302,16 +1552,103 @@ exports.getMyAssignedStudents = async (req, res) => {
       else andConditions.push({ source: source });
     }
 
+    // Self-heal / synchronize leadStage, leadSubStage, and counselingStatus for all leads of this counselor
+    // so that any student whose stage was previously overwritten or only logged in callLogs is accurately classified.
+    const allCounselorLeads = await Student.find(baseCounselorFilter)
+      .select('_id leadStage leadSubStage counselingStatus lastContactedAt nextFollowUpDate callLogs')
+      .lean();
+
+    const bulkSyncOps = [];
+    const stageCounts = {
+      all: allCounselorLeads.length,
+      'Untouched leads': 0,
+      'Follow up': 0,
+      'Not responding': 0,
+      'Call back later': 0,
+      'Not interested': 0,
+      'Admission done': 0
+    };
+    const subStageCounts = {};
+
+    allCounselorLeads.forEach(s => {
+      const resolved = resolveEffectiveLeadStage(s);
+      const effectiveStage = resolved.leadStage;
+      const effectiveSubStage = resolved.leadSubStage;
+      const effectiveStatus = resolved.counselingStatus;
+
+      if (stageCounts[effectiveStage] !== undefined) {
+        stageCounts[effectiveStage]++;
+      } else {
+        stageCounts['Untouched leads']++;
+      }
+
+      if (effectiveSubStage) {
+        const subKey = `${effectiveStage}::${effectiveSubStage}`;
+        subStageCounts[subKey] = (subStageCounts[subKey] || 0) + 1;
+        subStageCounts[effectiveSubStage] = (subStageCounts[effectiveSubStage] || 0) + 1;
+      }
+
+      let cleanedLogs = null;
+      if (effectiveStage !== 'Untouched leads' && Array.isArray(s.callLogs) && s.callLogs.length > 0) {
+        const filtered = s.callLogs.filter(l => {
+          const p = parseStageFromCallOutcome(l.callOutcome);
+          if (p && p.leadStage === 'Untouched leads' && (l.notes || '').trim() === 'Student details updated') {
+            return false;
+          }
+          return true;
+        });
+        if (filtered.length !== s.callLogs.length) {
+          cleanedLogs = filtered;
+        }
+      }
+
+      if (
+        s.leadStage !== effectiveStage ||
+        (effectiveSubStage && s.leadSubStage !== effectiveSubStage) ||
+        (effectiveStatus && s.counselingStatus !== effectiveStatus) ||
+        cleanedLogs !== null
+      ) {
+        const setFields = { leadStage: effectiveStage };
+        if (effectiveSubStage) setFields.leadSubStage = effectiveSubStage;
+        if (effectiveStatus) setFields.counselingStatus = effectiveStatus;
+        if (effectiveStage !== 'Untouched leads' && !s.lastContactedAt) {
+          setFields.lastContactedAt = new Date();
+        }
+        if (cleanedLogs !== null) {
+          setFields.callLogs = cleanedLogs;
+        }
+        bulkSyncOps.push({
+          updateOne: {
+            filter: { _id: s._id },
+            update: { $set: setFields }
+          }
+        });
+      }
+    });
+
+    if (bulkSyncOps.length > 0) {
+      await Student.bulkWrite(bulkSyncOps).catch(err => console.warn('Bulk stage sync warning:', err.message));
+    }
+
     if (leadStage && leadStage !== 'all') {
       if (leadStage === 'Untouched leads' || leadStage === 'Untouched') {
         andConditions.push({
-          $or: [
-            { leadStage: { $in: ['Untouched leads', 'Untouched'] } },
+          $and: [
             {
-              $and: [
-                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }] },
-                { $or: [{ counselingStatus: 'assigned' }, { counselingStatus: '' }, { counselingStatus: null }, { counselingStatus: { $exists: false } }] },
-                { $or: [{ lastContactedAt: null }, { lastContactedAt: { $exists: false } }] }
+              $or: [
+                { leadStage: { $in: ['Untouched leads', 'Untouched', '', null] } },
+                { leadStage: { $exists: false } }
+              ]
+            },
+            {
+              counselingStatus: {
+                $nin: ['follow_up', 'interested', 'contacted', 'ringing', 'not_interested', 'rejected', 'enrolled', 'registered']
+              }
+            },
+            {
+              $or: [
+                { nextFollowUpDate: null },
+                { nextFollowUpDate: { $exists: false } }
               ]
             }
           ]
@@ -1320,39 +1657,68 @@ exports.getMyAssignedStudents = async (req, res) => {
         andConditions.push({
           $or: [
             { leadStage: 'Admission done' },
-            { counselingStatus: { $in: ['enrolled', 'registered'] } }
+            {
+              $and: [
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                { counselingStatus: { $in: ['enrolled', 'registered'] } }
+              ]
+            }
           ]
         });
       } else if (leadStage === 'Not interested') {
         andConditions.push({
           $or: [
             { leadStage: 'Not interested' },
-            { counselingStatus: { $in: ['not_interested', 'rejected'] } }
+            {
+              $and: [
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                { counselingStatus: { $in: ['not_interested', 'rejected'] } }
+              ]
+            }
           ]
         });
       } else if (leadStage === 'Not responding') {
         andConditions.push({
           $or: [
             { leadStage: 'Not responding' },
-            { counselingStatus: 'ringing' }
+            {
+              $and: [
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                { counselingStatus: 'ringing' }
+              ]
+            }
           ]
         });
       } else if (leadStage === 'Call back later') {
         andConditions.push({
           $or: [
             { leadStage: 'Call back later' },
-            { counselingStatus: 'contacted' }
+            {
+              $and: [
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                { counselingStatus: 'contacted' }
+              ]
+            }
           ]
         });
       } else if (leadStage === 'Follow up') {
         andConditions.push({
           $or: [
             { leadStage: 'Follow up' },
-            { counselingStatus: 'follow_up' },
             {
               $and: [
-                { nextFollowUpDate: { $ne: null } },
-                { counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected', 'ringing'] } }
+                { $or: [{ leadStage: '' }, { leadStage: null }, { leadStage: { $exists: false } }, { leadStage: 'Untouched leads' }] },
+                {
+                  $or: [
+                    { counselingStatus: { $in: ['follow_up', 'interested'] } },
+                    {
+                      $and: [
+                        { nextFollowUpDate: { $ne: null } },
+                        { counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected', 'ringing', 'contacted'] } }
+                      ]
+                    }
+                  ]
+                }
               ]
             }
           ]
@@ -1702,42 +2068,12 @@ exports.getMyAssignedStudents = async (req, res) => {
       console.warn('Error counting machine selected students:', cntErr.message);
     }
 
-    // Aggregate Main Lead Stages across all leads for this counselor (Untouched leads distinct from Follow up leads)
-    const allAssignedStudents = await Student.find(baseCounselorFilter).select('leadStage leadSubStage counselingStatus lastContactedAt nextFollowUpDate').lean();
-    const stageCounts = {
-      all: totalAssignedCount,
-      'Untouched leads': 0,
-      'Follow up': 0,
-      'Not responding': 0,
-      'Call back later': 0,
-      'Not interested': 0,
-      'Admission done': 0
-    };
-    const subStageCounts = {};
-
-    allAssignedStudents.forEach(s => {
-      let stage = s.leadStage;
-      if (!stage) {
-        const st = s.counselingStatus || 'assigned';
-        if (st === 'enrolled' || st === 'registered') stage = 'Admission done';
-        else if (st === 'not_interested' || st === 'rejected') stage = 'Not interested';
-        else if (st === 'ringing') stage = 'Not responding';
-        else if (st === 'contacted') stage = 'Call back later';
-        else if (st === 'follow_up' || s.nextFollowUpDate) stage = 'Follow up';
-        else stage = 'Untouched leads';
-      }
-      if (stageCounts[stage] !== undefined) {
-        stageCounts[stage]++;
-      } else {
-        if (s.lastContactedAt || s.nextFollowUpDate || s.counselingStatus === 'follow_up') {
-          stageCounts['Follow up']++;
-        } else {
-          stageCounts['Untouched leads']++;
-        }
-      }
-      if (s.leadSubStage) {
-        subStageCounts[s.leadSubStage] = (subStageCounts[s.leadSubStage] || 0) + 1;
-      }
+    // Ensure returned students have their resolved effective leadStage, leadSubStage, and counselingStatus attached
+    students.forEach(s => {
+      const resolved = resolveEffectiveLeadStage(s);
+      s.leadStage = resolved.leadStage;
+      s.leadSubStage = resolved.leadSubStage;
+      s.counselingStatus = resolved.counselingStatus;
     });
 
     res.status(200).json({
@@ -2178,7 +2514,7 @@ exports.generateTestLink = async (req, res) => {
 // 13. Log Call & Follow-up Details
 exports.logCallAndFollowUp = async (req, res) => {
   try {
-    const { studentId, callOutcome, notes, nextFollowUpDate, counselingStatus } = req.body;
+    const { studentId, callOutcome, notes, nextFollowUpDate, counselingStatus, leadStage, leadSubStage } = req.body;
     const loggedInStaff = req.staff || {};
 
     if (!studentId) {
@@ -2209,6 +2545,10 @@ exports.logCallAndFollowUp = async (req, res) => {
     student.callLogs.unshift(newLog);
 
     student.lastContactedAt = new Date();
+    student.lastTouchedAt = new Date();
+    student.lastTouchedBy = loggedInStaff._id || null;
+    student.lastTouchedByName = newLog.calledByName;
+
     if (followUpDate) {
       student.nextFollowUpDate = followUpDate;
     }
@@ -2216,21 +2556,46 @@ exports.logCallAndFollowUp = async (req, res) => {
       student.counselingNotes = cleanNotes;
     }
 
+    const lowerOutcome = outcome.toLowerCase();
     if (counselingStatus) {
       student.counselingStatus = counselingStatus;
     } else {
-      if (outcome.includes('interested')) {
-        student.counselingStatus = 'interested';
-      } else if (outcome.includes('follow_up') || followUpDate) {
-        student.counselingStatus = 'follow_up';
-      } else if (outcome.includes('not_interested')) {
+      if (lowerOutcome.includes('not interested') || lowerOutcome.includes('not_interested')) {
         student.counselingStatus = 'not_interested';
-      } else if (outcome.includes('registered') || outcome.includes('enrolled')) {
+      } else if (lowerOutcome.includes('registered') || lowerOutcome.includes('enrolled') || lowerOutcome.includes('ready to enroll')) {
         student.counselingStatus = 'enrolled';
-      } else if (outcome.includes('ringing') || outcome.includes('no_answer')) {
+      } else if (lowerOutcome.includes('ringing') || lowerOutcome.includes('no_answer') || lowerOutcome.includes('no response') || lowerOutcome.includes('switched off') || lowerOutcome.includes('not reachable') || lowerOutcome.includes('invalid number')) {
         student.counselingStatus = 'ringing';
+      } else if (lowerOutcome.includes('call back later') || lowerOutcome.includes('busy')) {
+        student.counselingStatus = 'contacted';
+      } else if (lowerOutcome.includes('interested')) {
+        student.counselingStatus = 'interested';
+      } else if (lowerOutcome.includes('follow_up') || lowerOutcome.includes('follow-up') || lowerOutcome.includes('discussing with parents') || followUpDate) {
+        student.counselingStatus = 'follow_up';
       } else {
         student.counselingStatus = 'contacted';
+      }
+    }
+
+    // Synchronize leadStage and leadSubStage so stage tabs always reflect the latest call log
+    if (leadStage && LEAD_PARENT_STAGES_LIST.includes(leadStage)) {
+      student.leadStage = leadStage;
+      if (leadSubStage) student.leadSubStage = leadSubStage;
+      else if (!student.leadSubStage || !(LEAD_SUB_STAGES_MAP[leadStage] || []).includes(student.leadSubStage)) {
+        student.leadSubStage = LEAD_SUB_STAGES_MAP[leadStage]?.[0] || '';
+      }
+    } else {
+      const parsedFromOutcome = parseStageFromCallOutcome(outcome);
+      const mappedStage = (counselingStatus ? mapStatusToParentStage(counselingStatus, followUpDate) : null) || parsedFromOutcome?.leadStage || mapStatusToParentStage(student.counselingStatus, followUpDate);
+      if (mappedStage) {
+        student.leadStage = mappedStage;
+        if (leadSubStage) {
+          student.leadSubStage = leadSubStage;
+        } else if (parsedFromOutcome?.leadSubStage && parsedFromOutcome.leadStage === mappedStage) {
+          student.leadSubStage = parsedFromOutcome.leadSubStage;
+        } else if (!student.leadSubStage || !(LEAD_SUB_STAGES_MAP[mappedStage] || []).includes(student.leadSubStage)) {
+          student.leadSubStage = LEAD_SUB_STAGES_MAP[mappedStage]?.[0] || '';
+        }
       }
     }
 
@@ -2252,6 +2617,8 @@ exports.logCallAndFollowUp = async (req, res) => {
       metadata: {
         callOutcome: outcome,
         counselingStatus: student.counselingStatus,
+        leadStage: student.leadStage,
+        leadSubStage: student.leadSubStage,
         nextFollowUpDate: followUpDate,
         notes: cleanNotes,
         studentPhone: student.phoneNumber,
@@ -2285,6 +2652,44 @@ exports.getCallHistory = async (req, res) => {
 
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Resolve effective lead stage so LeadDetailsScreen always receives the accurate latest stage
+    const resolvedStage = resolveEffectiveLeadStage(student);
+    const setFields = {};
+    if (student.leadStage !== resolvedStage.leadStage) {
+      student.leadStage = resolvedStage.leadStage;
+      setFields.leadStage = resolvedStage.leadStage;
+    }
+    if (resolvedStage.leadSubStage && student.leadSubStage !== resolvedStage.leadSubStage) {
+      student.leadSubStage = resolvedStage.leadSubStage;
+      setFields.leadSubStage = resolvedStage.leadSubStage;
+    }
+    if (resolvedStage.counselingStatus && student.counselingStatus !== resolvedStage.counselingStatus) {
+      student.counselingStatus = resolvedStage.counselingStatus;
+      setFields.counselingStatus = resolvedStage.counselingStatus;
+    }
+
+    // Clean up any accidental "Untouched leads - never contacted" log with "Student details updated" when lead is in a touched stage
+    if (resolvedStage.leadStage !== 'Untouched leads' && Array.isArray(student.callLogs) && student.callLogs.length > 0) {
+      const cleanedLogs = student.callLogs.filter(l => {
+        const p = parseStageFromCallOutcome(l.callOutcome);
+        if (p && p.leadStage === 'Untouched leads' && (l.notes || '').trim() === 'Student details updated') {
+          return false;
+        }
+        return true;
+      });
+      if (cleanedLogs.length !== student.callLogs.length) {
+        student.callLogs = cleanedLogs;
+        setFields.callLogs = cleanedLogs;
+      }
+    }
+
+    if (Object.keys(setFields).length > 0) {
+      await Student.updateOne(
+        { _id: student._id },
+        { $set: setFields }
+      ).catch(() => null);
     }
 
     // Attach test results from Result collection if missing or available
@@ -2355,6 +2760,7 @@ exports.updateStudentDetails = async (req, res) => {
       counselingNotes,
       leadStage,
       leadSubStage,
+      nextFollowUpDate,
       demoTechnology,
       demoTiming,
       admissionTechnology,
@@ -2367,6 +2773,9 @@ exports.updateStudentDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found.' });
     }
 
+    // Determine student's existing effective stage BEFORE applying updates so profile-only edits never reset stage
+    const priorResolved = resolveEffectiveLeadStage(student);
+
     if (fullName) student.fullName = fullName.trim();
     if (email) student.email = email.trim().toLowerCase();
     if (phoneNumber !== undefined) student.phoneNumber = phoneNumber.trim();
@@ -2378,16 +2787,24 @@ exports.updateStudentDetails = async (req, res) => {
     if (city !== undefined) student.city = city;
     if (passingYear !== undefined) student.passingYear = passingYear;
     if (counselingNotes !== undefined) student.counselingNotes = counselingNotes;
+    if (nextFollowUpDate !== undefined) {
+      student.nextFollowUpDate = nextFollowUpDate ? new Date(nextFollowUpDate) : null;
+    }
 
-    // Stage updates
+    // Stage updates: only mark stageChanged if leadStage or leadSubStage is explicitly provided
     let stageChanged = false;
     if (leadStage) {
       student.leadStage = leadStage;
       stageChanged = true;
+    } else if (!student.leadStage && priorResolved.leadStage) {
+      student.leadStage = priorResolved.leadStage;
     }
+
     if (leadSubStage !== undefined) {
       student.leadSubStage = leadSubStage;
       stageChanged = true;
+    } else if (!student.leadSubStage && priorResolved.leadSubStage) {
+      student.leadSubStage = priorResolved.leadSubStage;
     }
 
     // Map parent stage to counselingStatus
@@ -2402,9 +2819,21 @@ exports.updateStudentDetails = async (req, res) => {
         student.counselingStatus = 'contacted';
       } else if (leadStage === 'Not responding') {
         student.counselingStatus = 'ringing';
+      } else if (leadStage === 'Untouched leads') {
+        student.counselingStatus = 'assigned';
       }
     } else if (counselingStatus) {
       student.counselingStatus = counselingStatus;
+      const mappedFromStatus = mapStatusToParentStage(counselingStatus, student.nextFollowUpDate);
+      if (mappedFromStatus) {
+        student.leadStage = mappedFromStatus;
+        const validSubs = LEAD_SUB_STAGES_MAP[mappedFromStatus] || [];
+        if (!student.leadSubStage || !validSubs.includes(student.leadSubStage)) {
+          student.leadSubStage = validSubs[0] || '';
+        }
+      }
+    } else if (priorResolved.counselingStatus && (!student.counselingStatus || student.counselingStatus === 'assigned')) {
+      student.counselingStatus = priorResolved.counselingStatus;
     }
 
     // Demo Session Details
@@ -2421,20 +2850,26 @@ exports.updateStudentDetails = async (req, res) => {
 
     // Inactivity tracking: touch the student
     student.lastTouchedAt = new Date();
-    student.lastContactedAt = new Date();
+    if (stageChanged || counselingNotes || counselingStatus || student.leadStage !== 'Untouched leads') {
+      student.lastContactedAt = new Date();
+    }
     student.lastTouchedBy = loggedInStaff._id || null;
     student.lastTouchedByName = loggedInStaff.fullName || `${loggedInStaff.firstName || ''} ${loggedInStaff.lastName || ''}`.trim() || 'Staff';
 
-    // Add entry to callLogs timeline if stage changed or notes provided
-    if (stageChanged || counselingNotes) {
-      const stageLogText = leadStage ? `${leadStage}${leadSubStage ? ` - ${leadSubStage}` : ''}` : 'Details Updated';
+    // Add entry to callLogs timeline ONLY when stage changed, demo/admission booked, or notes were explicitly provided
+    if (stageChanged || counselingNotes || demoTiming || admissionTechnology) {
+      const activeStage = student.leadStage || priorResolved.leadStage || 'Follow up';
+      const activeSubStage = student.leadSubStage || priorResolved.leadSubStage || '';
+      const stageLogText = stageChanged
+        ? `${activeStage}${activeSubStage ? ` - ${activeSubStage}` : ''}`
+        : `${activeStage}${activeSubStage ? ` - ${activeSubStage}` : ''} (Note Updated)`;
       if (!Array.isArray(student.callLogs)) student.callLogs = [];
       student.callLogs.unshift({
         calledAt: new Date(),
         calledBy: loggedInStaff._id || null,
         calledByName: student.lastTouchedByName,
         callOutcome: stageLogText,
-        notes: counselingNotes || (demoTiming ? `Demo scheduled: ${demoTechnology} on ${new Date(demoTiming).toLocaleString()}` : (admissionTechnology ? `Enrolled in ${admissionTechnology}` : 'Student details updated')),
+        notes: counselingNotes || (demoTiming ? `Demo scheduled: ${demoTechnology} on ${new Date(demoTiming).toLocaleString()}` : (admissionTechnology ? `Enrolled in ${admissionTechnology}` : `Stage updated to ${activeStage}${activeSubStage ? ` (${activeSubStage})` : ''}`)),
         nextFollowUpDate: student.nextFollowUpDate || null
       });
     }
