@@ -29,6 +29,11 @@ exports.updateStaff = async (req, res) => {
       address,
       profileImage,
       dateOfJoining,
+      joiningDate,
+      internshipPeriod,
+      internshipDuration,
+      internshipStartDate,
+      internshipEndDate,
       department,
       designation,
       reportingTo,
@@ -83,6 +88,11 @@ exports.updateStaff = async (req, res) => {
       });
     }
 
+    const effectiveJoiningDate = dateOfJoining !== undefined ? dateOfJoining : joiningDate;
+    const wasIntern = targetStaff.role === 'intern' || targetStaff.systemRole === 'intern' || targetStaff.employeeType === 'intern' || targetStaff.isIntern === true;
+    const isNowIntern = (role !== undefined && role === 'intern') || (systemRole !== undefined && systemRole === 'intern') || (employeeType !== undefined && employeeType === 'intern');
+    const isPromotedToEmployee = wasIntern && !isNowIntern && (role !== undefined || systemRole !== undefined || employeeType !== undefined);
+
     const updateData = {
       firstName,
       lastName: lastName !== undefined ? lastName : targetStaff.lastName,
@@ -93,7 +103,8 @@ exports.updateStaff = async (req, res) => {
       dateOfBirth,
       address,
       profileImage,
-      dateOfJoining,
+      dateOfJoining: effectiveJoiningDate,
+      joiningDate: effectiveJoiningDate,
       department,
       designation,
       reportingTo,
@@ -105,6 +116,35 @@ exports.updateStaff = async (req, res) => {
       isActive,
       permissions
     };
+
+    if (internshipPeriod !== undefined || internshipDuration !== undefined) {
+      const p = (internshipPeriod || internshipDuration || '').trim();
+      updateData.internshipPeriod = p;
+      updateData.internshipDuration = p;
+    }
+    if (internshipStartDate !== undefined) updateData.internshipStartDate = internshipStartDate;
+    if (internshipEndDate !== undefined) updateData.internshipEndDate = internshipEndDate;
+
+    // Transition handling: Intern -> Employee unlocks casual leaves!
+    if (isPromotedToEmployee) {
+      updateData.isIntern = false;
+      if (updateData.employeeType === 'intern' || (!updateData.employeeType && targetStaff.employeeType === 'intern')) {
+        updateData.employeeType = 'full_time';
+      }
+      updateData.leaveBalance = {
+        ...(targetStaff.leaveBalance?.toObject ? targetStaff.leaveBalance.toObject() : targetStaff.leaveBalance || {}),
+        casual: 12,
+        lastResetDate: new Date()
+      };
+    } else if (isNowIntern) {
+      updateData.isIntern = true;
+      updateData.employeeType = 'intern';
+      updateData.leaveBalance = {
+        ...(targetStaff.leaveBalance?.toObject ? targetStaff.leaveBalance.toObject() : targetStaff.leaveBalance || {}),
+        casual: 0,
+        lastResetDate: new Date()
+      };
+    }
 
     // Remove undefined values
     Object.keys(updateData).forEach(key =>

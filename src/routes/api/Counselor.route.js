@@ -125,4 +125,21 @@ router.post('/mark-dummy/:id', counselorController.markStudentAsDummy);
 // Unmark Student as Dummy (Restore)
 router.post('/unmark-dummy/:id', counselorController.unmarkStudentAsDummy);
 
+// Registration Slip & Payment Management (Marketing TL, Counselor, Admin, Superadmin)
+router.post('/registration-slip', counselorController.generateRegistrationSlip);
+router.post('/registration/payment-link', counselorController.createRegistrationPaymentLink);
+router.get('/registration/all-slips', counselorController.getAllRegistrationSlips);
+router.get('/registration-slips/:studentId', counselorController.getRegistrationSlipsForStudent);
+router.post('/registration/verify-proof/:slipId', counselorController.verifyPaymentProof);
+router.get('/registration/receipt-preview', counselorController.previewRegistrationReceipt);
+router.get('/registration/receipt-preview/:slipId', counselorController.previewRegistrationReceipt);
+router.post('/registration/preview-receipt-data', counselorController.previewRegistrationReceipt);
+router.get('/registration/receipt-pdf/:identifier', counselorController.downloadRegistrationReceiptPdf);
+router.post('/registration/resend-receipt-whatsapp/:slipId', counselorController.resendReceiptOnWhatsApp);
+router.get('/registration/search-students', counselorController.searchStudentsForSlip);
+router.post('/registration/manual-office-slip', counselorController.createManualOfficeSlip);
+
+router.post('/registration/collect-installment', counselorController.collectStudentInstallment);
+router.get('/registration/due-alerts', counselorController.getUpcomingDueAlerts);
+
 module.exports = router;

@@ -1,3 +1,4 @@
+const fs = require('fs');
 const mongoose = require('mongoose');
 const Student = require('../../models/Student.model');
 const Staff = require('../../models/Staff.model');
@@ -15,7 +16,7 @@ const { escapeRegex } = require('../../utils/regexUtils');
 
 const isSuperAdminOrAdmin = (staff) => {
   if (!staff) return false;
-  const roles = ['super_admin', 'admin', 'hr', 'hr_manager'];
+  const roles = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'];
   return roles.includes(staff.role) || roles.includes(staff.systemRole);
 };
 
@@ -3412,4 +3413,693 @@ exports.unmarkStudentAsDummy = async (req, res) => {
     console.error('Error restoring student from dummy:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
+};
+
+/**
+ * GET/POST /api/counselor/registration/receipt-preview/:slipId?
+ * Stream in-memory PDF preview for counselor to view before generating or approving
+ */
+exports.previewRegistrationReceipt = async (req, res) => {
+  try {
+    const { slipId } = req.params;
+    let slip = null;
+    let student = null;
+
+    if (slipId && slipId !== 'preview') {
+      const isObjectId = mongoose.Types.ObjectId.isValid(slipId);
+      slip = isObjectId
+        ? await RegistrationSlip.findById(slipId).populate('student')
+        : await RegistrationSlip.findOne({ registrationNo: slipId }).populate('student');
+      if (slip) {
+        student = slip.student;
+      }
+    } else if (req.body && req.body.studentId) {
+      student = await Student.findById(req.body.studentId);
+    }
+
+    const receiptService = require('../../src/services/receiptService');
+    const pdfBuffer = await receiptService.generateReceiptPdf({
+      registrationNo: slip ? slip.registrationNo : (req.body.registrationNo || 'WPX-PREVIEW'),
+      date: slip ? (slip.verifiedAt || slip.date) : (req.body.date || new Date()),
+      studentName: student ? student.fullName : (req.body.studentName || 'Student Name'),
+      fatherName: slip?.fatherName || student?.fatherName || req.body.fatherName || '',
+      contactNo: student?.phoneNumber || slip?.contactNo || req.body.contactNo || '',
+      email: student?.email || slip?.email || req.body.email || '',
+      address: slip?.address || student?.address || student?.city || req.body.address || '',
+      technology: slip?.registeredTechnology || slip?.technology || student?.registeredTechnology || student?.admissionTechnology || req.body.technology || 'Training Track',
+      duration: slip?.duration || student?.trainingDuration || req.body.duration || '6 Months',
+      totalFee: slip?.totalFee || student?.totalFee || req.body.totalFee || 25000,
+      paidAmount: slip?.paidAmount || req.body.paidAmount || 0,
+      dueAmount: slip?.dueAmount !== undefined ? slip.dueAmount : (req.body.dueAmount || 0),
+      paymentMode: slip?.paymentMode || req.body.paymentMode || 'UPI',
+      nextDueDate: slip?.nextDueDate || student?.nextDueDate || req.body.nextDueDate || ''
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="receipt-preview.pdf"');
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating receipt preview:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/counselor/registration/receipt-pdf/:identifier
+ * Download official tamper-proof PDF receipt
+ */
+exports.downloadRegistrationReceiptPdf = async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    const slip = isObjectId
+      ? await RegistrationSlip.findById(identifier).populate('student')
+      : await RegistrationSlip.findOne({ registrationNo: identifier }).populate('student');
+
+    if (!slip) {
+      return res.status(404).json({ success: false, message: 'Registration receipt not found.' });
+    }
+
+    const receiptService = require('../../src/services/receiptService');
+    let filePath = receiptService.getReceiptPdfPath(slip.registrationNo);
+    let pdfBuffer = null;
+
+    if (filePath && fs.existsSync(filePath)) {
+      pdfBuffer = fs.readFileSync(filePath);
+    } else {
+      const generated = await receiptService.generateAndSaveReceipt(slip, slip.student || {});
+      pdfBuffer = generated.pdfBuffer;
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Wipronix_Receipt_${slip.registrationNo}.pdf"`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error downloading receipt PDF:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/counselor/registration/resend-receipt-whatsapp/:slipId
+ * Resend official fee receipt on WhatsApp to student & return direct WhatsApp link
+ */
+exports.resendReceiptOnWhatsApp = async (req, res) => {
+  try {
+    const { slipId } = req.params;
+    const slip = await RegistrationSlip.findById(slipId).populate('student');
+    if (!slip) {
+      return res.status(404).json({ success: false, message: 'Registration slip not found.' });
+    }
+
+    const student = slip.student;
+    if (!student || !student.phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Student phone number not found.' });
+    }
+
+    const receiptService = require('../../src/services/receiptService');
+    await receiptService.generateAndSaveReceipt(slip, student);
+
+    const frontendBase = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://www.wipronix.com').replace(/\/+$/, '');
+    const pdfDownloadUrl = `${frontendBase}/receipt/${slip.registrationNo}`;
+    slip.pdfUrl = pdfDownloadUrl;
+    await slip.save();
+
+    const cleanDigits = (student.phoneNumber || '').toString().replace(/\D/g, '');
+    const formattedMobile = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+
+    const messageText = `🎓 *WIPRONIX TECHNOLOGIES — OFFICIAL REGISTRATION RECEIPT* 🎓\n\nDear *${student.fullName}*,\n\nYour registration payment for *${slip.registeredTechnology || slip.technology || 'Training Program'}* has been successfully verified & confirmed.\n\n📄 *Registration Ref:* ${slip.registrationNo}\n💰 *Registration Fee Paid:* ₹${Number(slip.paidAmount || 0).toLocaleString()}\n💳 *Net Remaining Fee:* ₹${Number(slip.dueAmount || 0).toLocaleString()}\n📅 *Date:* ${receiptService.formatDate(slip.verifiedAt || slip.date)}\n\n📥 *Download Your Official PDF Receipt (Tamper-Proof):*\n${pdfDownloadUrl}\n\n_Note: Please keep this official receipt safe for your training records._`;
+
+    const whatsappDirectUrl = `https://api.whatsapp.com/send?phone=${formattedMobile}&text=${encodeURIComponent(messageText)}`;
+
+    try {
+      const msgStudio = require('../../src/services/msgStudioService');
+      await msgStudio.sendWhatsAppTemplate({
+        mobile: formattedMobile,
+        variables: [
+          student.fullName,
+          slip.registrationNo,
+          `₹${Number(slip.paidAmount || 0).toLocaleString()}`,
+          pdfDownloadUrl
+        ],
+        mediaUrl: pdfDownloadUrl
+      });
+    } catch (waErr) {
+      console.warn('MsgStudio dispatch note in resend:', waErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Registration receipt prepared for ${student.fullName}.`,
+      data: {
+        pdfUrl: pdfDownloadUrl,
+        whatsappDirectUrl,
+        mobile: formattedMobile,
+        registrationNo: slip.registrationNo
+      }
+    });
+  } catch (error) {
+    console.error('Error resending receipt on WhatsApp:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/counselor/registration/search-students
+ * Search students with college filter for manual slip creation
+ */
+exports.searchStudentsForSlip = async (req, res) => {
+  try {
+    const { search = '', college = '' } = req.query;
+    const query = {};
+
+    if (college && college.trim()) {
+      query.college = { $regex: new RegExp(`^${college.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+    }
+
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { fullName: { $regex: s, $options: 'i' } },
+        { email: { $regex: s, $options: 'i' } },
+        { phoneNumber: { $regex: s, $options: 'i' } }
+      ];
+    }
+
+    const [students, distinctColleges] = await Promise.all([
+      Student.find(query)
+        .select('fullName email phoneNumber college course fatherName address city technology registeredTechnology admissionTechnology trainingDuration totalFee totalPaidFee dueAmount netRemainingFee isRegistrationVerified registrationSlipNo leadStage leadSubStage assignedTo')
+        .populate('assignedTo', 'fullName email')
+        .sort({ updatedAt: -1 })
+        .limit(40),
+      Student.distinct('college')
+    ]);
+
+    const cleanColleges = Array.from(new Set(distinctColleges.filter(Boolean).map(c => c.trim()))).sort();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        students,
+        colleges: cleanColleges
+      }
+    });
+  } catch (error) {
+    console.error('Error searching students for slip:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/counselor/registration/manual-office-slip
+ * Superadmin-only: Create in-office paid registration slip for existing or new student
+ */
+exports.createManualOfficeSlip = async (req, res) => {
+  try {
+    const loggedInStaff = req.staff || req.user;
+    if (!loggedInStaff) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    // Role check: Only Superadmin or authorized Admin
+    if (!isSuperAdminOrAdmin(loggedInStaff)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied. Only Superadmin or authorized Admin can create manual office slips.'
+      });
+    }
+
+    const {
+      studentId,
+      studentName,
+      phoneNumber,
+      email,
+      college,
+      course,
+      fatherName,
+      address,
+      technology,
+      duration = '6 Months',
+      totalFee = 25000,
+      paidAmount = 0,
+      dueAmount,
+      paymentMode = 'Cash',
+      nextDueDate,
+      remarks,
+      registrationNo: customRegNo,
+      sendWhatsApp = false
+    } = req.body;
+
+    let student = null;
+
+    if (studentId) {
+      student = await Student.findById(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: 'Selected student not found.' });
+      }
+    } else {
+      // Find by phone or email or create new student
+      const cleanPhone = (phoneNumber || '').toString().trim();
+      const cleanEmail = (email || '').toString().trim().toLowerCase();
+
+      if (!cleanPhone && !cleanEmail) {
+        return res.status(400).json({ success: false, message: 'Student phone number or email is required.' });
+      }
+
+      if (!studentName || !studentName.trim()) {
+        return res.status(400).json({ success: false, message: 'Student name is required.' });
+      }
+
+      const orQuery = [];
+      if (cleanPhone) orQuery.push({ phoneNumber: cleanPhone });
+      if (cleanEmail) orQuery.push({ email: cleanEmail });
+
+      student = await Student.findOne({ $or: orQuery });
+
+      if (!student) {
+        student = new Student({
+          fullName: studentName.trim(),
+          phoneNumber: cleanPhone,
+          email: cleanEmail || `${cleanPhone || Date.now()}@wipronix.local`,
+          college: (college || 'Office Walk-in').trim(),
+          course: (course || '').trim(),
+          fatherName: (fatherName || '').trim(),
+          address: (address || '').trim(),
+          city: (address || '').trim(),
+          technology: (technology || 'General').trim(),
+          registeredTechnology: (technology || 'General').trim(),
+          admissionTechnology: (technology || 'General').trim(),
+          trainingDuration: duration,
+          source: 'import',
+          leadStage: 'Admission done',
+          leadSubStage: (technology || 'General').trim(),
+          assignedTo: loggedInStaff._id,
+          assignedBy: loggedInStaff._id,
+          assignedAt: new Date()
+        });
+        await student.save();
+      }
+    }
+
+    const numTotal = Number(totalFee) || Number(student.totalFee) || 25000;
+    const numPaid = Number(paidAmount) || 0;
+    const calculatedDue = dueAmount !== undefined ? Number(dueAmount) : Math.max(0, numTotal - numPaid);
+
+    // Generate unique REG NO
+    const cleanDateCode = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const regNo = customRegNo && customRegNo.trim()
+      ? customRegNo.trim()
+      : `WPX-${cleanDateCode}-${randomSuffix}`;
+
+    // Create RegistrationSlip
+    const newSlip = new RegistrationSlip({
+      student: student._id,
+      issuedBy: loggedInStaff._id,
+      registrationNo: regNo,
+      fatherName: fatherName || student.fatherName || '',
+      address: address || student.address || student.city || '',
+      technology: technology || student.registeredTechnology || student.admissionTechnology || student.technology || 'General',
+      registeredTechnology: technology || student.registeredTechnology || student.admissionTechnology || student.technology || 'General',
+      duration: duration || student.trainingDuration || '6 Months',
+      totalFee: numTotal,
+      paidAmount: numPaid,
+      dueAmount: calculatedDue,
+      paymentMode: paymentMode || 'Cash',
+      mode: 'In-Office',
+      nextDueDate: nextDueDate || student.nextDueDate || null,
+      status: 'Paid', // Office slips are paid & verified
+      verifiedBy: loggedInStaff._id,
+      verifiedByName: loggedInStaff.fullName || 'Superadmin',
+      verifiedAt: new Date(),
+      remarks: remarks || `Manual in-office slip entered by ${loggedInStaff.fullName || 'Superadmin'}`
+    });
+
+    await newSlip.save();
+
+    // Update Student record with verified registration status & financials
+    student.isRegistrationVerified = true;
+    student.registrationSlipNo = regNo;
+    student.leadStage = 'Admission done';
+    student.leadSubStage = newSlip.registeredTechnology;
+    student.registeredTechnology = newSlip.registeredTechnology;
+    student.admissionTechnology = newSlip.registeredTechnology;
+    student.trainingDuration = newSlip.duration;
+    student.totalFee = numTotal;
+    student.totalPaidFee = (student.totalPaidFee || 0) + numPaid;
+    student.dueAmount = calculatedDue;
+    student.netRemainingFee = calculatedDue;
+    if (fatherName) student.fatherName = fatherName;
+    if (address) { student.address = address; if (!student.city) student.city = address; }
+    if (nextDueDate) student.nextDueDate = nextDueDate;
+    student.activePaymentSlipId = newSlip._id;
+    await student.save();
+
+    // Create FeePayment ledger record
+    try {
+      const FeePayment = require('../../models/FeePayment.model');
+      const feePayment = new FeePayment({
+        student: student._id,
+        amount: numPaid,
+        type: 'Registration',
+        paymentMode: paymentMode || 'Cash',
+        status: 'Paid',
+        slipNumber: regNo,
+        collectedBy: loggedInStaff._id,
+        date: new Date(),
+        remarks: remarks || 'Office manual registration slip payment'
+      });
+      await feePayment.save();
+    } catch (ledgerErr) {
+      console.warn('Ledger record creation note:', ledgerErr.message);
+    }
+
+    // Generate Official Tamper-Proof PDF Receipt
+    const receiptService = require('../../src/services/receiptService');
+    const receiptResult = await receiptService.generateAndSaveReceipt(newSlip, student);
+    newSlip.receiptPdfPath = receiptResult.filePath;
+
+    const frontendBase = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://www.wipronix.com').replace(/\/+$/, '');
+    const pdfDownloadUrl = `${frontendBase}/receipt/${regNo}`;
+    newSlip.pdfUrl = pdfDownloadUrl;
+    await newSlip.save();
+
+    // Send WhatsApp if requested
+    if (sendWhatsApp && student.phoneNumber) {
+      try {
+        const cleanDigits = (student.phoneNumber || '').toString().replace(/\D/g, '');
+        const formattedMobile = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+        const msgStudio = require('../../src/services/msgStudioService');
+        await msgStudio.sendWhatsAppTemplate({
+          mobile: formattedMobile,
+          variables: [
+            student.fullName,
+            newSlip.registrationNo,
+            `₹${numPaid.toLocaleString()}`,
+            pdfDownloadUrl
+          ],
+          mediaUrl: pdfDownloadUrl
+        });
+      } catch (waErr) {
+        console.warn('WhatsApp dispatch error in manual slip:', waErr.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Manual office slip ${regNo} created and verified for ${student.fullName}.`,
+      data: {
+        slip: newSlip,
+        student,
+        pdfUrl: pdfDownloadUrl
+      }
+    });
+  } catch (error) {
+    console.error('Error creating manual office slip:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+/**
+ * POST /api/counselor/registration/collect-installment
+ * Superadmin strictly manages subsequent fee installments (2nd, 3rd installment, final balance)
+ */
+exports.collectStudentInstallment = async (req, res) => {
+  try {
+    const loggedInStaff = req.staff || req.user;
+    if (!loggedInStaff) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    if (!isSuperAdminOrAdmin(loggedInStaff)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied. Only Superadmin or authorized Admin can record fee installments.'
+      });
+    }
+
+    const {
+      studentId,
+      installmentAmount,
+      paymentMode = 'Cash',
+      transactionId = '',
+      paymentScreenshotUrl = '',
+      nextDueDate,
+      remarks,
+      registrationNo: customRegNo,
+      sendWhatsApp = true
+    } = req.body;
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    const numInstallment = Number(installmentAmount) || 0;
+    if (numInstallment <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid installment amount is required.' });
+    }
+
+    // Previous slips to determine installment number
+    const previousSlips = await RegistrationSlip.find({ student: student._id }).sort({ createdAt: 1 });
+    const installmentNumber = previousSlips.length + 1;
+
+    const currentTotalPaid = Number(student.totalPaidFee || 0);
+    const newTotalPaid = currentTotalPaid + numInstallment;
+    const totalFee = Number(student.totalFee || 25000);
+    const newRemainingDue = Math.max(0, totalFee - newTotalPaid);
+
+    // Generate unique slip reference
+    const cleanDateCode = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const regNo = customRegNo && customRegNo.trim()
+      ? customRegNo.trim()
+      : `WPX-${cleanDateCode}-${randomSuffix}`;
+
+    const newSlip = new RegistrationSlip({
+      student: student._id,
+      issuedBy: loggedInStaff._id,
+      registrationNo: regNo,
+      installmentNumber,
+      fatherName: student.fatherName || '',
+      address: student.address || student.city || '',
+      technology: student.registeredTechnology || student.admissionTechnology || student.technology || 'Training Program',
+      registeredTechnology: student.registeredTechnology || student.admissionTechnology || student.technology || 'Training Program',
+      duration: student.trainingDuration || '6 Months',
+      totalFee,
+      paidAmount: numInstallment,
+      dueAmount: newRemainingDue,
+      paymentMode: paymentMode || 'Cash',
+      mode: 'In-Office',
+      transactionId: transactionId || '',
+      paymentScreenshotUrl: paymentScreenshotUrl || '',
+      nextDueDate: nextDueDate || null,
+      status: 'Paid',
+      verifiedBy: loggedInStaff._id,
+      verifiedByName: loggedInStaff.fullName || 'Superadmin',
+      verifiedAt: new Date(),
+      remarks: remarks || `Fee Installment #${installmentNumber} recorded by ${loggedInStaff.fullName || 'Superadmin'}`
+    });
+
+    await newSlip.save();
+
+    // Update Student financials
+    student.totalPaidFee = newTotalPaid;
+    student.dueAmount = newRemainingDue;
+    student.netRemainingFee = newRemainingDue;
+    if (nextDueDate) {
+      student.nextDueDate = nextDueDate;
+    } else if (newRemainingDue === 0) {
+      student.nextDueDate = null;
+    }
+    await student.save();
+
+    // Ledger entry
+    try {
+      const FeePayment = require('../../models/FeePayment.model');
+      const feePayment = new FeePayment({
+        student: student._id,
+        amount: numInstallment,
+        type: `Installment #${installmentNumber}`,
+        paymentMode: paymentMode || 'Cash',
+        status: 'Paid',
+        slipNumber: regNo,
+        transactionId: transactionId || '',
+        collectedBy: loggedInStaff._id,
+        date: new Date(),
+        remarks: remarks || `Installment #${installmentNumber} payment`
+      });
+      await feePayment.save();
+    } catch (ledgerErr) {
+      console.warn('Ledger error:', ledgerErr.message);
+    }
+
+    // Generate PDF receipt
+    const receiptService = require('../../src/services/receiptService');
+    const receiptResult = await receiptService.generateAndSaveReceipt(newSlip, student);
+    newSlip.receiptPdfPath = receiptResult.filePath;
+
+    const cleanFrontendBase = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://www.wipronix.com').replace(/\/+$/, '');
+    const publicReceiptUrl = `${cleanFrontendBase}/receipt/${regNo}`;
+    newSlip.pdfUrl = publicReceiptUrl;
+    await newSlip.save();
+
+    // WhatsApp dispatch
+    if (sendWhatsApp && student.phoneNumber) {
+      try {
+        const cleanDigits = (student.phoneNumber || '').toString().replace(/\D/g, '');
+        const formattedMobile = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+        const msgStudio = require('../../src/services/msgStudioService');
+        await msgStudio.sendReceiptWhatsApp({
+          studentPhone: formattedMobile,
+          studentName: student.fullName,
+          registrationNo: regNo,
+          paidAmount: numInstallment,
+          receiptUrl: publicReceiptUrl
+        });
+      } catch (waErr) {
+        console.warn('WhatsApp dispatch error:', waErr.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Installment #${installmentNumber} of ₹${numInstallment.toLocaleString()} recorded for ${student.fullName}. Official receipt: ${regNo}`,
+      data: {
+        slip: newSlip,
+        student,
+        receiptUrl: publicReceiptUrl,
+        installmentNumber
+      }
+    });
+  } catch (error) {
+    console.error('Error collecting installment:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/counselor/due-alerts
+ * Counselors receive alerts for assigned students whose fee due date is near (within 7 days or overdue)
+ */
+exports.getUpcomingDueAlerts = async (req, res) => {
+  try {
+    const loggedInStaff = req.staff || req.user;
+    if (!loggedInStaff) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    const query = {
+      isRegistrationVerified: true,
+      $or: [
+        { netRemainingFee: { $gt: 0 } },
+        { dueAmount: { $gt: 0 } }
+      ],
+      nextDueDate: { $ne: null }
+    };
+
+    // If counselor / staff, filter by assignedTo
+    if (!isSuperAdminOrAdmin(loggedInStaff)) {
+      query.assignedTo = loggedInStaff._id;
+    }
+
+    const students = await Student.find(query)
+      .populate('assignedTo', 'fullName email phoneNumber')
+      .sort({ nextDueDate: 1 })
+      .lean();
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const dueAlerts = [];
+
+    for (const student of students) {
+      if (!student.nextDueDate) continue;
+      const dueDate = new Date(student.nextDueDate);
+      const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+      const diffMs = dueDay.getTime() - today.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      // Alert if due within 7 days, due today, or overdue
+      if (diffDays <= 7) {
+        let status = 'upcoming';
+        let alertLabel = `Due in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+        if (diffDays === 0) {
+          status = 'today';
+          alertLabel = 'Due Today';
+        } else if (diffDays < 0) {
+          status = 'overdue';
+          alertLabel = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'}`;
+        }
+
+        const remainingFee = student.netRemainingFee !== undefined && student.netRemainingFee !== null ? student.netRemainingFee : student.dueAmount;
+        const cleanPhone = (student.phoneNumber || '').toString().replace(/\D/g, '');
+        const formattedMobile = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+        const reminderMsg = `🎓 *WIPRONIX TECHNOLOGIES — FEE DUE NOTICE* 🎓\\n\\nDear *${student.fullName}*,\\n\\nThis is a friendly reminder that your upcoming course fee installment of *₹${Number(remainingFee || 0).toLocaleString()}* for *${student.registeredTechnology || student.technology || 'Training'}* is scheduled for *${dueDate.toLocaleDateString('en-GB')}* (${alertLabel}).\\n\\nPlease connect with your counselor to ensure uninterrupted classes and project access.\\n\\nAssigned Counselor: ${student.assignedTo?.fullName || 'Academic Support'}\\nHelpline: 7087015329 / 7087015340\\nWebsite: https://www.wipronix.com`;
+
+        const whatsappReminderUrl = `https://api.whatsapp.com/send?phone=${formattedMobile}&text=${encodeURIComponent(reminderMsg)}`;
+
+        dueAlerts.push({
+          studentId: student._id,
+          studentName: student.fullName,
+          email: student.email,
+          phoneNumber: student.phoneNumber,
+          college: student.college,
+          technology: student.registeredTechnology || student.technology,
+          totalFee: student.totalFee,
+          totalPaidFee: student.totalPaidFee,
+          remainingFee,
+          dueDate: student.nextDueDate,
+          diffDays,
+          status,
+          alertLabel,
+          assignedCounselor: student.assignedTo?.fullName || 'Not Assigned',
+          whatsappReminderUrl
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalDueAlerts: dueAlerts.length,
+        alerts: dueAlerts
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching due alerts:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// =============================================================================
+// REGISTRATION & PAYMENT VERIFICATION DELEGATIONS
+// =============================================================================
+const financeController = require('../Finance/financeController');
+
+exports.getAllRegistrationSlips = financeController.getAllRegistrationSlips;
+exports.verifyPaymentProof = financeController.verifyRegistrationSlip;
+
+exports.getRegistrationSlipsForStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const slips = await RegistrationSlip.find({ student: studentId })
+      .populate('issuedBy', 'fullName firstName lastName email role')
+      .populate('verifiedBy', 'fullName firstName lastName email role')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: slips
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createRegistrationPaymentLink = async (req, res) => {
+  return exports.generateRegistrationSlip(req, res);
 };

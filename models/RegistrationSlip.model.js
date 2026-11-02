@@ -26,24 +26,50 @@ const registrationSlipSchema = new mongoose.Schema({
     },
     fatherName: {
         type: String,
-        required: true,
-        trim: true
+        trim: true,
+        default: ''
     },
     address: {
         type: String,
-        required: true
+        default: ''
     },
     technology: {
         type: String,
         required: true
     },
+    registeredTechnology: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    pdfUrl: {
+        type: String,
+        default: ''
+    },
+    receiptPdfPath: {
+        type: String,
+        default: ''
+    },
     duration: {
         type: String,
-        required: true
+        default: '6 Months'
     },
     totalFee: {
         type: Number,
         required: true
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+    discountType: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    netFee: {
+        type: Number,
+        default: null
     },
     paidAmount: {
         type: Number,
@@ -55,8 +81,13 @@ const registrationSlipSchema = new mongoose.Schema({
     },
     paymentMode: {
         type: String,
-        enum: ['Cash', 'UPI', 'Bank'],
-        required: true
+        enum: ['Cash', 'UPI', 'Bank', 'Online', 'Card POS'],
+        default: 'UPI'
+    },
+    mode: {
+        type: String,
+        enum: ['In-Office', 'Remote-QR'],
+        default: 'In-Office'
     },
     nextDueDate: {
         type: Date
@@ -68,16 +99,65 @@ const registrationSlipSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Pending Verification', 'Verified', 'Payment Pending', 'Paid'],
+        enum: [
+            'Pending Payment',      // Remote QR generated, waiting for student to pay
+            'Proof Submitted',      // Student submitted UTR & screenshot, awaiting review
+            'Pending Verification', // Legacy status
+            'Verified',             // Counselor/admin verified UTR
+            'Paid',                 // Official receipt generated/paid
+            'Rejected'              // Payment proof rejected
+        ],
         default: 'Pending Verification'
+    },
+    // Remote QR / Online Payment Details
+    paymentToken: {
+        type: String,
+        index: true,
+        sparse: true
+    },
+    tokenExpiresAt: {
+        type: Date
+    },
+    upiString: {
+        type: String
+    },
+    qrDataUrl: {
+        type: String
+    },
+    // Student submitted proof
+    transactionId: {
+        type: String,
+        trim: true
+    },
+    paymentScreenshotUrl: {
+        type: String
+    },
+    studentSubmissionDate: {
+        type: Date
+    },
+    // Verification audit
+    verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Staff'
+    },
+    verifiedByName: {
+        type: String
+    },
+    verifiedAt: {
+        type: Date
+    },
+    rejectionReason: {
+        type: String
+    },
+    remarks: {
+        type: String
     },
     verificationToken: {
         type: String,
-        required: true
+        default: ''
     },
     verificationTokenExpires: {
-        type: Date,
-        required: true
+        type: Date
     }
 }, {
     timestamps: true

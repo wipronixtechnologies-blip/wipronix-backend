@@ -78,5 +78,7 @@ Router.use("/webinars", webinarRoutes);
 Router.use("/daily-work-reports", dailyWorkReportRoutes);
 Router.use("/financial-years", financialYearRoutes);
 Router.use("/smart-cut", smartCutRoutes);
+const publicPaymentRoutes = require('./PublicPayment.route');
+Router.use("/public", publicPaymentRoutes);
 
 module.exports = Router;

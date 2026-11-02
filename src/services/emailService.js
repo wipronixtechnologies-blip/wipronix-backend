@@ -406,40 +406,27 @@ const sendStaffWelcomeEmailWithOfferLetter = async (staffData, password, pdfBuff
               <strong>Username/Email:</strong> ${staffData.email}<br>
               <strong>Temporary Password:</strong> ${password}
             </div>
-            <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">
-              *Please change your password after your first login for security.
-            </p>
           </div>
 
-          <!-- Document Upload Instructions -->
-          <div style="background-color: #fef3c7; border: 1px solid #fbbf24; padding: 20px; margin: 26px 0;">
-            <h4 style="margin-top: 0; color: #92400e; font-size: 16px;">
-              Mandatory Document Upload
+          <!-- Document Submission in Office -->
+          <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 20px; margin: 26px 0; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #047857; font-size: 16px; margin-bottom: 10px;">
+              Document Submission (In Office)
             </h4>
-            <p style="margin: 0; font-size: 14px; color: #78350f; line-height: 1.6;">
-              As part of our onboarding process, you are required to upload the following documents in your profile section:
-            </p>
-            <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px; color: #78350f;">
-              <li>Identity Proof (Aadhar/PAN/Passport)</li>
-              <li>Educational Certificates (Highest Qualification)</li>
-              <li>Medical Fitness Document</li>
-              <li>Past Experience Letter (if applicable)</li>
-            </ul>
-            <p style="margin: 0; font-size: 14px; color: #78350f;">
-              Failure to upload these within 3 working days may affect your payroll processing.
+            <p style="margin: 0; font-size: 15px; color: #065f46; line-height: 1.7;">
+              Please note that all required onboarding documents are to be submitted directly at our office on your date of joining.
             </p>
           </div>
 
           <!-- Next Steps -->
-          <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 20px; margin: 26px 0;">
-            <h4 style="margin-top: 0; color: #047857; font-size: 16px;">
+          <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 20px; margin: 26px 0; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #0369a1; font-size: 16px; margin-bottom: 12px;">
               Your Next Steps
             </h4>
-            <ol style="margin: 0; padding-left: 20px; font-size: 15px; color: #065f46; line-height: 1.7;">
+            <ol style="margin: 0; padding-left: 20px; font-size: 15px; color: #075985; line-height: 1.8;">
               <li>Download and review your attached <strong>Offer Letter</strong>.</li>
-              <li>Login to the portal using the credentials provided above.</li>
-              <li>Go to <strong>My Profile</strong> settings and upload the required documents.</li>
-              <li>Update your personal details including address and date of birth.</li>
+              <li>Login to the portal using the credentials provided above to access your staff account and attendance.</li>
+              <li>Submit your onboarding documents in office on your joining date.</li>
             </ol>
           </div>
 
@@ -543,7 +530,7 @@ const createStaffWelcomeEmailTemplate = (staffData, tempPassword) => {
               Your Login Credentials
             </h4>
             <p style="margin: 8px 0; font-size: 15px; color: #374151;">
-              <strong>Portal URL:</strong> <a href="${portalUrl}" style="color: #ab1428; text-decoration: none;">${portalUrl}</a>
+              <strong>Portal URL:</strong> <a href="${ADMIN_LINK}">${ADMIN_LINK}</a><br>
             </p>
             <p style="margin: 8px 0; font-size: 15px; color: #374151;">
               <strong>Username/Email:</strong> ${email}
@@ -551,32 +538,16 @@ const createStaffWelcomeEmailTemplate = (staffData, tempPassword) => {
             <p style="margin: 8px 0; font-size: 15px; color: #374151;">
               <strong>Temporary Password:</strong> ${tempPassword}
             </p>
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; padding: 12px; margin-top: 16px; border-radius: 4px;">
-              <p style="margin: 0; font-size: 14px; color: #92400e;">
-                <strong>*Please change your password after your first login for security.</strong>
-              </p>
-            </div>
           </div>
 
-          <!-- Mandatory Document Upload -->
+          <!-- Document Submission in Office -->
           <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 20px; margin: 26px 0; border-radius: 8px;">
-            <h4 style="margin-top: 0; color: #047857; font-size: 16px; margin-bottom: 12px;">
-              Mandatory Document Upload
+            <h4 style="margin-top: 0; color: #047857; font-size: 16px; margin-bottom: 10px;">
+              Document Submission (In Office)
             </h4>
-            <p style="margin: 0 0 12px; font-size: 15px; color: #065f46; line-height: 1.7;">
-              As part of our onboarding process, you are required to upload the following documents in your profile section:
+            <p style="margin: 0; font-size: 15px; color: #065f46; line-height: 1.7;">
+              Please note that all required onboarding documents are to be submitted directly at our office on your date of joining.
             </p>
-            <ul style="margin: 0; padding-left: 20px; font-size: 15px; color: #065f46; line-height: 1.9;">
-              <li>Identity Proof (Aadhar/PAN/Passport)</li>
-              <li>Educational Certificates (Highest Qualification)</li>
-              <li>Medical Fitness Document</li>
-              <li>Past Experience Letter (if applicable)</li>
-            </ul>
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; padding: 12px; margin-top: 16px; border-radius: 4px;">
-              <p style="margin: 0; font-size: 14px; color: #92400e;">
-                <strong>Failure to upload these within 3 working days may affect your payroll processing.</strong>
-              </p>
-            </div>
           </div>
 
           <!-- Your Next Steps -->
@@ -586,9 +557,8 @@ const createStaffWelcomeEmailTemplate = (staffData, tempPassword) => {
             </h4>
             <ol style="margin: 0; padding-left: 20px; font-size: 15px; color: #075985; line-height: 1.9;">
               <li>Download and review your attached Offer Letter</li>
-              <li>Login to the portal using the credentials provided above</li>
-              <li>Go to My Profile settings and upload the required documents</li>
-              <li>Update your personal details including address and date of birth</li>
+              <li>Login to the portal using the credentials provided above to access your staff dashboard and attendance</li>
+              <li>Submit your onboarding documents directly at the office on your joining date</li>
             </ol>
           </div>
 

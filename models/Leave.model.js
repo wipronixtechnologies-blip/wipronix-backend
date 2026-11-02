@@ -35,6 +35,22 @@ const leaveSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  paidDays: {
+    type: Number,
+    default: function() { return this.totalDays; }
+  },
+  nonPaidDays: {
+    type: Number,
+    default: 0
+  },
+  leaveBreakdownNote: {
+    type: String,
+    default: ''
+  },
+  isInternLeave: {
+    type: Boolean,
+    default: false
+  },
   reason: {
     type: String,
     required: true

@@ -22,7 +22,8 @@ const ROLE_PERMISSIONS_MAPPING = {
   development_manager: ['base', 'academic'],
   operation_manager: ['base', 'finance'],
   staff: ['base'],
-  employee: ['base']
+  employee: ['base'],
+  intern: ['base']
 };
 
 // These are modules that should NOT be shown in the normal Access Management UI 

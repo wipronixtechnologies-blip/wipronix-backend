@@ -25,7 +25,7 @@ exports.getMyLeaveBalance = async (req, res) => {
     const staffId = req.staff._id;
 
     // Get staff's current leave balance
-    const staff = await Staff.findById(staffId).select('leaveBalance');
+    const staff = await Staff.findById(staffId).select('leaveBalance role systemRole employeeType isIntern');
 
     if (!staff) {
       return res.status(404).json({
@@ -39,10 +39,11 @@ exports.getMyLeaveBalance = async (req, res) => {
     if (!staff.leaveBalance || !staff.leaveBalance.lastResetDate || 
         new Date(staff.leaveBalance.lastResetDate).getFullYear() < currentYear) {
       // Reset leave balance for new year
+      const isIntern = staff.role === 'intern' || staff.systemRole === 'intern' || staff.employeeType === 'intern' || staff.isIntern === true;
       staff.leaveBalance = {
-        casual: 12,
-        medical: 10,
-        maternity: 15,
+        casual: isIntern ? 0 : 12,
+        medical: isIntern ? 5 : 10,
+        maternity: isIntern ? 0 : 15,
         lastResetDate: new Date()
       };
       await staff.save();
@@ -74,32 +75,55 @@ exports.getMyLeaveBalance = async (req, res) => {
       }
     });
 
+    const isIntern = staff.role === 'intern' || staff.systemRole === 'intern' || staff.employeeType === 'intern' || staff.isIntern === true;
+    const casualTotal = isIntern ? 0 : 12;
+
+    // Monthly short leaves taken
+    const startOfCurrentMonth = new Date(currentYear, new Date().getMonth(), 1);
+    const endOfCurrentMonth = new Date(currentYear, new Date().getMonth() + 1, 0, 23, 59, 59);
+    const shortLeavesThisMonth = await Leave.countDocuments({
+      staffId,
+      leaveType: 'short_leave',
+      status: { $in: ['approved', 'pending'] },
+      startDate: { $gte: startOfCurrentMonth, $lte: endOfCurrentMonth }
+    });
+
     const balance = {
       casual: {
-        total: 12,
-        taken: takenByType.casual,
-        remaining: Math.max(0, 12 - takenByType.casual)
+        total: casualTotal,
+        taken: isIntern ? 0 : takenByType.casual,
+        remaining: isIntern ? 0 : Math.max(0, casualTotal - takenByType.casual),
+        eligible: !isIntern
       },
       medical: {
-        total: 10,
-        taken: takenByType.medical + takenByType.sick,
-        remaining: Math.max(0, 10 - (takenByType.medical + takenByType.sick))
+        total: isIntern ? 0 : 10,
+        taken: isIntern ? 0 : takenByType.medical + takenByType.sick,
+        remaining: isIntern ? 0 : Math.max(0, 10 - (takenByType.medical + takenByType.sick)),
+        eligible: !isIntern
       },
       maternity: {
-        total: 15,
-        taken: takenByType.maternity,
-        remaining: Math.max(0, 15 - takenByType.maternity)
+        total: isIntern ? 0 : 15,
+        taken: isIntern ? 0 : takenByType.maternity,
+        remaining: isIntern ? 0 : Math.max(0, 15 - takenByType.maternity),
+        eligible: !isIntern
+      },
+      short_leave: {
+        allowedPerMonth: 2,
+        takenThisMonth: shortLeavesThisMonth,
+        remainingThisMonth: Math.max(0, 2 - shortLeavesThisMonth)
       },
       // Backward compatibility aliases to prevent crashes in existing views
       sick: {
-        total: 10,
-        taken: takenByType.medical + takenByType.sick,
-        remaining: Math.max(0, 10 - (takenByType.medical + takenByType.sick))
+        total: isIntern ? 0 : 10,
+        taken: isIntern ? 0 : takenByType.medical + takenByType.sick,
+        remaining: isIntern ? 0 : Math.max(0, 10 - (takenByType.medical + takenByType.sick)),
+        eligible: !isIntern
       },
       paid: {
-        total: 15,
-        taken: takenByType.maternity + takenByType.paid,
-        remaining: Math.max(0, 15 - (takenByType.maternity + takenByType.paid))
+        total: isIntern ? 0 : 15,
+        taken: isIntern ? 0 : takenByType.maternity + takenByType.paid,
+        remaining: isIntern ? 0 : Math.max(0, 15 - (takenByType.maternity + takenByType.paid)),
+        eligible: !isIntern
       }
     };
 
@@ -108,7 +132,9 @@ exports.getMyLeaveBalance = async (req, res) => {
       data: {
         leaveBalance: staff.leaveBalance,
         balance,
-        currentYear
+        currentYear,
+        isIntern,
+        role: staff.role
       }
     });
   } catch (error) {
@@ -127,10 +153,7 @@ exports.applyLeave = async (req, res) => {
     const staffId = req.staff._id;
     const { leaveType, startDate, endDate, reason } = req.body;
 
-    // Get current year
     const currentYear = new Date().getFullYear();
-
-    // Get staff's leave balance
     const staff = await Staff.findById(staffId);
 
     if (!staff) {
@@ -140,112 +163,143 @@ exports.applyLeave = async (req, res) => {
       });
     }
 
-    // Check leave balance
-    const leaves = await Leave.find({
-      staffId,
-      status: 'approved',
-      startDate: {
-        $gte: new Date(currentYear, 0, 1),
-        $lte: new Date(currentYear, 11, 31)
-      }
-    });
-
-    const takenByType = {
-      casual: 0,
-      sick: 0,
-      paid: 0
-    };
-
-    leaves.forEach(leave => {
-      takenByType[leave.leaveType] += leave.totalDays;
-    });
+    const isInternStaff = staff.role === 'intern' || staff.systemRole === 'intern' || staff.employeeType === 'intern' || staff.isIntern === true;
 
     // Calculate working days
     const totalDays = calculateWorkingDays(startDate, endDate);
-
-    // Enforce max 2 casual leaves per month rule
-    if (leaveType === 'casual') {
-      const reqStart = new Date(startDate);
-      const startOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth(), 1);
-      const endOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth() + 1, 0, 23, 59, 59);
-
-      const monthLeaves = await Leave.find({
-        staffId,
-        leaveType: 'casual',
-        status: { $in: ['approved', 'pending'] },
-        startDate: { $gte: startOfMonth, $lte: endOfMonth }
+    if (totalDays <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected date range contains 0 working days.'
       });
+    }
 
-      const monthCasualDaysTaken = monthLeaves.reduce((acc, l) => acc + (l.totalDays || 0), 0);
-      if (monthCasualDaysTaken + totalDays > 2) {
-        return res.status(400).json({
-          success: false,
-          message: 'Policy Limit: A maximum of 2 casual leaves are permitted in a month (recommended standard is 1 per month).'
+    let paidDays = totalDays;
+    let nonPaidDays = 0;
+    let leaveBreakdownNote = '';
+
+    // CASE 1: Intern applying for leave
+    if (isInternStaff) {
+      if (leaveType === 'short_leave') {
+        const reqStart = new Date(startDate);
+        const startOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth(), 1);
+        const endOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth() + 1, 0, 23, 59, 59);
+
+        const monthShortLeaves = await Leave.countDocuments({
+          staffId,
+          leaveType: 'short_leave',
+          status: { $in: ['approved', 'pending'] },
+          startDate: { $gte: startOfMonth, $lte: endOfMonth }
         });
+
+        if (monthShortLeaves + totalDays > 2) {
+          return res.status(400).json({
+            success: false,
+            message: 'Policy Limit: Interns are permitted a maximum of 2 short leaves per month.'
+          });
+        }
+        paidDays = totalDays;
+        nonPaidDays = 0;
+        leaveBreakdownNote = `Intern Short Leave (${totalDays} day(s) within monthly limit of 2).`;
+      } else {
+        // Interns have NO paid leaves (casual/medical/etc.). Marked as Non-Paid Leave (LWP)
+        paidDays = 0;
+        nonPaidDays = totalDays;
+        leaveBreakdownNote = `Intern Policy: Interns are not eligible for paid leaves. All ${totalDays} day(s) marked as Non-Paid Leave (LWP).`;
+      }
+    } else {
+      // CASE 2: Regular employee applying for leave
+      if (leaveType === 'casual') {
+        const reqStart = new Date(startDate);
+        const startOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth(), 1);
+        const endOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth() + 1, 0, 23, 59, 59);
+
+        const monthLeaves = await Leave.find({
+          staffId,
+          leaveType: 'casual',
+          status: { $in: ['approved', 'pending'] },
+          startDate: { $gte: startOfMonth, $lte: endOfMonth }
+        });
+
+        const monthCasualPaidDaysTaken = monthLeaves.reduce((acc, l) => acc + (l.paidDays !== undefined ? l.paidDays : l.totalDays || 0), 0);
+        const maxPaidPerMonth = 2;
+        const availablePaidThisMonth = Math.max(0, maxPaidPerMonth - monthCasualPaidDaysTaken);
+
+        paidDays = Math.min(totalDays, availablePaidThisMonth);
+        nonPaidDays = Math.max(0, totalDays - paidDays);
+
+        if (nonPaidDays > 0) {
+          if (paidDays > 0) {
+            leaveBreakdownNote = `${paidDays} day(s) marked as Casual Leave (Paid), and ${nonPaidDays} day(s) exceeding monthly 2-day limit marked as Non-Paid Leave (LWP).`;
+          } else {
+            leaveBreakdownNote = `Monthly 2-day casual leave quota exhausted. All ${nonPaidDays} day(s) marked as Non-Paid Leave (LWP).`;
+          }
+        } else {
+          leaveBreakdownNote = `${paidDays} day(s) marked as Casual Leave (Paid).`;
+        }
+      } else if (leaveType === 'short_leave') {
+        const reqStart = new Date(startDate);
+        const startOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth(), 1);
+        const endOfMonth = new Date(reqStart.getFullYear(), reqStart.getMonth() + 1, 0, 23, 59, 59);
+
+        const monthShortLeaves = await Leave.countDocuments({
+          staffId,
+          leaveType: 'short_leave',
+          status: { $in: ['approved', 'pending'] },
+          startDate: { $gte: startOfMonth, $lte: endOfMonth }
+        });
+
+        if (monthShortLeaves + totalDays > 2) {
+          return res.status(400).json({
+            success: false,
+            message: 'Policy Limit: A maximum of 2 short leaves are permitted per month.'
+          });
+        }
+        paidDays = totalDays;
+        nonPaidDays = 0;
+        leaveBreakdownNote = `Short Leave (${totalDays} day(s) within monthly limit of 2).`;
+      } else {
+        // Other leave types
+        paidDays = leaveType === 'lwp' ? 0 : totalDays;
+        nonPaidDays = leaveType === 'lwp' ? totalDays : 0;
+        leaveBreakdownNote = leaveType === 'lwp'
+          ? `Leave Without Pay (${totalDays} day(s) non-paid).`
+          : `${totalDays} day(s) ${leaveType} leave.`;
       }
     }
 
-    // Leave limits
-    const maxQuotas = {
-      casual: 12,
-      medical: 10,
-      sick: 10,
-      maternity: 15,
-      paid: 4,
-      half_day: 12,
-      short_leave: 24
-    };
-
-    const quota = maxQuotas[leaveType] || 12;
-    const currentTaken = takenByType[leaveType] || 0;
-
-    // Check if enough balance
-    if (['casual', 'medical', 'maternity', 'sick', 'paid'].includes(leaveType) && (currentTaken + totalDays > quota)) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient ${leaveType} leave balance. Available: ${Math.max(0, quota - currentTaken)}, requested: ${totalDays}`
-      });
-    }
-
-    // Get balance snapshot
-    const balanceSnapshot = {
-      casual: Math.max(0, 12 - (takenByType.casual || 0)),
-      medical: Math.max(0, 10 - ((takenByType.medical || 0) + (takenByType.sick || 0))),
-      maternity: Math.max(0, 15 - (takenByType.maternity || 0)),
-      sick: Math.max(0, 10 - (takenByType.sick || 0)),
-      paid: Math.max(0, 4 - (takenByType.paid || 0))
-    };
-
     const leave = new Leave({
       staffId,
-      leaveType,
+      leaveType: isInternStaff && leaveType !== 'short_leave' ? 'lwp' : leaveType,
       startDate,
       endDate,
       totalDays,
+      paidDays,
+      nonPaidDays,
+      leaveBreakdownNote,
+      isInternLeave: isInternStaff,
       reason,
-      status: 'pending',
-      balanceSnapshot
+      status: 'pending'
     });
 
     await leave.save();
 
     // Log Activity
     await Activity.create({
-        type: 'leave_applied',
-        user: req.staff.fullName,
-        actorId: staffId,
-        action: `applied for ${leaveType} leave`,
-        target: `${totalDays} days`,
-        targetId: leave._id,
-        metadata: { leaveType, totalDays, startDate, endDate }
+      type: 'leave_applied',
+      user: req.staff.fullName,
+      actorId: staffId,
+      action: `applied for ${isInternStaff ? 'intern non-paid leave' : leaveType}`,
+      target: `${totalDays} days (${paidDays} paid, ${nonPaidDays} non-paid)`,
+      targetId: leave._id,
+      metadata: { leaveType, totalDays, paidDays, nonPaidDays, startDate, endDate, leaveBreakdownNote }
     });
 
-    // Populate staff details for response
     await leave.populate('staffId', 'fullName email department designation');
 
     res.status(201).json({
       success: true,
-      message: 'Leave application submitted successfully',
+      message: leaveBreakdownNote ? `Leave submitted: ${leaveBreakdownNote}` : 'Leave application submitted successfully',
       data: leave
     });
   } catch (error) {
@@ -413,6 +467,14 @@ exports.approveLeave = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to approve leave requests'
+      });
+    }
+
+    const isInternTarget = leave.staffId && (leave.staffId.role === 'intern' || leave.staffId.systemRole === 'intern' || leave.staffId.employeeType === 'intern' || leave.staffId.isIntern === true);
+    if (isInternTarget && leave.leaveType === 'casual') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot approve casual leave: Interns are not approved/eligible for casual leaves during their internship period.'
       });
     }
 

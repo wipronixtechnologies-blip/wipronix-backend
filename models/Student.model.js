@@ -165,10 +165,39 @@ const studentSchema = new mongoose.Schema(
     },
 
     // Admission Details
+    trainingDuration: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     admissionTechnology: {
       type: String,
       trim: true,
       default: ''
+    },
+    registeredTechnology: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    registrationTechnology: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    fatherName: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    address: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    nextDueDate: {
+      type: Date,
+      default: null
     },
     admissionDate: {
       type: Date,
@@ -177,6 +206,64 @@ const studentSchema = new mongoose.Schema(
     admissionFee: {
       type: Number,
       default: null
+    },
+    pendingRegistrationFee: {
+      type: Number,
+      default: null
+    },
+    targetRegistrationFee: {
+      type: Number,
+      default: null
+    },
+    totalFee: {
+      type: Number,
+      default: null
+    },
+    discountAmount: {
+      type: Number,
+      default: 0
+    },
+    discountType: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    netFee: {
+      type: Number,
+      default: null
+    },
+    totalPaidFee: {
+      type: Number,
+      default: 0
+    },
+    dueAmount: {
+      type: Number,
+      default: 0
+    },
+    pendingFee: {
+      type: Number,
+      default: 0
+    },
+    registrationFee: {
+      type: Number,
+      default: 0
+    },
+    isRegistrationVerified: {
+      type: Boolean,
+      default: false
+    },
+    registrationSlipNo: {
+      type: String,
+      default: ''
+    },
+    netRemainingFee: {
+      type: Number,
+      default: null
+    },
+    paymentMode: {
+      type: String,
+      enum: ['Cash', 'UPI', 'Bank Transfer', 'Online', 'Card POS', ''],
+      default: 'UPI'
     },
 
     // Inactivity & Untouched Tracking
@@ -271,7 +358,6 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ phoneNumber: 1 });
-studentSchema.index({ isDummy: 1 });
 studentSchema.index({ assignedTo: 1, isDummy: 1 });
 studentSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 // Allow same email for different technologies, but not same email+technology twice

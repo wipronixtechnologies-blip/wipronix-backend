@@ -76,6 +76,29 @@ const staffSchema = new mongoose.Schema({
   dateOfJoining: {
     type: Date
   },
+  joiningDate: {
+    type: Date
+  },
+  internshipPeriod: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  internshipDuration: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  internshipStartDate: {
+    type: Date
+  },
+  internshipEndDate: {
+    type: Date
+  },
+  isIntern: {
+    type: Boolean,
+    default: false
+  },
   department: {
     type: String,
     trim: true
@@ -91,7 +114,7 @@ const staffSchema = new mongoose.Schema({
   },
   systemRole: {
     type: String,
-    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl'],
+    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl', 'intern'],
     default: 'employee'
   },
   employeeType: {
@@ -145,7 +168,7 @@ const staffSchema = new mongoose.Schema({
   // System fields
   role: {
     type: String,
-    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl'],
+    enum: ['super_admin', 'admin', 'staff', 'employee', 'hr', 'hr_manager', 'project_manager', 'marketing_manager', 'development_manager', 'operation_manager', 'training_head', 'bde', 'bidder', 'tl', 'intern'],
     default: 'employee'
   },
   isActive: {

@@ -15,6 +15,11 @@ exports.createStaff = async (req, res) => {
       address,
       profileImage,
       dateOfJoining,
+      joiningDate,
+      internshipPeriod,
+      internshipDuration,
+      internshipStartDate,
+      internshipEndDate,
       department,
       designation,
       reportingTo,
@@ -62,6 +67,13 @@ exports.createStaff = async (req, res) => {
       finalOfferRefNo = `WIP/HR/${year}/${String(nextNum).padStart(3, '0')}`;
     }
 
+    const effectiveJoiningDate = dateOfJoining || joiningDate || null;
+    const isInternRole = role === 'intern' || systemRole === 'intern' || employeeType === 'intern';
+    const finalRole = role || (isInternRole ? 'intern' : 'employee');
+    const finalSystemRole = systemRole || (isInternRole ? 'intern' : 'employee');
+    const finalEmployeeType = employeeType || (isInternRole ? 'intern' : 'full_time');
+    const finalInternshipPeriod = (internshipPeriod || internshipDuration || '').trim();
+
     const staff = new Staff({
       firstName,
       lastName: lastName || '',
@@ -72,12 +84,18 @@ exports.createStaff = async (req, res) => {
       dateOfBirth,
       address: address || {},
       profileImage,
-      dateOfJoining,
+      dateOfJoining: effectiveJoiningDate,
+      joiningDate: effectiveJoiningDate,
+      internshipPeriod: finalInternshipPeriod,
+      internshipDuration: finalInternshipPeriod,
+      internshipStartDate: internshipStartDate || null,
+      internshipEndDate: internshipEndDate || null,
+      isIntern: isInternRole,
       department,
       designation,
       reportingTo: reportingTo || null,
-      systemRole: systemRole || 'employee',
-      employeeType: employeeType || 'full_time',
+      systemRole: finalSystemRole,
+      employeeType: finalEmployeeType,
       salaryStructure: salaryStructure || {
         baseSalary: 0,
         hra: 0,
@@ -87,9 +105,20 @@ exports.createStaff = async (req, res) => {
         pf: 0
       },
       documents: documents || {},
-      role: role || 'employee',
+      role: finalRole,
+      leaveBalance: isInternRole ? {
+        casual: 0,
+        medical: 5,
+        maternity: 0,
+        lastResetDate: new Date()
+      } : {
+        casual: 12,
+        medical: 10,
+        maternity: 15,
+        lastResetDate: new Date()
+      },
       isActive: isActive !== undefined ? isActive : true,
-      permissions: role ? getDefaultPermissionsForRole(role) : getDefaultPermissionsForRole('employee'),
+      permissions: finalRole ? getDefaultPermissionsForRole(finalRole) : getDefaultPermissionsForRole('employee'),
       // Offer details
       offerReferenceNo: finalOfferRefNo,
       workMode,
