@@ -221,7 +221,35 @@ const parseStageFromCallOutcome = (callOutcome) => {
 const resolveEffectiveLeadStage = (student) => {
   if (!student) return { leadStage: 'Untouched leads', leadSubStage: 'never contacted', counselingStatus: 'assigned' };
 
-  // 1. Check most recent callLog that specifies a stage (callLogs are sorted newest-first via unshift, but verify timestamps)
+  // Priority 0: Confirmed admission / registration
+  if (
+    student.isRegistrationVerified === true ||
+    Boolean(student.registrationSlipNo) ||
+    student.leadStage === 'Admission done' ||
+    student.counselingStatus === 'enrolled' ||
+    student.counselingStatus === 'registered'
+  ) {
+    const validSubs = LEAD_SUB_STAGES_MAP['Admission done'] || [];
+    const track = student.registeredTechnology || student.admissionTechnology || student.technology || student.leadSubStage || '';
+    const matched = validSubs.find(v => track && v.toLowerCase().includes(track.toLowerCase())) || track || validSubs[0] || 'Full Stack Web Development (MERN)';
+    return {
+      leadStage: 'Admission done',
+      leadSubStage: matched,
+      counselingStatus: 'enrolled'
+    };
+  }
+
+  // Priority 1: Explicit active leadStage set on student (Follow up, Not responding, Call back later, Not interested)
+  if (student.leadStage && student.leadStage !== 'Untouched leads' && LEAD_PARENT_STAGES_LIST.includes(student.leadStage)) {
+    const validSubs = LEAD_SUB_STAGES_MAP[student.leadStage] || [];
+    return {
+      leadStage: student.leadStage,
+      leadSubStage: student.leadSubStage || validSubs[0] || '',
+      counselingStatus: mapParentStageToStatus(student.leadStage) || student.counselingStatus || 'assigned'
+    };
+  }
+
+  // Priority 2: Check most recent callLog that specifies a stage (for leads whose top-level stage was not explicitly set)
   if (Array.isArray(student.callLogs) && student.callLogs.length > 0) {
     const sortedLogs = [...student.callLogs].sort((a, b) => {
       const tA = new Date(a.calledAt || a.createdAt || 0).getTime();
@@ -234,21 +262,19 @@ const resolveEffectiveLeadStage = (student) => {
         const p = parseStageFromCallOutcome(l.callOutcome);
         return p && p.leadStage && p.leadStage !== 'Untouched leads';
       }) ||
-      (student.leadStage && student.leadStage !== 'Untouched leads' && student.leadStage !== 'Untouched') ||
       (student.counselingStatus && !['assigned', 'unassigned', ''].includes(student.counselingStatus)) ||
       Boolean(student.nextFollowUpDate);
 
     for (const log of sortedLogs) {
       const parsed = parseStageFromCallOutcome(log.callOutcome);
       if (parsed && parsed.leadStage) {
-        // Never let an accidental "Untouched leads" details-update log override a lead that has touched history
         if (
           parsed.leadStage === 'Untouched leads' &&
           (hasTouchedHistory || (log.notes || '').trim() === 'Student details updated')
         ) {
           continue;
         }
-        const resolvedSub = parsed.leadSubStage || (student.leadStage === parsed.leadStage ? student.leadSubStage : '') || (LEAD_SUB_STAGES_MAP[parsed.leadStage]?.[0] || '');
+        const resolvedSub = parsed.leadSubStage || (LEAD_SUB_STAGES_MAP[parsed.leadStage]?.[0] || '');
         const resolvedStatus = mapParentStageToStatus(parsed.leadStage) || student.counselingStatus || 'assigned';
         return {
           leadStage: parsed.leadStage,
@@ -259,32 +285,31 @@ const resolveEffectiveLeadStage = (student) => {
     }
   }
 
-  // 2. Check top-level leadStage if valid
-  if (student.leadStage && LEAD_PARENT_STAGES_LIST.includes(student.leadStage)) {
-    // Guard against stale "Untouched leads" when counselingStatus or follow-up clearly shows touched state
-    if (student.leadStage === 'Untouched leads' && student.counselingStatus && student.counselingStatus !== 'assigned' && student.counselingStatus !== 'unassigned') {
-      const mappedStage = mapStatusToParentStage(student.counselingStatus, student.nextFollowUpDate);
-      if (mappedStage !== 'Untouched leads') {
-        return {
-          leadStage: mappedStage,
-          leadSubStage: (LEAD_SUB_STAGES_MAP[mappedStage]?.includes(student.leadSubStage) ? student.leadSubStage : LEAD_SUB_STAGES_MAP[mappedStage]?.[0]) || '',
-          counselingStatus: student.counselingStatus
-        };
-      }
+  // Priority 3: Fallback from counselingStatus / nextFollowUpDate
+  if (student.counselingStatus && !['assigned', 'unassigned', ''].includes(student.counselingStatus)) {
+    const mappedStage = mapStatusToParentStage(student.counselingStatus, student.nextFollowUpDate);
+    if (mappedStage && mappedStage !== 'Untouched leads') {
+      const validSubs = LEAD_SUB_STAGES_MAP[mappedStage] || [];
+      return {
+        leadStage: mappedStage,
+        leadSubStage: student.leadSubStage || validSubs[0] || '',
+        counselingStatus: student.counselingStatus
+      };
     }
+  }
+
+  if (student.nextFollowUpDate) {
     return {
-      leadStage: student.leadStage,
-      leadSubStage: student.leadSubStage || (LEAD_SUB_STAGES_MAP[student.leadStage]?.[0] || ''),
-      counselingStatus: mapParentStageToStatus(student.leadStage) || student.counselingStatus || 'assigned'
+      leadStage: 'Follow up',
+      leadSubStage: student.leadSubStage || (LEAD_SUB_STAGES_MAP['Follow up']?.[0] || 'need time to think'),
+      counselingStatus: 'follow_up'
     };
   }
 
-  // 3. Fallback to counselingStatus / nextFollowUpDate
-  const fallbackStage = mapStatusToParentStage(student.counselingStatus || 'assigned', student.nextFollowUpDate);
   return {
-    leadStage: fallbackStage,
-    leadSubStage: student.leadSubStage || (LEAD_SUB_STAGES_MAP[fallbackStage]?.[0] || ''),
-    counselingStatus: student.counselingStatus || mapParentStageToStatus(fallbackStage) || 'assigned'
+    leadStage: 'Untouched leads',
+    leadSubStage: student.leadSubStage || 'never contacted',
+    counselingStatus: 'assigned'
   };
 };
 
