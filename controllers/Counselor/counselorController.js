@@ -1436,6 +1436,29 @@ exports.updateCounselingStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
+    // STRICT LEAD OWNERSHIP: Counselors can only modify leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads assigned directly to you.' });
+        }
+      }
+    }
+
     if (counselingStatus) {
       student.counselingStatus = counselingStatus;
       const mappedStage = leadStage || mapStatusToParentStage(counselingStatus, student.nextFollowUpDate);
@@ -2135,7 +2158,11 @@ exports.getMyAssignedStudents = async (req, res) => {
       sortObj.createdAt = -1;
     }
 
-    // Parallel queries: Students list, Total matching, Counselor Overall Stats, Distinct Colleges, Courses & Semesters
+    // Parallel queries: Students list, Total matching, Counselor Overall Stats, Distinct Colleges, Courses & Semesters, Today's Follow-ups
+    const nowTime = new Date();
+    const startOfToday = new Date(nowTime.getFullYear(), nowTime.getMonth(), nowTime.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(nowTime.getFullYear(), nowTime.getMonth(), nowTime.getDate(), 23, 59, 59, 999);
+
     const [
       students,
       totalMatchingCount,
@@ -2144,7 +2171,10 @@ exports.getMyAssignedStudents = async (req, res) => {
       distinctColleges,
       distinctOrganicColleges,
       distinctCourses,
-      distinctSemesters
+      distinctSemesters,
+      todayFollowUpsCount,
+      overdueFollowUpsCount,
+      testsCompletedCount
     ] = await Promise.all([
       Student.find(query)
         .select('-password -resetPasswordToken -resetPasswordExpires')
@@ -2177,7 +2207,27 @@ exports.getMyAssignedStudents = async (req, res) => {
         college: { $ne: null, $nin: ['', '-', 'N/A', 'None', 'other', 'Other'] }
       }),
       Student.distinct('course', baseCounselorFilter),
-      Student.distinct('semester', baseCounselorFilter)
+      Student.distinct('semester', baseCounselorFilter),
+      Student.countDocuments({
+        ...baseCounselorFilter,
+        isDummy: { $ne: true },
+        nextFollowUpDate: { $gte: startOfToday, $lte: endOfToday }
+      }),
+      Student.countDocuments({
+        ...baseCounselorFilter,
+        isDummy: { $ne: true },
+        nextFollowUpDate: { $lt: startOfToday },
+        counselingStatus: { $nin: ['enrolled', 'registered', 'not_interested', 'rejected'] }
+      }),
+      Student.countDocuments({
+        ...baseCounselorFilter,
+        isDummy: { $ne: true },
+        $or: [
+          { resultDeclared: true },
+          { testTokenStatus: 'completed' },
+          { testCompletedAt: { $ne: null } }
+        ]
+      })
     ]);
 
 
@@ -2297,7 +2347,10 @@ exports.getMyAssignedStudents = async (req, res) => {
           conversionRate,
           totalColleges: distinctColleges.filter(Boolean).length,
           stageCounts,
-          subStageCounts
+          subStageCounts,
+          todayFollowUps: todayFollowUpsCount,
+          overdueFollowUps: overdueFollowUpsCount,
+          testsCompleted: testsCompletedCount
         },
         colleges: distinctColleges.filter(Boolean).sort(),
         organicColleges: (distinctOrganicColleges || []).filter(Boolean).sort(),
@@ -2595,6 +2648,29 @@ exports.generateTestLink = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
+    // STRICT LEAD OWNERSHIP: Counselors can only work on leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads assigned directly to you.' });
+        }
+      }
+    }
+
     // Only Organic Leads and Excel Leads need a 2-hour assessment link (Non-organic internship leads already took the test)
     if (student.source !== 'organic' && student.source !== 'import') {
       return res.status(400).json({
@@ -2731,6 +2807,29 @@ exports.logCallAndFollowUp = async (req, res) => {
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // STRICT LEAD OWNERSHIP: Counselors can only work on leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads assigned directly to you.' });
+        }
+      }
     }
 
     const outcome = callOutcome || 'connected';
@@ -2978,6 +3077,29 @@ exports.updateStudentDetails = async (req, res) => {
     const student = await Student.findById(id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    // STRICT LEAD OWNERSHIP: Counselors can only update leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only update leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only update leads assigned directly to you.' });
+        }
+      }
     }
 
     // Determine student's existing effective stage BEFORE applying updates so profile-only edits never reset stage
@@ -3513,15 +3635,38 @@ exports.markStudentAsDummy = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
+    // STRICT LEAD OWNERSHIP: Counselors can only work on leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads assigned directly to you.' });
+        }
+      }
+    }
+
     const staffName = staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff';
-    const staffRole = staff.role || staff.systemRole || 'Counselor';
+    const markerStaffRole = staff.role || staff.systemRole || 'Counselor';
 
     student.isDummy = true;
     student.dummyInfo = {
       isDummy: true,
       markedBy: staff._id,
       markedByName: staffName,
-      markedByRole: staffRole,
+      markedByRole: markerStaffRole,
       markedAt: new Date(),
       reasonCategory: reasonCategory || 'Duplicate Lead (Same Student)',
       reasonNotes: (reasonNotes || '').trim(),
@@ -3570,6 +3715,29 @@ exports.unmarkStudentAsDummy = async (req, res) => {
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // STRICT LEAD OWNERSHIP: Counselors can only work on leads assigned to them
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+
+    if (!isSuperAdminOrAdminUser) {
+      const assignedToId = student.assignedTo ? student.assignedTo.toString() : null;
+      const assignedById = student.assignedBy ? student.assignedBy.toString() : null;
+      const loggedInId = loggedInStaff._id ? loggedInStaff._id.toString() : null;
+
+      if (isTL) {
+        if (assignedToId !== loggedInId && assignedById !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads within your team purview.' });
+        }
+      } else {
+        if (assignedToId !== loggedInId) {
+          return res.status(403).json({ success: false, message: 'Access denied: You can only work on leads assigned directly to you.' });
+        }
+      }
     }
 
     const staffName = staff.fullName || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Staff';

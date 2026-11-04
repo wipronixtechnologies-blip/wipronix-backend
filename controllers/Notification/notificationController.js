@@ -1,4 +1,5 @@
 const Notification = require('../../models/Notification.model');
+const Student = require('../../models/Student.model');
 const { emitNotification } = require('../../src/services/socket');
 
 // Get all notifications for a user
@@ -9,6 +10,50 @@ exports.getNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const type = req.query.type;
     const isRead = req.query.isRead;
+
+    // Auto-generate notification for today's scheduled follow-ups for this counselor
+    if (userId) {
+      try {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+        const todayFollowUps = await Student.find({
+          assignedTo: userId,
+          nextFollowUpDate: { $gte: startOfToday, $lte: endOfToday },
+          isDummy: { $ne: true }
+        }).select('_id fullName phoneNumber college course nextFollowUpDate').lean();
+
+        if (todayFollowUps.length > 0) {
+          const existingNotification = await Notification.findOne({
+            recipient: userId,
+            type: 'system',
+            createdAt: { $gte: startOfToday, $lte: endOfToday },
+            title: { $regex: /follow-up/i }
+          });
+
+          if (!existingNotification) {
+            const studentNames = todayFollowUps.slice(0, 3).map(s => s.fullName).join(', ');
+            const moreCount = todayFollowUps.length > 3 ? ` and ${todayFollowUps.length - 3} more` : '';
+            await Notification.create({
+              recipient: userId,
+              type: 'system',
+              title: `?? Follow-ups Due Today (${todayFollowUps.length})`,
+              message: `You have ${todayFollowUps.length} follow-up(s) scheduled for today: ${studentNames}${moreCount}. Click to review.`,
+              link: '/counselor/my-students',
+              priority: 'high',
+              isRead: false,
+              metadata: {
+                followUpCount: todayFollowUps.length,
+                studentIds: todayFollowUps.map(s => s._id)
+              }
+            });
+          }
+        }
+      } catch (fErr) {
+        console.warn('Error checking today follow-up notifications:', fErr.message);
+      }
+    }
 
     const query = { recipient: userId };
     
