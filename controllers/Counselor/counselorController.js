@@ -1379,25 +1379,9 @@ exports.reassignStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Students can only be reassigned to staff members in the Marketing department.' });
     }
 
-    // STRICT CHECK: Students assigned once cannot be assigned again directly.
-    // If they need to be reassigned, they must be UNASSIGNED first!
-    const alreadyAssignedStudents = await Student.find({
-      _id: { $in: studentIds },
-      assignedTo: { $ne: null }
-    }).populate('assignedTo', 'fullName');
-
-    if (alreadyAssignedStudents.length > 0) {
-      const sampleNames = alreadyAssignedStudents.slice(0, 3).map(s => `${s.fullName} (${s.assignedTo?.fullName || 'Assigned'})`).join(', ');
-      const extra = alreadyAssignedStudents.length > 3 ? ` and ${alreadyAssignedStudents.length - 3} other student(s)` : '';
-      return res.status(400).json({
-        success: false,
-        message: `${alreadyAssignedStudents.length} student(s) are already assigned: ${sampleNames}${extra}. Students who are already assigned cannot be directly reassigned. Please unassign them first before assigning to a new counselor/BDE/TL.`
-      });
-    }
-
-        // Authorization check for TL: TL can only re-assign students globally if they own them, OR are super admin
+    // Authorization check for TL: TL can only re-assign students globally if they own them, OR are super admin
     let query = { _id: { $in: studentIds } };
-    const isSuperAdmin = req.staff && ['super_admin', 'admin', 'hr', 'hr_manager'].includes(req.staff.role || req.staff.systemRole);
+    const isSuperAdmin = req.staff && ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(req.staff.role || req.staff.systemRole);
     const isTL = req.staff && (req.staff.role === 'tl' || req.staff.systemRole === 'tl');
     
     if (isTL && !isSuperAdmin) {
@@ -1414,6 +1398,19 @@ exports.reassignStudents = async (req, res) => {
           assignedAt: new Date()
         }
       }
+    );
+
+    // Update counselingStatus to 'assigned' for any reassigned leads that had unassigned/empty status
+    await Student.updateMany(
+      {
+        _id: { $in: studentIds },
+        $or: [
+          { counselingStatus: { $in: ['unassigned', 'assigned', ''] } },
+          { counselingStatus: { $exists: false } },
+          { counselingStatus: null }
+        ]
+      },
+      { $set: { counselingStatus: 'assigned' } }
     );
 
     res.status(200).json({
@@ -1640,14 +1637,46 @@ exports.getMyAssignedStudents = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    // Determine target counselor:
-    // If admin/HR/TL and counselorId is specified, allow switching; otherwise use logged in staff ID
-    let targetStaffId = loggedInStaff._id;
-    const isPrivileged = ['super_admin', 'admin', 'hr', 'hr_manager', 'tl'].includes(loggedInStaff.role) ||
-      ['super_admin', 'admin', 'hr', 'hr_manager', 'tl'].includes(loggedInStaff.systemRole);
+    // Determine target counselor and permissions:
+    const staffRole = (loggedInStaff.role || '').toLowerCase();
+    const staffSystemRole = (loggedInStaff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdminUser = ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffRole) ||
+      ['super_admin', 'superadmin', 'admin', 'director', 'hr', 'hr_manager'].includes(staffSystemRole);
+    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdminUser;
+    const isPrivileged = isSuperAdminOrAdminUser || isTL;
 
-    if (req.query.counselorId && req.query.counselorId !== 'all' && isPrivileged) {
+    let targetStaffId = loggedInStaff._id;
+    let baseCounselorFilter;
+
+    if (!isPrivileged) {
+      // STRICT ISOLATION FOR BDE COUNSELORS:
+      // Regular BDE / Counselor can ONLY EVER see leads assigned directly to their own ID!
+      // Any query params trying to view 'all' or another counselor are strictly ignored.
+      targetStaffId = loggedInStaff._id;
+      baseCounselorFilter = { assignedTo: loggedInStaff._id };
+    } else if (req.query.counselorId && req.query.counselorId !== 'all') {
+      // Privileged user viewing a specific counselor
       targetStaffId = req.query.counselorId;
+      baseCounselorFilter = { assignedTo: new mongoose.Types.ObjectId(targetStaffId) };
+    } else if (req.query.counselorId === 'all') {
+      // Privileged user viewing all leads under their purview
+      if (isTL) {
+        baseCounselorFilter = {
+          $or: [
+            { assignedTo: loggedInStaff._id },
+            { assignedBy: loggedInStaff._id }
+          ]
+        };
+      } else {
+        baseCounselorFilter = { assignedTo: { $ne: null } };
+      }
+    } else {
+      // Privileged user without counselorId param:
+      if (isTL) {
+        baseCounselorFilter = { assignedTo: loggedInStaff._id };
+      } else {
+        baseCounselorFilter = { assignedTo: { $ne: null } };
+      }
     }
 
     const counselorObjectId = new mongoose.Types.ObjectId(targetStaffId);
@@ -1673,29 +1702,6 @@ exports.getMyAssignedStudents = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    const isTL = isTLRole(loggedInStaff) && !isSuperAdminOrAdmin(loggedInStaff);
-
-    // Base match filter for this counselor's assignments
-    let baseCounselorFilter;
-    if (req.query.counselorId && req.query.counselorId !== 'all') {
-      // Viewing as a specific counselor (for TL, Admin, and Super Admin)
-      baseCounselorFilter = { assignedTo: counselorObjectId };
-    } else if (req.query.counselorId === 'all') {
-      // Viewing all team leads
-      if (isTL) {
-        baseCounselorFilter = {
-          $or: [
-            { assignedTo: loggedInStaff._id },
-            { assignedBy: loggedInStaff._id }
-          ]
-        };
-      } else {
-        baseCounselorFilter = { assignedTo: { $ne: null } };
-      }
-    } else {
-      // Default: logged in staff viewing their own assigned students
-      baseCounselorFilter = { assignedTo: loggedInStaff._id };
-    }
     const andConditions = [baseCounselorFilter];
 
     if (college && college !== 'all') {
