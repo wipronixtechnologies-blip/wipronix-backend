@@ -88,8 +88,30 @@ const authorizeAssigner = (req, res, next) => {
 // Assign Students (sequential remaining distribution)
 router.post('/assign-students', authorizeAssigner, counselorController.assignStudents);
 
-// Unassign Students
-router.post('/unassign-students', authorizeAssigner, counselorController.unassignStudents);
+// Restrict Unassign action EXCLUSIVELY to Super Admin and Admin (NOT TL or any other staff)
+const authorizeUnassigner = (req, res, next) => {
+  const staff = req.staff;
+  if (!staff) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+
+  const role = (staff.role || '').toLowerCase();
+  const systemRole = (staff.systemRole || '').toLowerCase();
+  const isSuperAdminOrAdmin = ['super_admin', 'superadmin', 'admin', 'director'].includes(role) ||
+                              ['super_admin', 'superadmin', 'admin', 'director'].includes(systemRole);
+
+  if (!isSuperAdminOrAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied: Only Super Admin and Admin can unassign leads. Team Leads and Counselors do not have unassign permissions.'
+    });
+  }
+
+  return next();
+};
+
+// Unassign Students (Exclusively Super Admin and Admin)
+router.post('/unassign-students', authorizeUnassigner, counselorController.unassignStudents);
 
 // Reassign Students
 router.post('/reassign-students', authorizeAssigner, counselorController.reassignStudents);
@@ -138,8 +160,18 @@ router.get('/registration/receipt-pdf/:identifier', counselorController.download
 router.post('/registration/resend-receipt-whatsapp/:slipId', counselorController.resendReceiptOnWhatsApp);
 router.get('/registration/search-students', counselorController.searchStudentsForSlip);
 router.post('/registration/manual-office-slip', counselorController.createManualOfficeSlip);
+router.put('/registration-slip/:slipId', counselorController.updateRegistrationSlip);
 
 router.post('/registration/collect-installment', counselorController.collectStudentInstallment);
 router.get('/registration/due-alerts', counselorController.getUpcomingDueAlerts);
+
+// Cloudinary Payment Proof Storage Routes
+router.post('/upload-proof-cloudinary', counselorController.uploadProofToCloudinary);
+router.post('/registration/migrate-proofs-cloudinary', counselorController.migrateAllProofsToCloudinary);
+
+// Dynamic Registration Courses Collection Routes
+router.get('/registration-courses', counselorController.getRegistrationCourses);
+router.post('/registration-courses', counselorController.addRegistrationCourse);
+router.post('/registration-course', counselorController.addRegistrationCourse);
 
 module.exports = router;

@@ -326,17 +326,50 @@ exports.getAllRegistrationSlips = async (req, res) => {
     const filter = {};
 
     if (status && status !== 'all') {
-      filter.status = status;
+      const lower = status.toLowerCase();
+      if (lower === 'verified' || lower === 'paid') {
+        filter.status = { $in: ['Verified', 'Paid'] };
+      } else if (lower === 'pending' || lower === 'proof submitted' || lower === 'pending verification') {
+        filter.status = { $in: ['Proof Submitted', 'Pending Verification'] };
+      } else if (lower === 'installments' || lower === 'installment') {
+        filter.installmentNumber = { $gt: 1 };
+      } else if (lower === 'rejected') {
+        filter.status = 'Rejected';
+      } else {
+        filter.status = status;
+      }
     }
 
-    if (search) {
+    if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), 'i');
-      filter.$or = [
+      const orConditions = [
         { registrationNo: searchRegex },
         { transactionId: searchRegex },
         { technology: searchRegex },
-        { registeredTechnology: searchRegex }
+        { registeredTechnology: searchRegex },
+        { fatherName: searchRegex },
+        { paymentMode: searchRegex },
+        { remarks: searchRegex }
       ];
+
+      try {
+        const matchedStudents = await Student.find({
+          $or: [
+            { fullName: searchRegex },
+            { email: searchRegex },
+            { phoneNumber: searchRegex },
+            { college: searchRegex }
+          ]
+        }).select('_id').lean();
+
+        if (matchedStudents && matchedStudents.length > 0) {
+          orConditions.push({ student: { $in: matchedStudents.map(s => s._id) } });
+        }
+      } catch (stErr) {
+        console.warn('Student search match error:', stErr.message);
+      }
+
+      filter.$or = orConditions;
     }
 
     const slips = await RegistrationSlip.find(filter)
@@ -345,11 +378,12 @@ exports.getAllRegistrationSlips = async (req, res) => {
       .populate('verifiedBy', 'fullName firstName lastName email role')
       .sort({ createdAt: -1 });
 
-    const [totalCount, pendingApprovalCount, verifiedCount, rejectedCount] = await Promise.all([
+    const [totalCount, pendingApprovalCount, verifiedCount, rejectedCount, installmentCount] = await Promise.all([
       RegistrationSlip.countDocuments({}),
       RegistrationSlip.countDocuments({ status: { $in: ['Proof Submitted', 'Pending Verification'] } }),
       RegistrationSlip.countDocuments({ status: { $in: ['Verified', 'Paid'] } }),
-      RegistrationSlip.countDocuments({ status: 'Rejected' })
+      RegistrationSlip.countDocuments({ status: 'Rejected' }),
+      RegistrationSlip.countDocuments({ installmentNumber: { $gt: 1 } })
     ]);
 
     return res.status(200).json({
@@ -360,7 +394,8 @@ exports.getAllRegistrationSlips = async (req, res) => {
           totalCount,
           pendingApprovalCount,
           verifiedCount,
-          rejectedCount
+          rejectedCount,
+          installmentCount
         }
       }
     });

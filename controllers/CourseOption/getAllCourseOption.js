@@ -4,20 +4,32 @@ const { escapeRegex } = require('../../utils/regexUtils');
 const getAllCourseOption = async (req, res) => {
   try {
     const { highestEducation } = req.query;
-    let filter = {};
+    let options = [];
     if (highestEducation && highestEducation.trim()) {
-      filter = {
+      const cleanEdu = highestEducation.trim();
+      const specificFilter = {
         $or: [
-          { highestEducation: { $regex: new RegExp(`^${escapeRegex(highestEducation.trim())}$`, 'i') } },
-          { highestEducation: "All" },
-          { highestEducation: { $exists: false } },
-          { highestEducation: null },
-          { highestEducation: "" }
+          { highestEducation: { $regex: new RegExp(`^${escapeRegex(cleanEdu)}$`, 'i') } },
+          { highestEducation: "All" }
         ]
       };
+      const specificOptions = await CourseOption.find(specificFilter).sort({ createdAt: 1 });
+      if (specificOptions.length > 0) {
+        options = specificOptions;
+      } else {
+        options = await CourseOption.find({
+          $or: [
+            { highestEducation: { $regex: new RegExp(`^${escapeRegex(cleanEdu)}$`, 'i') } },
+            { highestEducation: "All" },
+            { highestEducation: { $exists: false } },
+            { highestEducation: null },
+            { highestEducation: "" }
+          ]
+        }).sort({ createdAt: 1 });
+      }
+    } else {
+      options = await CourseOption.find().sort({ createdAt: 1 });
     }
-
-    let options = await CourseOption.find(filter).sort({ createdAt: 1 });
     
     // Seed default values if the collection is empty
     if (options.length === 0 && (!highestEducation || /b\.?\s*tech/i.test(highestEducation))) {

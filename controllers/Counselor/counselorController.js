@@ -5,6 +5,42 @@ const Staff = require('../../models/Staff.model');
 const College = require('../../models/College.model');
 const EventTest = require('../../models/EventTest.model');
 const RegistrationSlip = require('../../models/RegistrationSlip.model');
+const RegistrationCourse = require('../../models/RegistrationCourse.model');
+
+const DEFAULT_REGISTRATION_COURSES = [
+  'AI / ML',
+  'UI / UX & Product Design',
+  'Full Stack Web Development (MERN)',
+  'Python AI / ML & Data Science',
+  'Data Analytics & Power BI',
+  'Java Enterprise Software Engineering',
+  'Cloud DevOps & AWS Infrastructure',
+  'Mobile Application Development',
+  'Cybersecurity & Ethical Hacking',
+  'Software Testing & QA Automation'
+];
+
+const ensureRegistrationCourseExists = async (trackName, staffId = null) => {
+  if (!trackName || typeof trackName !== 'string') return;
+  const cleanName = trackName.trim();
+  if (!cleanName || cleanName.length < 2) return;
+
+  try {
+    const existing = await RegistrationCourse.findOne({
+      name: { $regex: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') }
+    });
+    if (!existing) {
+      await RegistrationCourse.create({
+        name: cleanName,
+        isActive: true,
+        isCustom: true,
+        createdBy: staffId || undefined
+      });
+    }
+  } catch (err) {
+    // Ignore duplicate key collision
+  }
+};
 const Result = require('../../models/Result.model');
 const Task = require('../../models/Task.model');
 const DailyWorkReport = require('../../models/DailyWorkReport.model');
@@ -13,6 +49,48 @@ const crypto = require('crypto');
 const emailService = require('../../src/services/emailService');
 const { logActivity } = require('../Activity/activityController');
 const { escapeRegex } = require('../../utils/regexUtils');
+const { uploadBase64 } = require('../../src/services/cloudinaryService');
+
+/**
+ * Upload array of screenshots / base64 images to Cloudinary and return array of secure URLs
+ */
+async function uploadProofScreenshotsToCloudinary(items) {
+  if (!items) return [];
+  const list = Array.isArray(items) ? items : [items];
+  const results = [];
+  for (const item of list) {
+    if (!item || typeof item !== 'string') continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    // Already hosted on Cloudinary or remote HTTPS CDN
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      results.push(trimmed);
+      continue;
+    }
+    // Base64 data string (upload to Cloudinary)
+    if (trimmed.startsWith('data:image') || trimmed.length > 500) {
+      try {
+        const uploadRes = await uploadBase64(trimmed, {
+          folder: 'wipronix/payment-proofs',
+          resource_type: 'image'
+        });
+        if (uploadRes?.secure_url) {
+          results.push(uploadRes.secure_url);
+        } else if (uploadRes?.url) {
+          results.push(uploadRes.url);
+        } else {
+          results.push(trimmed);
+        }
+      } catch (upErr) {
+        console.error('Failed to upload proof image to Cloudinary:', upErr.message);
+        results.push(trimmed);
+      }
+    } else {
+      results.push(trimmed);
+    }
+  }
+  return results;
+}
 
 const isSuperAdminOrAdmin = (staff) => {
   if (!staff) return false;
@@ -324,8 +402,14 @@ exports.getAllCollegeNames = async (req, res) => {
       studentCollegesQuery = { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] };
     }
 
+    const placementCollegeQuery = {
+      ...studentCollegesQuery,
+      source: { $nin: ['organic', 'Organic'] },
+      college: { $ne: null, $nin: ['', '-', 'N/A', 'None', 'other', 'Other'] }
+    };
+
     const [studentColleges, eventColleges, collegeDocs] = await Promise.all([
-      Student.distinct('college', studentCollegesQuery),
+      Student.distinct('college', placementCollegeQuery),
       EventTest.distinct('collegeName'),
       College.distinct('name')
     ]);
@@ -623,7 +707,7 @@ exports.getCollegesStudentStats = async (req, res) => {
 // 2.1 Get Breakdown of Courses and Semesters with Unassigned Counts for a College/Drive
 exports.getPoolBreakdown = async (req, res) => {
   try {
-    const { collegeName, course, semester } = req.query;
+    const { collegeName, course, semester, includeOrganic, includeDrive, includeExcel } = req.query;
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
     const tlId = req.staff?._id;
 
@@ -638,6 +722,35 @@ exports.getPoolBreakdown = async (req, res) => {
       ]
     });
 
+    const incOrg = includeOrganic !== 'false' && includeOrganic !== false && includeOrganic !== undefined;
+    const incDrv = includeDrive !== 'false' && includeDrive !== false && includeDrive !== undefined;
+    const incXls = includeExcel !== 'false' && includeExcel !== false && includeExcel !== undefined;
+    const hasSourceFilter = includeOrganic !== undefined || includeDrive !== undefined || includeExcel !== undefined;
+
+    const organicSources = ['organic', 'Organic', 'website', 'web'];
+    const excelSources = ['excel', 'Excel', 'import', 'Import', 'college_leads', 'bulk_import'];
+
+    const sourceConditions = [];
+    if (hasSourceFilter) {
+      if (incOrg) sourceConditions.push({ source: { $in: organicSources } });
+      if (incXls) sourceConditions.push({ source: { $in: excelSources } });
+      if (incDrv) sourceConditions.push({ source: { $nin: [...organicSources, ...excelSources] } });
+    }
+
+    if (hasSourceFilter && sourceConditions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          collegeName,
+          totalStudents: 0,
+          unassignedStudents: 0,
+          matchingUnassigned: 0,
+          courses: [],
+          semesters: []
+        }
+      });
+    }
+
     const baseCollegeMatch = {
       $or: [
         { college: { $regex: new RegExp(`^${escapeRegex(collegeName.trim())}$`, 'i') } },
@@ -649,13 +762,18 @@ exports.getPoolBreakdown = async (req, res) => {
       ]
     };
 
+    const sourceMatch = (hasSourceFilter && sourceConditions.length > 0 && sourceConditions.length < 3)
+      ? { $or: sourceConditions }
+      : null;
+
     // For TL: Available pool to assign = students currently assigned to this TL
     // For Admin: Available pool to assign = global unassigned students
     const unassignedMatch = isTL
       ? {
           $and: [
             baseCollegeMatch,
-            { assignedTo: tlId }
+            { assignedTo: tlId },
+            ...(sourceMatch ? [sourceMatch] : [])
           ]
         }
       : {
@@ -666,7 +784,8 @@ exports.getPoolBreakdown = async (req, res) => {
                 { assignedTo: null },
                 { assignedTo: { $exists: false } }
               ]
-            }
+            },
+            ...(sourceMatch ? [sourceMatch] : [])
           ]
         };
 
@@ -674,10 +793,11 @@ exports.getPoolBreakdown = async (req, res) => {
       ? {
           $and: [
             baseCollegeMatch,
-            { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] }
+            { $or: [{ assignedTo: tlId }, { assignedBy: tlId }] },
+            ...(sourceMatch ? [sourceMatch] : [])
           ]
         }
-      : baseCollegeMatch;
+      : (sourceMatch ? { $and: [baseCollegeMatch, sourceMatch] } : baseCollegeMatch);
 
     // Aggregate unique courses with total and unassigned counts
     const coursesStats = await Student.aggregate([
@@ -748,6 +868,9 @@ exports.getPoolBreakdown = async (req, res) => {
           }
     ];
 
+    // Apply source filter to filteredConditions as well
+    if (sourceMatch) filteredConditions.push(sourceMatch);
+
     if (course && course !== 'all' && course.trim()) {
       filteredConditions.push({
         course: { $regex: new RegExp(`^${escapeRegex(course.trim())}$`, 'i') }
@@ -798,9 +921,29 @@ exports.getPoolBreakdown = async (req, res) => {
 // 3. Assign Students to BDE (Sequentially from unassigned pool with Course & Semester filters)
 exports.assignStudents = async (req, res) => {
   try {
-    const { collegeName, bdeId, count, course, semester, assignmentMode } = req.body;
+    const { collegeName, bdeId, count, course, semester, assignmentMode, includeOrganic, includeDrive, includeExcel } = req.body;
     const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
     const tlId = req.staff?._id;
+
+    // Build source filter (same logic as getPoolBreakdown)
+    const incOrg = includeOrganic !== false && includeOrganic !== 'false' && includeOrganic !== undefined;
+    const incDrv = includeDrive !== false && includeDrive !== 'false' && includeDrive !== undefined;
+    const incXls = includeExcel !== false && includeExcel !== 'false' && includeExcel !== undefined;
+    const hasSourceFilter = includeOrganic !== undefined || includeDrive !== undefined || includeExcel !== undefined;
+
+    const organicSourcesAssign = ['organic', 'Organic', 'website', 'web'];
+    const excelSourcesAssign = ['excel', 'Excel', 'import', 'Import', 'college_leads', 'bulk_import'];
+
+    const sourceConditionsAssign = [];
+    if (hasSourceFilter) {
+      if (incOrg) sourceConditionsAssign.push({ source: { $in: organicSourcesAssign } });
+      if (incXls) sourceConditionsAssign.push({ source: { $in: excelSourcesAssign } });
+      if (incDrv) sourceConditionsAssign.push({ source: { $nin: [...organicSourcesAssign, ...excelSourcesAssign] } });
+    }
+
+    const assignSourceMatch = (hasSourceFilter && sourceConditionsAssign.length > 0 && sourceConditionsAssign.length < 3)
+      ? { $or: sourceConditionsAssign }
+      : null;
 
     if (!collegeName) {
       return res.status(400).json({ success: false, message: 'College name is required' });
@@ -855,6 +998,9 @@ exports.assignStudents = async (req, res) => {
       unassignCondition
     ];
 
+    // Apply source filter to assignment pool
+    if (assignSourceMatch) andConditions.push(assignSourceMatch);
+
     if (course && course !== 'all' && course.trim()) {
       andConditions.push({
         course: { $regex: new RegExp(`^${escapeRegex(course.trim())}$`, 'i') }
@@ -906,27 +1052,25 @@ exports.assignStudents = async (req, res) => {
     // Only set counselingStatus to 'assigned' for leads that don't already have an active counseling status
     await Student.updateMany(
       { _id: { $in: studentIds } },
-      [
-        {
-          $set: {
-            assignedTo: bde._id,
-            assignedBy: req.staff?._id || null,
-            assignedAt: new Date(),
-            counselingStatus: {
-              $cond: [
-                {
-                  $in: [
-                    { $ifNull: ['$counselingStatus', 'unassigned'] },
-                    ['unassigned', 'assigned', '']
-                  ]
-                },
-                'assigned',
-                '$counselingStatus'
-              ]
-            }
-          }
+      {
+        $set: {
+          assignedTo: bde._id,
+          assignedBy: req.staff?._id || null,
+          assignedAt: new Date()
         }
-      ]
+      }
+    );
+    // Update counselingStatus only for students without an active status
+    await Student.updateMany(
+      {
+        _id: { $in: studentIds },
+        $or: [
+          { counselingStatus: { $in: ['unassigned', 'assigned', ''] } },
+          { counselingStatus: { $exists: false } },
+          { counselingStatus: null }
+        ]
+      },
+      { $set: { counselingStatus: 'assigned' } }
     );
 
     const remainingUnassigned = totalUnassigned - numberToAssign;
@@ -1124,7 +1268,18 @@ exports.getAssignedStudents = async (req, res) => {
 // 5. Unassign Students (Move back to pool)
 exports.unassignStudents = async (req, res) => {
   try {
-    const isTL = isTLRole(req.staff) && !isSuperAdminOrAdmin(req.staff);
+    // STRICT RULE: Only Super Admin and Admin can unassign leads (NOT TL or counselors)
+    const staff = req.staff || req.user;
+    const staffRole = (staff?.role || staff?.systemRole || '').toLowerCase();
+    const isAllowed = ['superadmin', 'super_admin', 'admin', 'director'].includes(staffRole);
+    if (!isAllowed) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only Super Admin and Admin can unassign leads. Team Leads and Counselors do not have unassign permissions.'
+      });
+    }
+
+    const isTL = false;
     const tlId = req.staff?._id;
     const { studentIds, collegeName, bdeId } = req.body;
 
@@ -1222,6 +1377,22 @@ exports.reassignStudents = async (req, res) => {
     const newBdeDept = (newBde.department || '').toLowerCase();
     if (!newBdeDept.includes('marketing')) {
       return res.status(400).json({ success: false, message: 'Students can only be reassigned to staff members in the Marketing department.' });
+    }
+
+    // STRICT CHECK: Students assigned once cannot be assigned again directly.
+    // If they need to be reassigned, they must be UNASSIGNED first!
+    const alreadyAssignedStudents = await Student.find({
+      _id: { $in: studentIds },
+      assignedTo: { $ne: null }
+    }).populate('assignedTo', 'fullName');
+
+    if (alreadyAssignedStudents.length > 0) {
+      const sampleNames = alreadyAssignedStudents.slice(0, 3).map(s => `${s.fullName} (${s.assignedTo?.fullName || 'Assigned'})`).join(', ');
+      const extra = alreadyAssignedStudents.length > 3 ? ` and ${alreadyAssignedStudents.length - 3} other student(s)` : '';
+      return res.status(400).json({
+        success: false,
+        message: `${alreadyAssignedStudents.length} student(s) are already assigned: ${sampleNames}${extra}. Students who are already assigned cannot be directly reassigned. Please unassign them first before assigning to a new counselor/BDE/TL.`
+      });
     }
 
         // Authorization check for TL: TL can only re-assign students globally if they own them, OR are super admin
@@ -1965,6 +2136,7 @@ exports.getMyAssignedStudents = async (req, res) => {
       totalAssignedCount,
       statusAggregation,
       distinctColleges,
+      distinctOrganicColleges,
       distinctCourses,
       distinctSemesters
     ] = await Promise.all([
@@ -1988,7 +2160,16 @@ exports.getMyAssignedStudents = async (req, res) => {
           }
         }
       ]),
-      Student.distinct('college', baseCounselorFilter),
+      Student.distinct('college', {
+        ...baseCounselorFilter,
+        source: { $nin: ['organic', 'Organic'] },
+        college: { $ne: null, $nin: ['', '-', 'N/A', 'None', 'other', 'Other'] }
+      }),
+      Student.distinct('college', {
+        ...baseCounselorFilter,
+        source: { $in: ['organic', 'Organic'] },
+        college: { $ne: null, $nin: ['', '-', 'N/A', 'None', 'other', 'Other'] }
+      }),
       Student.distinct('course', baseCounselorFilter),
       Student.distinct('semester', baseCounselorFilter)
     ]);
@@ -2113,6 +2294,7 @@ exports.getMyAssignedStudents = async (req, res) => {
           subStageCounts
         },
         colleges: distinctColleges.filter(Boolean).sort(),
+        organicColleges: (distinctOrganicColleges || []).filter(Boolean).sort(),
         courses: distinctCourses.filter(Boolean).sort(),
         semesters: distinctSemesters.filter(Boolean).sort(),
         students,
@@ -2347,6 +2529,11 @@ exports.generateRegistrationSlip = async (req, res) => {
     });
 
     await newSlip.save();
+
+    // Dynamically persist course track in RegistrationCourse collection
+    if (newSlip.technology) {
+      await ensureRegistrationCourseExists(newSlip.technology, loggedInStaff?._id);
+    }
     // Log activity for Super Admin
     logActivity({
       type: 'registration_slip_generated',
@@ -3641,13 +3828,20 @@ exports.createManualOfficeSlip = async (req, res) => {
       technology,
       duration = '6 Months',
       totalFee = 25000,
+      discountAmount = 0,
+      discountType = '',
+      netFee,
       paidAmount = 0,
       dueAmount,
       paymentMode = 'Cash',
+      transactionId,
+      paymentScreenshotUrl,
+      paymentScreenshots,
       nextDueDate,
       remarks,
       registrationNo: customRegNo,
-      sendWhatsApp = false
+      sendWhatsApp = false,
+      assignedTo
     } = req.body;
 
     let student = null;
@@ -3656,6 +3850,11 @@ exports.createManualOfficeSlip = async (req, res) => {
       student = await Student.findById(studentId);
       if (!student) {
         return res.status(404).json({ success: false, message: 'Selected student not found.' });
+      }
+      if (assignedTo) {
+        student.assignedTo = assignedTo;
+        student.assignedBy = loggedInStaff._id;
+        student.assignedAt = new Date();
       }
     } else {
       // Find by phone or email or create new student
@@ -3676,7 +3875,13 @@ exports.createManualOfficeSlip = async (req, res) => {
 
       student = await Student.findOne({ $or: orQuery });
 
-      if (!student) {
+      if (student) {
+        if (assignedTo) {
+          student.assignedTo = assignedTo;
+          student.assignedBy = loggedInStaff._id;
+          student.assignedAt = new Date();
+        }
+      } else {
         student = new Student({
           fullName: studentName.trim(),
           phoneNumber: cleanPhone,
@@ -3693,7 +3898,7 @@ exports.createManualOfficeSlip = async (req, res) => {
           source: 'import',
           leadStage: 'Admission done',
           leadSubStage: (technology || 'General').trim(),
-          assignedTo: loggedInStaff._id,
+          assignedTo: assignedTo || loggedInStaff._id,
           assignedBy: loggedInStaff._id,
           assignedAt: new Date()
         });
@@ -3712,6 +3917,18 @@ exports.createManualOfficeSlip = async (req, res) => {
       ? customRegNo.trim()
       : `WPX-${cleanDateCode}-${randomSuffix}`;
 
+    // Determine effective transactionId & mode
+    const isCashMode = (paymentMode || '').toLowerCase().includes('cash');
+    const effectiveTransactionId = (transactionId && transactionId.trim())
+      ? transactionId.trim()
+      : (isCashMode ? 'CASH-PAYMENT' : '');
+
+    // Upload any base64 payment screenshots to Cloudinary
+    const incomingScreenshots = (Array.isArray(paymentScreenshots) && paymentScreenshots.length > 0)
+      ? paymentScreenshots
+      : (paymentScreenshotUrl ? [paymentScreenshotUrl] : []);
+    const cloudinaryUrls = await uploadProofScreenshotsToCloudinary(incomingScreenshots);
+
     // Create RegistrationSlip
     const newSlip = new RegistrationSlip({
       student: student._id,
@@ -3723,10 +3940,17 @@ exports.createManualOfficeSlip = async (req, res) => {
       registeredTechnology: technology || student.registeredTechnology || student.admissionTechnology || student.technology || 'General',
       duration: duration || student.trainingDuration || '6 Months',
       totalFee: numTotal,
+      discountAmount: Number(discountAmount) || 0,
+      discountType: (discountType || '').trim(),
+      netFee: netFee !== undefined ? Number(netFee) : Math.max(0, numTotal - (Number(discountAmount) || 0)),
       paidAmount: numPaid,
       dueAmount: calculatedDue,
       paymentMode: paymentMode || 'Cash',
-      mode: 'In-Office',
+      mode: isCashMode ? 'In-Office' : 'Remote-QR',
+      transactionId: effectiveTransactionId,
+      paymentScreenshotUrl: cloudinaryUrls[0] || '',
+      paymentScreenshots: cloudinaryUrls,
+      studentSubmissionDate: (cloudinaryUrls.length > 0 || transactionId) ? new Date() : undefined,
       nextDueDate: nextDueDate || student.nextDueDate || null,
       status: 'Paid', // Office slips are paid & verified
       verifiedBy: loggedInStaff._id,
@@ -3754,6 +3978,11 @@ exports.createManualOfficeSlip = async (req, res) => {
     if (nextDueDate) student.nextDueDate = nextDueDate;
     student.activePaymentSlipId = newSlip._id;
     await student.save();
+
+    // Ensure technology track is dynamically registered in RegistrationCourse collection
+    if (newSlip.registeredTechnology) {
+      await ensureRegistrationCourseExists(newSlip.registeredTechnology, loggedInStaff._id);
+    }
 
     // Create FeePayment ledger record
     try {
@@ -3877,6 +4106,12 @@ exports.collectStudentInstallment = async (req, res) => {
       ? customRegNo.trim()
       : `WPX-${cleanDateCode}-${randomSuffix}`;
 
+    // Upload any base64 payment screenshots to Cloudinary
+    const incomingScreenshots = (Array.isArray(paymentScreenshots) && paymentScreenshots.length > 0)
+      ? paymentScreenshots
+      : (paymentScreenshotUrl ? [paymentScreenshotUrl] : []);
+    const cloudinaryUrls = await uploadProofScreenshotsToCloudinary(incomingScreenshots);
+
     const newSlip = new RegistrationSlip({
       student: student._id,
       issuedBy: loggedInStaff._id,
@@ -3893,7 +4128,9 @@ exports.collectStudentInstallment = async (req, res) => {
       paymentMode: paymentMode || 'Cash',
       mode: 'In-Office',
       transactionId: transactionId || '',
-      paymentScreenshotUrl: paymentScreenshotUrl || '',
+      paymentScreenshotUrl: cloudinaryUrls[0] || '',
+      paymentScreenshots: cloudinaryUrls,
+      studentSubmissionDate: (cloudinaryUrls.length > 0 || transactionId) ? new Date() : undefined,
       nextDueDate: nextDueDate || null,
       status: 'Paid',
       verifiedBy: loggedInStaff._id,
@@ -4103,3 +4340,351 @@ exports.getRegistrationSlipsForStudent = async (req, res) => {
 exports.createRegistrationPaymentLink = async (req, res) => {
   return exports.generateRegistrationSlip(req, res);
 };
+
+
+// =============================================================================
+// SUPERADMIN: UPDATE REGISTRATION SLIP & CANDIDATE DETAILS
+// =============================================================================
+exports.updateRegistrationSlip = async (req, res) => {
+  try {
+    const staff = req.staff || req.user;
+    if (!staff) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    const staffRole = (staff.role || staff.systemRole || '').toLowerCase();
+    const isSuperAdminOrAdmin = ['superadmin', 'super_admin', 'admin', 'director'].includes(staffRole);
+    if (!isSuperAdminOrAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: Only Superadmin or Finance Admin can edit registration slips and student records.'
+      });
+    }
+
+    const { slipId } = req.params;
+    const {
+      studentName,
+      phoneNumber,
+      email,
+      college,
+      technology,
+      duration,
+      totalFee,
+      discountAmount,
+      discountType,
+      paidAmount,
+      paymentMode,
+      transactionId,
+      paymentScreenshotUrl,
+      paymentScreenshots,
+      nextDueDate,
+      remarks,
+      fatherName,
+      address,
+      assignedTo
+    } = req.body;
+
+    const slip = await RegistrationSlip.findById(slipId).populate('student');
+    if (!slip) {
+      return res.status(404).json({ success: false, message: 'Registration slip not found.' });
+    }
+
+    // 1. Update candidate info in slip
+    if (studentName) slip.studentName = studentName.trim();
+    if (phoneNumber) slip.phoneNumber = phoneNumber.trim();
+    if (email) slip.email = email.trim().toLowerCase();
+    if (college) slip.college = college.trim();
+    if (technology) {
+      slip.technology = technology.trim();
+      slip.registeredTechnology = technology.trim();
+      await ensureRegistrationCourseExists(technology.trim(), staff._id);
+    }
+    if (duration) slip.duration = duration.trim();
+    if (fatherName !== undefined) slip.fatherName = fatherName.trim();
+    if (address !== undefined) slip.address = address.trim();
+
+    // 2. Update payment details
+    if (paymentMode) {
+      slip.paymentMode = paymentMode;
+      const isCash = paymentMode.toLowerCase().includes('cash');
+      slip.mode = isCash ? 'In-Office' : 'Remote-QR';
+      if (isCash && !transactionId) {
+        slip.transactionId = 'CASH-PAYMENT';
+      }
+    }
+    if (transactionId !== undefined) {
+      slip.transactionId = transactionId.trim();
+    }
+    const incomingScreenshots = (paymentScreenshots !== undefined && Array.isArray(paymentScreenshots))
+      ? paymentScreenshots
+      : (paymentScreenshotUrl !== undefined ? (paymentScreenshotUrl ? [paymentScreenshotUrl] : []) : undefined);
+
+    if (incomingScreenshots !== undefined) {
+      const cloudinaryUrls = await uploadProofScreenshotsToCloudinary(incomingScreenshots);
+      slip.paymentScreenshots = cloudinaryUrls;
+      slip.paymentScreenshotUrl = cloudinaryUrls[0] || '';
+      slip.studentSubmissionDate = new Date();
+    }
+    if (nextDueDate !== undefined) {
+      slip.nextDueDate = nextDueDate ? new Date(nextDueDate) : null;
+    }
+    if (remarks !== undefined) {
+      slip.remarks = remarks.trim();
+    }
+
+    // 3. Update financial figures
+    if (totalFee !== undefined && totalFee !== null) slip.totalFee = Number(totalFee);
+    if (discountAmount !== undefined && discountAmount !== null) slip.discountAmount = Number(discountAmount);
+    if (discountType !== undefined) slip.discountType = (discountType || '').trim();
+    if (paidAmount !== undefined && paidAmount !== null) slip.paidAmount = Number(paidAmount);
+
+    const netFee = (slip.totalFee || 25000) - (slip.discountAmount || 0);
+
+    // Calculate dueAmount based on all verified slips for this student
+    const student = slip.student ? await Student.findById(slip.student._id) : null;
+    if (student) {
+      if (studentName) student.fullName = studentName.trim();
+      if (phoneNumber) student.phoneNumber = phoneNumber.trim();
+      if (email) student.email = email.trim().toLowerCase();
+      if (college) student.college = college.trim();
+      if (technology) {
+        student.registeredTechnology = technology.trim();
+        student.admissionTechnology = technology.trim();
+        student.technology = technology.trim();
+      }
+      if (duration) student.trainingDuration = duration.trim();
+      if (fatherName !== undefined) student.fatherName = fatherName.trim();
+      if (address !== undefined) student.address = address.trim();
+      if (assignedTo) {
+        student.assignedTo = assignedTo;
+        student.assignedBy = staff._id;
+        student.assignedAt = new Date();
+      }
+
+      if (slip.totalFee !== undefined) student.totalFee = Number(slip.totalFee);
+      if (slip.discountAmount !== undefined) student.discountAmount = Number(slip.discountAmount);
+      if (slip.discountType !== undefined) student.discountType = slip.discountType;
+
+      // Calculate total paid across all verified slips
+      const otherVerifiedSlips = await RegistrationSlip.find({
+        student: student._id,
+        _id: { $ne: slip._id },
+        status: { $in: ['Verified', 'Paid'] }
+      });
+      const otherPaid = otherVerifiedSlips.reduce((sum, s) => sum + (Number(s.paidAmount) || 0), 0);
+      const totalPaidSoFar = otherPaid + (Number(slip.paidAmount) || 0);
+
+      const calculatedRemaining = Math.max(0, netFee - totalPaidSoFar);
+      slip.dueAmount = calculatedRemaining;
+
+      student.totalPaidFee = totalPaidSoFar;
+      student.admissionFee = totalPaidSoFar;
+      student.registrationFee = totalPaidSoFar;
+      student.dueAmount = calculatedRemaining;
+      student.netRemainingFee = calculatedRemaining;
+      student.pendingFee = calculatedRemaining;
+      if (slip.nextDueDate) student.nextDueDate = slip.nextDueDate;
+
+      await student.save();
+    } else {
+      slip.dueAmount = Math.max(0, netFee - (Number(slip.paidAmount) || 0));
+    }
+
+    await slip.save();
+
+    // 4. Regenerate PDF receipt if slip is verified
+    if (slip.status === 'Verified' || slip.status === 'Paid') {
+      try {
+        const receiptService = require('../../src/services/receiptService');
+        await receiptService.generateAndSaveReceipt(slip, student || {});
+      } catch (pdfErr) {
+        console.warn('PDF re-generation warning:', pdfErr.message);
+      }
+    }
+
+    // Populate for response
+    const populated = await RegistrationSlip.findById(slip._id)
+      .populate('student', 'fullName email phoneNumber college course semester')
+      .populate('issuedBy', 'fullName firstName lastName email role')
+      .populate('verifiedBy', 'fullName firstName lastName email role');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Registration slip and candidate details updated successfully',
+      data: populated
+    });
+  } catch (error) {
+    console.error('Error updating registration slip:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update registration slip',
+      error: error.message
+    });
+  }
+};
+
+
+// =============================================================================
+// DYNAMIC REGISTRATION COURSES (DOCUMENT COLLECTION)
+// =============================================================================
+exports.getRegistrationCourses = async (req, res) => {
+  try {
+    let courses = await RegistrationCourse.find({ isActive: { $ne: false } }).sort({ createdAt: 1 }).lean();
+    if (!courses || courses.length === 0) {
+      const docs = DEFAULT_REGISTRATION_COURSES.map(name => ({
+        name,
+        isActive: true,
+        isCustom: false
+      }));
+      await RegistrationCourse.insertMany(docs, { ordered: false }).catch(() => {});
+      courses = await RegistrationCourse.find({ isActive: { $ne: false } }).sort({ createdAt: 1 }).lean();
+    }
+
+    // Ensure 'AI / ML' is present
+    const hasAiMl = courses.some(c => c.name.toLowerCase().replace(/\s+/g, '') === 'ai/ml');
+    if (!hasAiMl) {
+      await RegistrationCourse.create({
+        name: 'AI / ML',
+        isActive: true,
+        isCustom: false
+      }).catch(() => {});
+      courses = await RegistrationCourse.find({ isActive: { $ne: false } }).sort({ createdAt: 1 }).lean();
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: courses.map(c => c.name)
+    });
+  } catch (error) {
+    console.error('Error fetching registration courses:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.addRegistrationCourse = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Course track name is required' });
+    }
+    const cleanName = name.trim();
+    let course = await RegistrationCourse.findOne({
+      name: { $regex: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') }
+    });
+    if (!course) {
+      course = await RegistrationCourse.create({
+        name: cleanName,
+        isActive: true,
+        isCustom: true,
+        createdBy: req.staff?._id || req.user?._id
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: course.name,
+      message: `Course track "${course.name}" registered successfully.`
+    });
+  } catch (error) {
+    console.error('Error adding registration course:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Upload single or multiple payment proofs to Cloudinary
+ */
+exports.uploadProofToCloudinary = async (req, res) => {
+  try {
+    const { image, images } = req.body;
+    const toUpload = images && Array.isArray(images) ? images : (image ? [image] : []);
+    if (toUpload.length === 0) {
+      return res.status(400).json({ success: false, message: 'No image provided for upload.' });
+    }
+    const uploadedUrls = await uploadProofScreenshotsToCloudinary(toUpload);
+    return res.status(200).json({
+      success: true,
+      url: uploadedUrls[0] || '',
+      urls: uploadedUrls,
+      message: 'Payment proof uploaded to Cloudinary successfully.'
+    });
+  } catch (err) {
+    console.error('Error uploading to Cloudinary:', err);
+    return res.status(500).json({ success: false, message: 'Failed to upload proof to Cloudinary', error: err.message });
+  }
+};
+
+/**
+ * Migrate all existing slips in database with base64 screenshots to Cloudinary
+ */
+exports.migrateAllProofsToCloudinary = async (req, res) => {
+  try {
+    const slips = await RegistrationSlip.find({
+      $or: [
+        { paymentScreenshotUrl: { $regex: '^data:image' } },
+        { paymentScreenshots: { $elemMatch: { $regex: '^data:image' } } }
+      ]
+    });
+
+    let migratedSlipsCount = 0;
+    let migratedImagesCount = 0;
+
+    for (const slip of slips) {
+      const currentList = (slip.paymentScreenshots && slip.paymentScreenshots.length > 0)
+        ? slip.paymentScreenshots
+        : (slip.paymentScreenshotUrl ? [slip.paymentScreenshotUrl] : []);
+
+      const hasBase64 = currentList.some(item => typeof item === 'string' && item.startsWith('data:image'));
+      if (hasBase64) {
+        const cloudinaryUrls = await uploadProofScreenshotsToCloudinary(currentList);
+        slip.paymentScreenshots = cloudinaryUrls;
+        slip.paymentScreenshotUrl = cloudinaryUrls[0] || '';
+        await slip.save();
+        migratedSlipsCount++;
+        migratedImagesCount += cloudinaryUrls.length;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Migrated ${migratedImagesCount} proofs across ${migratedSlipsCount} slips to Cloudinary.`,
+      migratedSlipsCount,
+      migratedImagesCount
+    });
+  } catch (err) {
+    console.error('Error migrating proofs to Cloudinary:', err);
+    return res.status(500).json({ success: false, message: 'Migration failed', error: err.message });
+  }
+};
+
+// Automatic background migration on server startup with internet access
+setTimeout(async () => {
+  try {
+    const count = await RegistrationSlip.countDocuments({
+      $or: [
+        { paymentScreenshotUrl: { $regex: '^data:image' } },
+        { paymentScreenshots: { $elemMatch: { $regex: '^data:image' } } }
+      ]
+    });
+    if (count > 0) {
+      console.log(`[Cloudinary Migration] Found ${count} slips with base64 payment proofs. Migrating to Cloudinary...`);
+      const slips = await RegistrationSlip.find({
+        $or: [
+          { paymentScreenshotUrl: { $regex: '^data:image' } },
+          { paymentScreenshots: { $elemMatch: { $regex: '^data:image' } } }
+        ]
+      });
+      for (const slip of slips) {
+        const currentList = (slip.paymentScreenshots && slip.paymentScreenshots.length > 0)
+          ? slip.paymentScreenshots
+          : (slip.paymentScreenshotUrl ? [slip.paymentScreenshotUrl] : []);
+        const cloudinaryUrls = await uploadProofScreenshotsToCloudinary(currentList);
+        slip.paymentScreenshots = cloudinaryUrls;
+        slip.paymentScreenshotUrl = cloudinaryUrls[0] || '';
+        await slip.save();
+      }
+      console.log(`[Cloudinary Migration] Finished migrating payment proofs to Cloudinary.`);
+    }
+  } catch (bgErr) {
+    console.warn('[Cloudinary Migration] Background check:', bgErr.message);
+  }
+}, 5000);

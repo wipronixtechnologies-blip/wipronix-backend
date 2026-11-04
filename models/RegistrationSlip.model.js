@@ -132,6 +132,10 @@ const registrationSlipSchema = new mongoose.Schema({
     paymentScreenshotUrl: {
         type: String
     },
+    paymentScreenshots: {
+        type: [String],
+        default: []
+    },
     studentSubmissionDate: {
         type: Date
     },

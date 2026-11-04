@@ -41,8 +41,8 @@ const attendanceSchema = new mongoose.Schema({
   punchInLocation: {
     type: locationSchema,
     default: () => ({
-      latitude: 30.6970439,
-      longitude: 76.68684
+      latitude: 30.698090360163878,
+      longitude: 76.68515921097536
     })
   },
 

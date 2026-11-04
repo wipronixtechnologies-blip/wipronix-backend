@@ -75,14 +75,104 @@ const seedDefaultEvents = async () => {
     ];
 
     await EventTest.insertMany(defaultDrives);
-    console.log("✅ Seeded default ERP placement drive events into MongoDB");
+    console.log("Seeded default ERP placement drive events into MongoDB");
   }
+};
+
+// Smart event code generator based on college name and distinct keywords
+const generateSmartEventCode = (collegeName, existingCodes = []) => {
+  if (!collegeName) return `WIP-EVENT-${Date.now().toString().slice(-4)}-2026`;
+  const clean = collegeName.trim();
+  const words = clean.split(/[\s,.\-_/()]+/).filter(w => w.length > 0);
+  const stopWords = new Set([
+    'college', 'colleg', 'collge', 'institute', 'inst', 'institution',
+    'university', 'univ', 'of', 'and', '&', 'the', 'for', 'in', 'at',
+    'technology', 'tech', 'sciences', 'science', 'engineering', 'engg', 'eng'
+  ]);
+  const distinct = words.filter(w => !stopWords.has(w.toLowerCase()));
+  let core = '';
+  if (distinct.length >= 2) {
+    const w1 = distinct[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const wLast = distinct[distinct.length - 1].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    core = (w1.slice(0, 4) + wLast.slice(0, 4)).slice(0, 8);
+  } else if (distinct.length === 1) {
+    core = distinct[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
+  } else if (words.length > 0) {
+    core = words[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
+  } else {
+    core = 'COLLEGE';
+  }
+  let baseCode = `WIP-${core}-2026`;
+  if (existingCodes.includes(baseCode)) {
+    let counter = 2;
+    while (existingCodes.includes(`WIP-${core.slice(0, 6)}${counter}-2026`)) {
+      counter++;
+    }
+    baseCode = `WIP-${core.slice(0, 6)}${counter}-2026`;
+  }
+  return baseCode;
+};
+
+// Alternate unique code generator when a collision occurs
+const generateAlternateCode = (collegeName, conflictedCode, existingCodes = []) => {
+  const clean = (collegeName || '').trim();
+  const words = clean.split(/[\s,.\-_/()]+/).filter(w => w.length > 0);
+  let altLetters = words.map(w => w[0]).join('').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (altLetters.length < 3) {
+    altLetters = clean.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(-6);
+  }
+  let altCode = `WIP-${altLetters.slice(0, 7)}-2026`;
+  if (altCode === conflictedCode || existingCodes.includes(altCode)) {
+    let counter = 2;
+    while (existingCodes.includes(`WIP-${altLetters.slice(0, 5)}${counter}-2026`) || `WIP-${altLetters.slice(0, 5)}${counter}-2026` === conflictedCode) {
+      counter++;
+    }
+    altCode = `WIP-${altLetters.slice(0, 5)}${counter}-2026`;
+  }
+  return altCode;
 };
 
 // POST /api/test/create-event
 const createEvent = async (req, res, next) => {
   try {
-    const { collegeName, testTitle, technology, durationMinutes, questionsCount, passPercentage, isActive, eventCode, eventType, conductedBy, maxHrMarks, maxTechMarks } = req.body;
+    const {
+      collegeName,
+      testTitle,
+      technology,
+      durationMinutes,
+      questionsCount,
+      passPercentage,
+      isActive,
+      eventCode,
+      eventType,
+      conductedBy,
+      maxHrMarks,
+      maxTechMarks,
+      action, // 'activate_existing' | 'create_new_code' | 'change_code'
+      existingEventId,
+      customEventCode
+    } = req.body;
+
+    // Action 1: User chose to activate the existing matched event
+    if (action === 'activate_existing') {
+      let targetEvent = null;
+      if (existingEventId) {
+        targetEvent = await EventTest.findById(existingEventId);
+      } else if (eventCode) {
+        targetEvent = await EventTest.findOne({ eventCode: eventCode.trim().toUpperCase() });
+      }
+      if (!targetEvent) {
+        return res.status(404).json({ success: false, message: "Existing event not found" });
+      }
+      targetEvent.isActive = true;
+      await targetEvent.save();
+      return res.status(200).json({
+        success: true,
+        message: `Existing college event for "${targetEvent.collegeName}" (${targetEvent.eventCode}) is now Active!`,
+        data: targetEvent,
+        activatedExisting: true
+      });
+    }
 
     if (!collegeName || !testTitle) {
       return res.status(400).json({
@@ -92,38 +182,93 @@ const createEvent = async (req, res, next) => {
     }
 
     const cleanCollege = collegeName.trim();
-    // Auto-generate eventCode from College Name if not provided
-    const generatedCode = eventCode
-      ? eventCode.trim().toUpperCase()
-      : `WIP-${cleanCollege.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)}-2026`;
+    const existingEvents = await EventTest.find({}).lean();
+    const existingCodes = existingEvents.map(e => (e.eventCode || '').toUpperCase()).filter(Boolean);
 
-    // Check if event for this college already exists
-    let existingEvent = await EventTest.findOne({
-      $or: [{ collegeName: cleanCollege }, { eventCode: generatedCode }]
-    });
+    // Determine eventCode to use
+    let targetCode = customEventCode
+      ? customEventCode.trim().toUpperCase()
+      : (eventCode ? eventCode.trim().toUpperCase() : generateSmartEventCode(cleanCollege, existingCodes));
 
-    if (existingEvent) {
-      existingEvent.collegeName = cleanCollege;
-      existingEvent.testTitle = testTitle;
-      existingEvent.technology = technology || existingEvent.technology;
-      existingEvent.durationMinutes = durationMinutes || existingEvent.durationMinutes;
-      existingEvent.eventType = eventType || existingEvent.eventType || "Placement Drive";
-      existingEvent.conductedBy = conductedBy || existingEvent.conductedBy || "Harish Chawla";
-      existingEvent.maxHrMarks = maxHrMarks || existingEvent.maxHrMarks || 10;
-      existingEvent.maxTechMarks = maxTechMarks || existingEvent.maxTechMarks || 10;
-      existingEvent.passPercentage = passPercentage || existingEvent.passPercentage || 70;
-      if (isActive !== undefined) existingEvent.isActive = isActive;
-      await existingEvent.save();
+    // If user explicitly chose to generate a new distinct event code
+    if (action === 'create_new_code' || action === 'change_code') {
+      if (existingCodes.includes(targetCode)) {
+        targetCode = generateAlternateCode(cleanCollege, targetCode, existingCodes);
+      }
+    }
 
-      return res.status(200).json({
-        success: true,
-        message: `College event for ${cleanCollege} updated successfully`,
-        data: existingEvent
-      });
+    // Check if an event exists for the exact same college
+    const collegeMatch = existingEvents.find(
+      e => (e.collegeName || '').trim().toLowerCase() === cleanCollege.toLowerCase()
+    );
+
+    // Check if another event is already using this targetCode
+    const codeMatch = existingEvents.find(
+      e => (e.eventCode || '').trim().toUpperCase() === targetCode
+    );
+
+    // Conflict detection: targetCode is in use by a DIFFERENT college
+    if (codeMatch && (!collegeMatch || codeMatch._id.toString() !== collegeMatch._id.toString())) {
+      // If action is not explicitly creating with a new code, prompt conflict modal
+      if (action !== 'create_new_code' && action !== 'change_code') {
+        const suggestedCode = generateAlternateCode(cleanCollege, targetCode, existingCodes);
+        return res.status(200).json({
+          success: false,
+          conflict: true,
+          message: `The event code "${targetCode}" is already active and currently matched with "${codeMatch.collegeName}".`,
+          conflictData: {
+            attemptedCode: targetCode,
+            newCollegeName: cleanCollege,
+            newTestTitle: testTitle,
+            existingEvent: {
+              _id: codeMatch._id,
+              collegeName: codeMatch.collegeName,
+              testTitle: codeMatch.testTitle,
+              eventCode: codeMatch.eventCode,
+              eventType: codeMatch.eventType,
+              conductedBy: codeMatch.conductedBy,
+              isActive: codeMatch.isActive
+            },
+            suggestedCode
+          }
+        });
+      }
+    }
+
+    // If exact same college exists and user didn't request a brand new distinct event, update it
+    if (collegeMatch && action !== 'create_new_code') {
+      const existing = await EventTest.findById(collegeMatch._id);
+      if (existing) {
+        existing.testTitle = testTitle;
+        existing.technology = technology || existing.technology;
+        existing.durationMinutes = durationMinutes || existing.durationMinutes;
+        existing.eventType = eventType || existing.eventType || "Placement Drive";
+        existing.conductedBy = conductedBy || existing.conductedBy || "Harish Chawla";
+        existing.maxHrMarks = maxHrMarks || existing.maxHrMarks || 10;
+        existing.maxTechMarks = maxTechMarks || existing.maxTechMarks || 10;
+        existing.passPercentage = passPercentage || existing.passPercentage || 70;
+        if (isActive !== undefined) existing.isActive = isActive;
+        if (!codeMatch || codeMatch._id.toString() === existing._id.toString()) {
+          existing.eventCode = targetCode;
+        }
+        await existing.save();
+
+        return res.status(200).json({
+          success: true,
+          message: `College event for "${cleanCollege}" updated successfully`,
+          data: existing
+        });
+      }
+    }
+
+    // Otherwise create a new event! Ensure uniqueness of targetCode
+    while (await EventTest.exists({ eventCode: targetCode })) {
+      targetCode = generateAlternateCode(cleanCollege, targetCode, existingCodes);
+      existingCodes.push(targetCode);
     }
 
     const newEvent = await EventTest.create({
-      eventCode: generatedCode,
+      eventCode: targetCode,
       collegeName: cleanCollege,
       testTitle,
       eventType: eventType || "Placement Drive",
@@ -139,7 +284,7 @@ const createEvent = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `College event for ${cleanCollege} created successfully`,
+      message: `College event for "${cleanCollege}" created successfully with code ${targetCode}`,
       data: newEvent
     });
   } catch (error) {
